@@ -1,5 +1,18 @@
 # Pandemic Simulator Compartment Models
-This repository aims to provide epidemiological modelers with a flexible Python package and framework for producing compartment models that implement ordinary differential equations to simulate diseases. We aim to provide tools for quickly editing models, running batches of simulations quickly, and exporting data for analysis with python tools or other resources.
+
+## Under Construction
+This repository is under construction and verbiage reflects the desired state. Sections with such verbiage have indicative headers.
+
+The code in this module has been maintained in a private repository in a different organization, and is in the process of being refactored to make it easier for the community to experiment with creating and testing models.
+
+Code in the migration folder is a copy from the private repository. Functionality from this code will be moved into the abstract and concrete folders over time. The structure of the [mesa](https://github.com/projectmesa/mesa/tree/main) repository is an influence on this structure.
+
+The examples folder will contain model configurations approved by community experts as acceptable starting points for modeling and using tools available in the package. This allows the package to avoid taking specific opinions on exact model parameters.
+
+## About This Repository
+* This section includes verbiage which describes the target state of the repository.
+
+This repository provides epidemiological modelers with a flexible Python package and framework for producing compartment models that implement ordinary differential equations to simulate diseases. We provide tools for quickly editing models, running batches of simulations quickly, and exporting data for analysis with python tools or other resources.
 
 This repository's output is a package which can be used by modelers to create models and simulations which will generate outputs interchangeable with tools in this package's ecosystem. The package will contain examples of vetted models endorsed by the collaboratory as valid uses of the package's capabilities, similar to the educational examples provided by the [mesa agent based modeling library](https://github.com/projectmesa/mesa/tree/main/mesa/examples).
 
@@ -7,9 +20,13 @@ This repository's output is a package which can be used by modelers to create mo
 - Modular modeling framework supporting extensions and mixins for diseases.
 - Separation of models from simulation runs, and built in support for batch runs of simulations.
 - Summary statistics objects.
-- Geographic elements in compartment models, such as travel between jurisdictions with different demographics.
+- Rich geographic elements in compartment models, such as travel between jurisdictions with different demographics.
 
 ## Contributing
-This package will contain flexible core components intended to solve common problems in modeling diseases with ODEs computationally. It will lean towards flexibility without forcing users to implement every attribute of underlying model compute on their own.
+* This section includes verbiage which describes the target state of the repository.
 
-The examples folder will contain more opinionated models which are considered educational examples of both epidemiological modeling and how to use the tools in this package.
+There are two acknowledged ways to contribute to this package. Working on the core features, or submitting an example model.
+
+Contributing to core features will help the package's flexible core components solve common problems in modeling diseases with ODEs computationally. Contributing to core functionality is evaluated against automated build tools and by maintainers of the repository's technical components.
+
+Contributing an example model to the examples folder is reviewed by disease experts in the community. Models may be rejected because the community does not agree about the realism of the model's parameters, or because the example model does not higlight a different disease or features than existing example models.
