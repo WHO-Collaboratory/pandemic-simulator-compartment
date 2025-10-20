@@ -30,3 +30,7 @@ There are two acknowledged ways to contribute to this package. Working on the co
 Contributing to core features will help the package's flexible core components solve common problems in modeling diseases with ODEs computationally. Contributing to core functionality is evaluated against automated build tools and by maintainers of the repository's technical components.
 
 Contributing an example model to the examples folder is reviewed by disease experts in the community. Models may be rejected because the community does not agree about the realism of the model's parameters, or because the example model does not higlight a different disease or features than existing example models.
+
+
+## About the Pandemic Simulator
+This repository adapts code developed for the World Health Organization's Pandemic Simulator project. The path for this repository is to make compartment modelling a standalone package so that tools built for the app are isolated from application dependencies and available for use in the wider community. The current structure includes some dependencies that tightly couple this package with the application, we will pursue moving those dependencies into extensions to preserve compatibility with the app, but with less baggage for modellers.
