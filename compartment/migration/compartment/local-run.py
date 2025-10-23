@@ -12,14 +12,13 @@ from math import ceil
 from simulation_manager import SimulationManager
 from simulation_postprocessor import SimulationPostProcessor
 import argparse
-import boto3
 import copy
 import json
-import multiprocessing
 import numpy as np
 import os
 import time
 import tracemalloc
+from datetime import datetime
 
 
 #from temp_uncertainty_graphs import plot_simulation_results, plot_compartments_all_regions, plot_all_regions_and_compartments
@@ -41,28 +40,16 @@ def batch_simulate_and_postprocess(model, n_sims, param_list, ci, num_workers):
   processor = SimulationPostProcessor(model, all_output)
   return processor.process(ci=ci)
 
-def main(simulation_params, config_file_path):
+def main(config_file_path):
 
     logger.info("Starting the simulation...")
-    simulation_job_id = simulation_params.get('SIMULATION_JOB_ID')
-    logger.info(f"simulation_job_id: {simulation_job_id}")
-    logger.info(f"graphql_endpoint: {simulation_params.get('GRAPHQL_ENDPOINT')}")
 
-    # Grab simulation job and clean payload for model
-    #config = get_simulation_job(simulation_params, GRAPHQL_QUERY)
-    #print(f"\n\n{config}\n\n")
-    #time.sleep(100000000)
     config = json.load(open(config_file_path))
-    #print(f"\n\n{config}\n\n")
-    #time.sleep(100000000)
     cleaned_config = clean_payload(config)
-    #print(f"\n\n{cleaned_config}\n\n")
-    #time.sleep(100000000)
 
     disease_type = config['data']['getSimulationJob']['Disease']['disease_type']
 
     run_metadata = {
-        "simulation_job_id": simulation_job_id,
         "admin_zone_count": len(cleaned_config.get('admin_units')),
         "simulation_time_steps": config['data']['getSimulationJob']['time_steps'],
         "owner": config['data']['getSimulationJob']['owner'],
@@ -93,8 +80,7 @@ def main(simulation_params, config_file_path):
 
     # Create business as usual model
     model_with = model_class(config, cleaned_config)
-    #print(f"cleaned_config: {cleaned_config}")
-    #time.sleep(100000000)
+
     # Create a deepcopy for the interventionless model
     model_without = copy.deepcopy(model_with)
     model_without.intervention_dict = {}
@@ -143,12 +129,19 @@ def main(simulation_params, config_file_path):
     results = [results_with, results_without]
     s3_results = copy.deepcopy(results)
 
-    return run_metadata
+    # Prepare output data
+    output_data = {
+        "run_metadata": run_metadata,
+        "results": results
+    }
+
+    return output_data
 
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Run pandemic simulation with specified config file')
     parser.add_argument('config_file', help='Path to the JSON config file for the simulation')
+    parser.add_argument('output_file', nargs='?', help='Path to the output JSON file (optional, defaults to input file with results-timestamp suffix)')
     args = parser.parse_args()
 
     # Start tracking memory usage
@@ -157,19 +150,22 @@ if __name__ == "__main__":
     logger.info("Memory tracking started...")
 
 
-    # Run model
-    run_metadata = main(simulation_params, args.config_file)
-    #result = main(simulation_params)
-    #logger.info(f"response from gql: {result}")
+    # Determine output file path
+    if args.output_file:
+        output_file = args.output_file
+    else:
+        # Generate default output filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        config_basename = os.path.splitext(os.path.basename(args.config_file))[0]
+        output_file = f"{config_basename}-results-{timestamp}.json"
 
-    run_metadata_query = """
-    mutation CreateSimulationRunMetadata($input: CreateSimulationRunMetadataInput!) {
-            createSimulationRunMetadata(input: $input) {
-                id
-                simulation_job_id
-            }
-        }
-    """
+    # Run model
+    output_data = main(args.config_file)
+
+    # Write results to JSON file
+    logger.info(f"Writing results to: {output_file}")
+    with open(output_file, 'w') as f:
+        json.dump(output_data, f, indent=2)
 
     # Capture and log memory usage
     current, peak = tracemalloc.get_traced_memory() 
@@ -177,12 +173,7 @@ if __name__ == "__main__":
     end_time = time.time()
 
     elapsed_time = round(end_time - start_time, 2)
-    #run_metadata["run_time"] = elapsed_time
-
-    # DONT RUN THIS LOCALLY
-    # Write run metadata to gql 
-    #run_metadata_response = gql_write_helper(simulation_params, run_metadata, run_metadata_query)
-    #logger.info(f"run_metadata_response: {run_metadata_response}")
 
     logger.info(f"Memory tracking stopped. Peak memory usage: {peak / (1024 * 1024):.2f} MB")
     logger.info(f"Elapsed time: {elapsed_time} seconds")
+    logger.info(f"Results saved to: {output_file}")
