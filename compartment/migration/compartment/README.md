@@ -39,6 +39,63 @@ The compartment models use [JAX](https://docs.jax.dev/en/latest/notebooks/thinki
 - GPU acceleration support
 - Efficient batch processing of multiple parameter sets
 
+## Running Locally
+
+To run simulations locally using the `local-run.py` script:
+
+### Prerequisites
+
+- Python 3.8 or higher
+- [uv](https://docs.astral.sh/uv/) package manager
+
+### Setup
+
+1. **Install uv** (if not already installed):
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+2. **Create and activate virtual environment**:
+   ```bash
+   uv venv
+   source .venv/bin/activate
+   ```
+   **On Windows**:
+   ```bash
+   .venv\Scripts\activate
+   ```
+### Running Simulations
+
+The `local-run.py` script accepts a configuration file and optionally an output file:
+
+```bash
+# Run with default output filename (includes timestamp)
+python local-run.py config.json
+
+# Run with custom output filename
+python local-run.py config.json my-results.json
+```
+
+#### Output
+
+- Results are saved as JSON files containing both simulation metadata and results
+- Default output format: `{config-name}-results-{timestamp}.json`
+- Example: `pansim-config-results-20251023-133124.json`
+
+#### Configuration File
+
+The script expects a JSON configuration file with the structure used by the simulation system. See the existing `pansim-config.json` for reference.
+
+### Example Usage
+
+```bash
+# Basic run with timestamped output
+python local-run.py pansim-config.json
+
+# Custom output file
+python local-run.py pansim-config.json my-simulation-results.json
+```
+
 ## Usage
 
 This code represents the current implementation during the migration process and serves as the foundation for the new epidemiological modeling framework being developed.
