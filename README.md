@@ -5,6 +5,17 @@ Fast, flexible, and accurate construction of compartmental models to simulate tr
 ## Overview
 This repository builds on code developed for the World Health Organization Pandemic Hub’s Pandemic Simulator project. Its purpose is to extend that work by providing accessible, research-based compartmental modeling tools that enable decision makers, epidemiologists, and modelers to assess public health intervention strategies.
 
+## Features
+
+Current:
+
+* Simulate respiratory and vector-borne disease dynamics
+* Incorporate real-world factors including population mobility, age structure, and intervention strategies
+* Run multiple simulations efficiently for uncertainty quantification
+* Leverages [JAX](https://github.com/jax-ml/jax) for high-performance, efficient computation
+
+
+
 ## Directory Structure
 
 ```
