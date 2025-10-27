@@ -14,6 +14,17 @@ Current:
 * Run multiple simulations efficiently for uncertainty quantification
 * Leverages [JAX](https://github.com/jax-ml/jax) for high-performance, efficient computation
 
+Planned
+
+* Modular modeling framework supporting extensions and variants for diseases.
+* Separation of models from simulation runs, and built in support for batch runs of simulations.
+* Summary statistics objects.
+
+## Methods
+
+For detail on our methods please refer to our documentation:
+* [Respiratory compartmental documentation](https://drive.google.com/file/d/1Ff4gEKu5gu3MuwTdgzRIH1A7jjzZerCj/view?usp=drive_link)
+* [Vector-borne compartmental documentation](https://drive.google.com/file/d/1g5wkayJ9dUL4WuZjvTCj8OvRrAdq2LxG/view?usp=drive_link)
 
 
 ## Directory Structure
