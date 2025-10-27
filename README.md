@@ -1,4 +1,9 @@
-# Pandemic Simulator Compartment Models
+# Pandemic Simulator - Compartmental models in Python
+
+Fast, flexible, and accurate construction of compartmental models to simulate transmission dynamics of respiratory and vector-borne diseases.
+
+## Overview
+This repository builds on code developed for the World Health Organization Pandemic Hub’s Pandemic Simulator project. Its purpose is to extend that work by providing accessible, research-based compartmental modeling tools that enable decision makers, epidemiologists, and modelers to assess public health intervention strategies.
 
 ## Directory Structure
 
