@@ -1,25 +1,25 @@
-# Compartment Models
+# Compartmental Models
 
-This directory contains the core compartment model implementations and simulation management components for epidemiological modeling.
+This directory contains the core compartmental model implementations and simulation management components for epidemiological modeling.
 
 ## Purpose
 
 This directory houses the main simulation infrastructure including:
-- **Compartment Model Implementations** - Epidemiological models for ODEs implemented in JAX. Currently we operate distinct models for respiratory and vector-borne diseases with some common features such as interventions and travel.
-- **Simulation Management** - Simulations can be run in batches, allowing for runs with uncertainty and parameter values across a range.
-- **Intervention Systems** - Simulations support interventions which can be triggered by date or based on infections crossing thresholds. Interventions are unique for different diseases, have different effects, and can have variable adherence.
+- **Compartment Model Implementations** - Epidemiological models for ordinary differential equations (ODEs) implemented in JAX. Currently we operate distinct models for respiratory and vector-borne diseases with some common features such as interventions and travel.
+- **Simulation Management** - Simulations can be run in batches, allowing for runs with uncertainty and a range of parameter values.
+- **Intervention Systems** - Interventions can be implemented or removed in two scenarios: at a specific timestep or when the proportion of the infected population reaches a user-defined threshold. Interventions are unique for respiratory and vector-borne diseases and can have variable adherence.
 - **Helper Utilities** - Configuration loading, parameter generation, and data processing
 
 ## Key Components
 
 ### Model Implementations
-- **`covid_jax_model.py`** - COVID-19 compartmental model with dynamic travel and intervention mechanisms
-- **`dengue_jax_model.py`** - Dengue fever model incorporating temperature seasonality and vector dynamics
+- **`covid_jax_model.py`** - Contains functions specific to the respiratory compartmental model including travel and intervention mechanisms
+- **`dengue_jax_model.py`** - Contains functions specific to the vector-borne compartmental model and incorporates temperature and vector dynamics via thermal response curves.
 
 ### Simulation Infrastructure
 - **`main.py`** - Primary entry point for batch simulation execution
-- **`simulation_manager.py`** - Core simulation execution engine using JAX ODE solvers
-- **`batch_simulation_manager.py`** - Batch processing coordination and parallel execution
+- **`simulation_manager.py`** - Core simulation execution engine using JAX ODE solvers, houses run_simulation, responsible for running a single simulation of any disease
+- **`batch_simulation_manager.py`** - Batch processing coordination and parallel execution, wrapper of simulation_manager, invoked when multi-run is called, creates n simulation objects
 - **`simulation_postprocessor.py`** - Post-simulation data processing and output formatting
 
 ### Supporting Systems
@@ -95,7 +95,3 @@ python local-run.py pansim-config.json
 # Custom output file
 python local-run.py pansim-config.json my-simulation-results.json
 ```
-
-## Usage
-
-This code represents the current implementation during the migration process and serves as the foundation for the new epidemiological modeling framework being developed.
