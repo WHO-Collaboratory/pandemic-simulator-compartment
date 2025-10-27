@@ -13,13 +13,13 @@ This directory houses the main simulation infrastructure including:
 ## Key Components
 
 ### Model Implementations
-- **`covid_jax_model.py`** - COVID-19 compartmental model with dynamic travel and intervention mechanisms
-- **`dengue_jax_model.py`** - Dengue fever model incorporating temperature seasonality and vector dynamics
+- **`covid_jax_model.py`** - Contains functions specific to the respiratory compartmental model including travel and intervention mechanisms
+- **`dengue_jax_model.py`** - Contains functions specific to the vector-borne compartmental model and incorporates temperature and vector dynamics via thermal response curves.
 
 ### Simulation Infrastructure
 - **`main.py`** - Primary entry point for batch simulation execution
-- **`simulation_manager.py`** - Core simulation execution engine using JAX ODE solvers
-- **`batch_simulation_manager.py`** - Batch processing coordination and parallel execution
+- **`simulation_manager.py`** - Core simulation execution engine using JAX ODE solvers, houses run_simulation, responsible for running a single simulation of any disease
+- **`batch_simulation_manager.py`** - Batch processing coordination and parallel execution, wrapper of simulation_manager, invoked when multi-run is called, creates n simulation objects
 - **`simulation_postprocessor.py`** - Post-simulation data processing and output formatting
 
 ### Supporting Systems
