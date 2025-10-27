@@ -37,7 +37,6 @@ pandemic-simulator-compartment/
 │   ├── examples/                   # Community-vetted example models
 │   │   └── README.md
 │   └── migration/                  # Legacy code from private repository
-│       ├── batch_helpers/          # AWS service utilities (to be moved to extensions)
 │       ├── compartment/            # Current core compartment model implementation
 ```
 
