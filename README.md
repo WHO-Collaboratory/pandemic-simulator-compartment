@@ -34,7 +34,6 @@ pandemic-simulator-compartment/
 ├── compartment/
 │   ├── abstract/                   # Abstract base classes and interfaces
 │   ├── concrete/                   # Concrete model implementations
-│   │   └── respiratory/            # Respiratory disease models
 │   ├── examples/                   # Community-vetted example models
 │   │   └── README.md
 │   └── migration/                  # Legacy code from private repository
