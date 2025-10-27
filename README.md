@@ -1,15 +1,57 @@
-# Pandemic Simulator Compartment Models
-This repository aims to provide epidemiological modelers with a flexible Python package and framework for producing compartment models that implement ordinary differential equations to simulate diseases. We aim to provide tools for quickly editing models, running batches of simulations quickly, and exporting data for analysis with python tools or other resources.
+# Pandemic Simulator - Compartmental models in Python
 
-This repository's output is a package which can be used by modelers to create models and simulations which will generate outputs interchangeable with tools in this package's ecosystem. The package will contain examples of vetted models endorsed by the collaboratory as valid uses of the package's capabilities, similar to the educational examples provided by the [mesa agent based modeling library](https://github.com/projectmesa/mesa/tree/main/mesa/examples).
+Fast, flexible, and accurate construction of compartmental models to simulate transmission dynamics of respiratory and vector-borne diseases.
 
-## Planned Features
-- Modular modeling framework supporting extensions and mixins for diseases.
-- Separation of models from simulation runs, and built in support for batch runs of simulations.
-- Summary statistics objects.
-- Geographic elements in compartment models, such as travel between jurisdictions with different demographics.
+## Overview
+This repository builds on code developed for the World Health Organization Pandemic Hub’s Pandemic Simulator project. Its purpose is to extend that work by providing accessible, research-based compartmental modeling tools that enable decision makers, epidemiologists, and modelers to assess public health intervention strategies.
+
+## Features
+
+Current:
+
+* Simulate respiratory and vector-borne disease dynamics
+* Incorporate real-world factors including population mobility, age structure, and intervention strategies
+* Run multiple simulations efficiently for uncertainty quantification
+* Leverages [JAX](https://github.com/jax-ml/jax) for high-performance, efficient computation
+
+Planned
+
+* Modular modeling framework supporting extensions and variants for diseases.
+* Separation of models from simulation runs, and built in support for batch runs of simulations.
+* Summary statistics objects.
+
+## Methods
+
+For detail on our methods please refer to our documentation:
+* [Respiratory compartmental documentation](https://drive.google.com/file/d/1Ff4gEKu5gu3MuwTdgzRIH1A7jjzZerCj/view?usp=drive_link)
+* [Vector-borne compartmental documentation](https://drive.google.com/file/d/1g5wkayJ9dUL4WuZjvTCj8OvRrAdq2LxG/view?usp=drive_link)
+
+
+## Directory Structure
+
+```
+pandemic-simulator-compartment/
+├── compartment/
+│   ├── abstract/                   # Abstract base classes and interfaces
+│   ├── concrete/                   # Concrete model implementations
+│   │   └── respiratory/            # Respiratory disease models
+│   ├── examples/                   # Community-vetted example models
+│   │   └── README.md
+│   └── migration/                  # Legacy code from private repository
+│       ├── batch_helpers/          # AWS service utilities (to be moved to extensions)
+│       ├── compartment/            # Current core compartment model implementation
+```
+
+## Caveats/Limitations
+* This repository is currently under development. Some descriptions reflect planned features or the intended final state.
+* Models in this repository may not apply to all scenarios, for example, modeling outbreaks of endemic diseases versus the introduction of a disease into a new region.
 
 ## Contributing
-This package will contain flexible core components intended to solve common problems in modeling diseases with ODEs computationally. It will lean towards flexibility without forcing users to implement every attribute of underlying model compute on their own.
+We welcome contributions via pull request related to the core features or submitting an example model. 
 
-The examples folder will contain more opinionated models which are considered educational examples of both epidemiological modeling and how to use the tools in this package.
+For major changes, please open an issue first to discuss what you would like to change.
+Join our project and provide assistance by:
+Checking out the list of open issues where we need help.
+If you need new features, please open a new issue or start a discussion. 
+
+Example models submitted to this repository will be reviewed by community subject matter experts. Public release is subject to approval and cannot be guaranteed.
