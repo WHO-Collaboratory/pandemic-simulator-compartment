@@ -32,10 +32,9 @@ This repository provides epidemiological modelers with a flexible Python package
 This repository's output is a package which can be used by modelers to create models and simulations which will generate outputs interchangeable with tools in this package's ecosystem. The package will contain examples of vetted models endorsed by the collaboratory as valid uses of the package's capabilities, similar to the educational examples provided by the [mesa agent based modeling library](https://github.com/projectmesa/mesa/tree/main/mesa/examples).
 
 ## Planned Features
-- Modular modeling framework supporting extensions and mixins for diseases.
+- Modular modeling framework supporting extensions and variants for diseases.
 - Separation of models from simulation runs, and built in support for batch runs of simulations.
 - Summary statistics objects.
-- Rich geographic elements in compartment models, such as travel between jurisdictions with different demographics.
 
 ## Contributing
 * This section includes verbiage which describes the target state of the repository.
