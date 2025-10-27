@@ -95,7 +95,3 @@ python local-run.py pansim-config.json
 # Custom output file
 python local-run.py pansim-config.json my-simulation-results.json
 ```
-
-## Usage
-
-This code represents the current implementation during the migration process and serves as the foundation for the new epidemiological modeling framework being developed.
