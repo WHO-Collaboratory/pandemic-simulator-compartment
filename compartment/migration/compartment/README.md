@@ -1,13 +1,13 @@
-# Compartment Models
+# Compartmental Models
 
-This directory contains the core compartment model implementations and simulation management components for epidemiological modeling.
+This directory contains the core compartmental model implementations and simulation management components for epidemiological modeling.
 
 ## Purpose
 
 This directory houses the main simulation infrastructure including:
-- **Compartment Model Implementations** - Epidemiological models for ODEs implemented in JAX. Currently we operate distinct models for respiratory and vector-borne diseases with some common features such as interventions and travel.
-- **Simulation Management** - Simulations can be run in batches, allowing for runs with uncertainty and parameter values across a range.
-- **Intervention Systems** - Simulations support interventions which can be triggered by date or based on infections crossing thresholds. Interventions are unique for different diseases, have different effects, and can have variable adherence.
+- **Compartment Model Implementations** - Epidemiological models for ordinary differential equations (ODEs) implemented in JAX. Currently we operate distinct models for respiratory and vector-borne diseases with some common features such as interventions and travel.
+- **Simulation Management** - Simulations can be run in batches, allowing for runs with uncertainty and a range of parameter values.
+- **Intervention Systems** - Interventions can be implemented or removed in two scenarios: at a specific timestep or when the proportion of the infected population reaches a user-defined threshold. Interventions are unique for respiratory and vector-borne diseases and can have variable adherence.
 - **Helper Utilities** - Configuration loading, parameter generation, and data processing
 
 ## Key Components
