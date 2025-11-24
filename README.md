@@ -34,9 +34,11 @@ pandemic-simulator-compartment/
 ├── compartment/
 │   ├── abstract/                   # Abstract base classes and interfaces
 │   ├── concrete/                   # Concrete model implementations
+│   │   └── respiratory/            # Respiratory disease models
 │   ├── examples/                   # Community-vetted example models
 │   │   └── README.md
 │   └── migration/                  # Legacy code from private repository
+│       ├── batch_helpers/          # AWS service utilities (to be moved to extensions)
 │       ├── compartment/            # Current core compartment model implementation
 ```
 
@@ -49,7 +51,7 @@ We welcome contributions via pull request related to the core features or submit
 
 For major changes, please open an issue first to discuss what you would like to change.
 Join our project and provide assistance by:
-* Checking out the list of open issues where we need help.
-* If you need new features, please open a new issue or start a discussion. 
+Checking out the list of open issues where we need help.
+If you need new features, please open a new issue or start a discussion. 
 
 Example models submitted to this repository will be reviewed by community subject matter experts. Public release is subject to approval and cannot be guaranteed.
