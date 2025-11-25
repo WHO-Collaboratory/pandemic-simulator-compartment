@@ -5,8 +5,6 @@ logging.getLogger("jax._src").setLevel(logging.WARNING)
 logging.getLogger("jax._src.xla_bridge").setLevel(logging.WARNING)
 from batch_simulation_manager import BatchSimulationManager
 from concurrent.futures import ProcessPoolExecutor
-from covid_jax_model import CovidJaxModel
-from dengue_jax_model import DengueJaxModel
 from helpers import clean_payload, generate_LHS_samples, build_uncertainty_params
 from math import ceil
 from simulation_manager import SimulationManager
@@ -20,6 +18,10 @@ import time
 import tracemalloc
 from datetime import datetime
 
+MODEL_DIR = os.environ.get('MODEL_DIR')
+
+from examples.covid_jax_model.model import CovidJaxModel
+from examples.dengue_jax_model.model import DengueJaxModel
 
 #from temp_uncertainty_graphs import plot_simulation_results, plot_compartments_all_regions, plot_all_regions_and_compartments
 np.set_printoptions(suppress=True, formatter={'float_kind':'{:0.2f}'.format})
@@ -66,7 +68,7 @@ def main(config_file_path):
     # Map of disease_type to model_class
     DISEASE_MODEL_MAP = {
       "VECTOR_BORNE": DengueJaxModel,
-      "RESPIRATORY": CovidJaxModel    
+      "RESPIRATORY": CovidJaxModel
     }
 
     try:
@@ -127,7 +129,6 @@ def main(config_file_path):
     results_with["control_run"] = False
     results_without["control_run"] = True
     results = [results_with, results_without]
-    s3_results = copy.deepcopy(results)
 
     # Prepare output data
     output_data = {
