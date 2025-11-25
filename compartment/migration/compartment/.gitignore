@@ -1,6 +1,0 @@
-.venv/
-*.ipynb*
-__pycache__/
-
-local-main.py
-temp_*
