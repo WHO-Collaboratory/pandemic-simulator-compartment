@@ -2,7 +2,7 @@ import numpy as np
 from helpers import format_jax_output, format_uncertainty_output,get_simulation_step_size, compute_multi_run_compartment_deltas
 import scipy.stats as st
 
-from batch_helpers.simulation_helpers import setup_logging
+from helpers import setup_logging
 import logging
 
 from helpers import dengue_compartment_grouping, covid_compartment_grouping

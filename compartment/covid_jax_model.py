@@ -1,7 +1,7 @@
 import jax.numpy as np
 import logging
 import numpy as onp
-from batch_helpers.simulation_helpers import setup_logging
+from helpers import setup_logging
 from datetime import datetime
 from helpers import prepare_covid_initial_state
 from interventions import jax_timestep_intervention, jax_prop_intervention
