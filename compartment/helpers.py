@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from logging import basicConfig, StreamHandler, INFO
 import geopy.distance
 import json
 import numpy as np
@@ -20,6 +21,13 @@ def load_config(file_path):
     with open(file_path, 'r') as file:
         return json.load(file)
 
+def setup_logging():
+    """Sets up logging in an AWS Batch friendly format."""
+    basicConfig(
+        format="[%(levelname)s] %(name)s: %(message)s",
+        level=INFO,
+        handlers=[StreamHandler()]
+    )
 # --------------------------------------------------
 # Helper Functions: Model Output
 # --------------------------------------------------
