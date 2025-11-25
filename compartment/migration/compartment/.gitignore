@@ -1,6 +1,6 @@
 .venv/
 *.ipynb*
 __pycache__/
-batch_helpers
+
 local-main.py
 temp_*
