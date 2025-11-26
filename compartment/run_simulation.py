@@ -49,7 +49,7 @@ def run_simulation(model:Model, config_file_path:str):
 
   #TODO is an intervention_dict a property of all models?
   #TODO pass just one config
-  model_with = model(config, cleaned_config)
+  model_with = model(cleaned_config)
 
   model_without = deepcopy(model_with)
   model_without.intervention_dict = {}

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class CovidJaxModel:
     """ A class representing a compartmental model with dynamic travel and intervention mechanisms """
-    def __init__(self, config, cleaned_config):
+    def __init__(self, cleaned_config):
         """ Initialize the CompartmentalModel with a configuration dictionary """
         # Load population and travel data
         self.population_matrix = np.array(cleaned_config["initial_population"])
@@ -31,13 +31,13 @@ class CovidJaxModel:
         self.original_rates = {"beta": self.beta}
 
         # Simulation parameters
-        self.start_date = datetime.strptime(config["data"]["getSimulationJob"]["start_date"], "%Y-%m-%d").date()
+        self.start_date = cleaned_config["start_date"]
         self.start_date_ordinal = self.start_date.toordinal()
-        self.n_timesteps = config["data"]["getSimulationJob"]["time_steps"]
+        self.n_timesteps = cleaned_config["time_steps"]
 
         # Administrative units & demographics
         self.admin_units = cleaned_config["admin_units"]
-        self.demographics = config["data"]["getSimulationJob"]["case_file"]["demographics"]
+        self.demographics = cleaned_config["demographics"]
         self.age_stratification = list(self.demographics.values())
         self.age_groups = list(self.demographics.keys())
         self.interaction_matrix = np.array([
@@ -55,8 +55,8 @@ class CovidJaxModel:
             "vaccination": False
         }
 
-        # Extra
-        self.payload = config
+        #TODO Make payload optional/debugging?
+        self.payload = cleaned_config["raw_payload"]
 
     @property
     def disease_type(self):
