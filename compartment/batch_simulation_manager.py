@@ -1,5 +1,5 @@
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from simulation_manager import SimulationManager
+from compartment.simulation_manager import SimulationManager
 
 class BatchSimulationManager:
     def __init__(self, max_workers: int = None):

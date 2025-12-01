@@ -2,8 +2,8 @@ import jax.numpy as np
 import logging
 import numpy as onp
 from datetime import datetime
-from helpers import setup_logging, prepare_covid_initial_state
-from interventions import jax_timestep_intervention, jax_prop_intervention
+from compartment.helpers import setup_logging, prepare_covid_initial_state
+from compartment.interventions import jax_timestep_intervention, jax_prop_intervention
 
 # Initialize logging
 setup_logging()

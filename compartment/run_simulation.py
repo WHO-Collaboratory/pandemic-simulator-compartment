@@ -5,11 +5,11 @@ from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor
 from math import ceil
 import os
-from model import Model
-from simulation_manager import SimulationManager
-from simulation_postprocessor import SimulationPostProcessor
-from batch_simulation_manager import BatchSimulationManager
-from helpers import (
+from compartment.model import Model
+from compartment.simulation_manager import SimulationManager
+from compartment.simulation_postprocessor import SimulationPostProcessor
+from compartment.batch_simulation_manager import BatchSimulationManager
+from compartment.helpers import (
   clean_payload,
   generate_LHS_samples, 
   build_uncertainty_params
@@ -48,7 +48,6 @@ def run_simulation(model:Model, config_file_path:str):
   logger.info(f"run_mode: {run_mode}")
 
   #TODO is an intervention_dict a property of all models?
-  #TODO pass just one config
   model_with = model(cleaned_config)
 
   model_without = deepcopy(model_with)
