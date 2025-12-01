@@ -1,10 +1,11 @@
 import logging
 import json
+import os
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
 import numpy as np # should we use jax.numpy?
 from copy import deepcopy
-from concurrent.futures import ProcessPoolExecutor
 from math import ceil
-import os
 from compartment.model import Model
 from compartment.simulation_manager import SimulationManager
 from compartment.simulation_postprocessor import SimulationPostProcessor
@@ -14,6 +15,10 @@ from compartment.helpers import (
   generate_LHS_samples, 
   build_uncertainty_params
 )
+
+# Makes sure unix implementations don't deadlock
+multiprocessing.set_start_method('spawn', force=True)
+
 # Remove unnecessary jax INFO logging
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)
