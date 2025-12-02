@@ -58,13 +58,6 @@ def run_simulation(model:Model, config_file_path:str):
   model_without = deepcopy(model_with)
   model_without.intervention_dict = {}
 
-  run_metadata = {
-    "admin_zone_count": len(cleaned_config.get('admin_units')),
-    "simulation_time_steps": config['data']['getSimulationJob']['time_steps'],
-    "owner": config['data']['getSimulationJob']['owner'],
-    "disease_type": model_with.disease_type
-  }
-
   logger.info(f"owner: {config['data']['getSimulationJob']['owner']}")
   logger.info(f"number of admin units: {len(cleaned_config.get('admin_units'))}")
   logger.info(f"compartment_list: {cleaned_config.get('compartment_list')}")
@@ -115,7 +108,6 @@ def run_simulation(model:Model, config_file_path:str):
   results = [results_with, results_without]
 
   output_data = {
-    "run_metadata": run_metadata,
     "results": results
   }
 
