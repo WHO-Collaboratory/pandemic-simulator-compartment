@@ -445,7 +445,7 @@ def format_uncertainty_output(means_child, lower_child, upper_child,
             }
         parent_time_series.append(record)
 
-    parent_admin_info = next((simulation_metadata["admin_zones"][key] for key in ["AdminUnit2", "AdminUnit1", "AdminUnit0"] if simulation_metadata["admin_zones"].get(key)), None)
+    parent_admin_info = next((simulation_metadata[key] for key in ["AdminUnit2", "AdminUnit1", "AdminUnit0"] if simulation_metadata.get(key)), None)
     formatted_data["parent_admin_total"] = {
         "id": parent_unique_id,
         "simulation_job_result_id": unique_id,
