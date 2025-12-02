@@ -1,5 +1,5 @@
 import logging
-from batch_helpers.simulation_helpers import setup_logging
+from compartment.helpers import setup_logging
 import jax.numpy as jnp
 
 # Initialize logging

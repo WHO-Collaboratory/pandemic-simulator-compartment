@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from logging import basicConfig, StreamHandler, INFO
 import geopy.distance
 import json
 import numpy as np
@@ -20,6 +21,13 @@ def load_config(file_path):
     with open(file_path, 'r') as file:
         return json.load(file)
 
+def setup_logging():
+    """Sets up logging in an AWS Batch friendly format."""
+    basicConfig(
+        format="[%(levelname)s] %(name)s: %(message)s",
+        level=INFO,
+        handlers=[StreamHandler()]
+    )
 # --------------------------------------------------
 # Helper Functions: Model Output
 # --------------------------------------------------
@@ -627,14 +635,17 @@ def prepare_covid_initial_state(initial_population, age_transmission, demographi
 
 def clean_payload(payload):
     # Extract components from payload
-    case_file = payload['data']['getSimulationJob']['case_file']['admin_zones']
+    admin_zones = payload['data']['getSimulationJob']['case_file']['admin_zones']
+    demographics = payload['data']['getSimulationJob']['case_file']['demographics']
+    time_steps = payload['data']['getSimulationJob']['time_steps']
+    start_date = datetime.strptime(payload['data']['getSimulationJob']['start_date'], "%Y-%m-%d").date()
     disease_nodes = payload['data']['getSimulationJob']['Disease']['disease_nodes']
     transmission_edges = payload['data']['getSimulationJob']['Disease']['transmission_edges']
     interventions = payload['data']['getSimulationJob']['interventions']
-    disease_type = payload['data']['getSimulationJob']['Disease']['disease_type']
+    disease_type = payload['data']['getSimulationJob']['Disease']['disease_type'] #TODO remove from payload since intrinsic to model.
     # Handle travel_volume: None case
     travel_volume = (payload.get('data', {}).get('getSimulationJob', {}).get('travel_volume', None))
-    travel_rates = get_travel_volume(travel_volume, case_file)
+    travel_rates = get_travel_volume(travel_volume, admin_zones)
     
     # Create each component 
     if disease_type == "VECTOR_BORNE":
@@ -645,27 +656,32 @@ def clean_payload(payload):
                             'E12', 'E13', 'E14', 'E21', 'E23', 'E24', 'E31', 'E32', 'E34', 'E41', 'E42', 'E43', 
                             'I12', 'I13', 'I14', 'I21', 'I23', 'I24', 'I31', 'I32', 'I34', 'I41', 'I42', 'I43', 
                             'H1', 'H2', 'H3', 'H4', 'R1', 'R2', 'R3', 'R4']
-        initial_population = get_dengue_initial_population(case_file, compartment_list, run_mode)
+        initial_population = get_dengue_initial_population(admin_zones, compartment_list, run_mode)
 
     else:
         compartment_list = create_compartment_list(disease_nodes)
-        initial_population = create_initial_population_matrix(case_file, compartment_list)
+        initial_population = create_initial_population_matrix(admin_zones, compartment_list)
 
     transmission_dict = create_transmission_dict(transmission_edges)
-    admin_units = extract_admin_units(case_file)
+    admin_units = extract_admin_units(admin_zones)
     intervention_dict = create_intervention_dict(interventions, payload['data']['getSimulationJob']['start_date'])
     
+    #TODO make payload optional/debugging?
     # Create final cleaned payload
     cleaned_payload = {
         "initial_population": initial_population,
         "compartment_list": compartment_list,
         "transmission_dict": transmission_dict,
         "admin_units": admin_units,
+        "demographics": demographics,
+        "time_steps": time_steps,
+        "start_date": start_date,
         "intervention_dict": intervention_dict,
-        "travel_matrix": get_gravity_model_travel_matrix(case_file, travel_rates),
+        "travel_matrix": get_gravity_model_travel_matrix(admin_zones, travel_rates),
         "hemisphere": get_hemisphere(payload),
-        "temperature": get_temperature(case_file),
-        "travel_volume": travel_rates
+        "temperature": get_temperature(admin_zones),
+        "travel_volume": travel_rates,
+        "raw_payload": payload
     }
     
     return cleaned_payload

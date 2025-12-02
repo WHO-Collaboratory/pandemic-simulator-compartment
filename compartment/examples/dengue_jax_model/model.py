@@ -1,7 +1,7 @@
 import jax.numpy as np
 import logging
 import numpy as onp
-from batch_helpers.simulation_helpers import setup_logging
+from helpers import setup_logging
 from datetime import datetime
 from interventions import jax_prop_intervention, jax_timestep_intervention
 from temperature import temperature_seasonality_jax, calculate_thermal_responses, calculate_surviving_offspring, get_carrying_capacity

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pandemic-simulator-compartment"
+version = "0.1.0"
+description = "Compartment models made with systems of ordinary differential equations for use in the World Health Organization's Pandemic Simulator app."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "geopy>=2.4.1",
+    "jax>=0.8.1",
+    "numpy>=2.3.5",
+    "pandas>=2.3.3",
+    "scipy>=1.16.3",
+]
+
+[tool.setuptools]
+packages = ["compartment"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.txt", "*.md"]

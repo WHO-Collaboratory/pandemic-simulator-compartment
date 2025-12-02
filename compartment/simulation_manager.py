@@ -1,7 +1,6 @@
 import logging
 import numpy as np
-from batch_helpers.simulation_helpers import setup_logging
-from helpers import get_simulation_step_size
+from compartment.helpers import get_simulation_step_size, setup_logging
 from jax.experimental.ode import odeint
 
 # Initialize logging
