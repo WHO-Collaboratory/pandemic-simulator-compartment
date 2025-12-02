@@ -274,7 +274,7 @@ def create_jax_intervention_results(population_matrix: np.ndarray, intervention_
 
     return events
 
-def format_jax_output(intervention_dict, payload, population_matrix, compartment_list, 
+def format_jax_output(intervention_dict, simulation_metadata, population_matrix, compartment_list, 
                       n_regions, start_date, n_timesteps, demographics, disease_type, step):
     """ Im hoping this replaces the mess we have above """
     unique_id = str(uuid.uuid4()) # Generate unique id for gql
@@ -287,12 +287,12 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
     formatted_data = {
         "id": unique_id,
         "parent_time_series_id": parent_unique_id,
-        "simulation_job_id": payload['data']['getSimulationJob']['id'],
-        "simulation_type": payload['data']['getSimulationJob']['simulation_type'],
-        "owner": payload['data']['getSimulationJob']['owner'],
-        "start_date": payload['data']['getSimulationJob']['start_date'],
-        "end_date": payload['data']['getSimulationJob']['end_date'],
-        "time_steps": payload['data']['getSimulationJob']['time_steps'],
+        "simulation_job_id": simulation_metadata['id'],
+        "simulation_type": simulation_metadata['simulation_type'],
+        "owner": simulation_metadata['owner'],
+        "start_date": simulation_metadata['start_date'],
+        "end_date": simulation_metadata['end_date'],
+        "time_steps": simulation_metadata['time_steps'],
         "interventions": intervention_dict,
         "intervention_results": intervention_results, 
         "admin_zones": []
@@ -374,7 +374,7 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
 
 def format_uncertainty_output(means_child, lower_child, upper_child,
                               means_parent, lower_parent, upper_parent,
-                              payload,
+                              simulation_metadata,
                               compartment_list,
                               admin_units,
                               start_date,
@@ -388,12 +388,12 @@ def format_uncertainty_output(means_child, lower_child, upper_child,
     formatted_data = {
         "id": unique_id,
         "parent_time_series_id": parent_unique_id,
-        "simulation_job_id": payload['data']['getSimulationJob']['id'],
-        "simulation_type": payload['data']['getSimulationJob']['simulation_type'],
-        "owner": payload['data']['getSimulationJob']['owner'],
-        "start_date": payload['data']['getSimulationJob']['start_date'],
-        "end_date": payload['data']['getSimulationJob']['end_date'],
-        "time_steps": payload['data']['getSimulationJob']['time_steps'],
+        "simulation_job_id": simulation_metadata['id'],
+        "simulation_type": simulation_metadata['simulation_type'],
+        "owner": simulation_metadata['owner'],
+        "start_date": simulation_metadata['start_date'],
+        "end_date": simulation_metadata['end_date'],
+        "time_steps": simulation_metadata['time_steps'],
         "admin_zones": [],
         "compartment_deltas": avg_compartment_deltas,
         "parent_admin_total": []
@@ -665,8 +665,16 @@ def clean_payload(payload):
     transmission_dict = create_transmission_dict(transmission_edges)
     admin_units = extract_admin_units(admin_zones)
     intervention_dict = create_intervention_dict(interventions, payload['data']['getSimulationJob']['start_date'])
+
+    simulation_metadata = {
+        "id": payload['data']['getSimulationJob']['id'],
+        "simulation_type": payload['data']['getSimulationJob']['simulation_type'],
+        "owner": payload['data']['getSimulationJob']['owner'],
+        "start_date": payload['data']['getSimulationJob']['start_date'],
+        "end_date": payload['data']['getSimulationJob']['end_date'],
+        "time_steps": payload['data']['getSimulationJob']['time_steps'],
+    }
     
-    #TODO make payload optional/debugging?
     # Create final cleaned payload
     cleaned_payload = {
         "initial_population": initial_population,
@@ -681,7 +689,7 @@ def clean_payload(payload):
         "hemisphere": get_hemisphere(payload),
         "temperature": get_temperature(admin_zones),
         "travel_volume": travel_rates,
-        "raw_payload": payload
+        "simulation_metadata": simulation_metadata
     }
     
     return cleaned_payload

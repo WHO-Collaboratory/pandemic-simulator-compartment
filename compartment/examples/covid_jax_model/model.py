@@ -56,7 +56,7 @@ class CovidJaxModel:
         }
 
         #TODO Make payload optional/debugging?
-        self.payload = cleaned_config["raw_payload"]
+        self.simulation_metadata = cleaned_config["simulation_metadata"]
 
     @property
     def disease_type(self):
