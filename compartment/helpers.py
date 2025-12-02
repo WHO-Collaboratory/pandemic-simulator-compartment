@@ -84,17 +84,17 @@ def transform_interventions(data):
 
     return transformed
 
-def compute_parent_admin_total(data, payload, unique_id, parent_unique_id, num_timesteps, step):
+def compute_parent_admin_total(data, simulation_metadata, unique_id, parent_unique_id, num_timesteps, step):
     #num_timesteps = len(data[0]["time_series"])
     start_date = datetime.strptime(data[0]["time_series"][0]["date"], "%Y-%m-%d")
     time_series = []
-    parent_admin_info = next((payload["data"]["getSimulationJob"][key] for key in ["AdminUnit2", "AdminUnit1", "AdminUnit0"] if payload["data"]["getSimulationJob"].get(key)), None)
+    parent_admin_info = next((simulation_metadata[key] for key in ["AdminUnit2", "AdminUnit1", "AdminUnit0"] if simulation_metadata.get(key)), None)
     results = {
         "id": parent_unique_id,
         "simulation_job_result_id": unique_id,
         "admin_zone_id": parent_admin_info["id"],
         "admin_unit_id": parent_admin_info["id"],
-        "owner": payload['data']['getSimulationJob']['owner']
+        "owner": simulation_metadata['owner']
     }
 
     for t in range(num_timesteps):
@@ -297,7 +297,7 @@ def format_jax_output(intervention_dict, simulation_metadata, population_matrix,
         "intervention_results": intervention_results, 
         "admin_zones": []
     }
-    admin_zones_payload = payload['data']['getSimulationJob']['case_file']['admin_zones']
+    admin_zones_payload = simulation_metadata['admin_zones']
 
     dates = [
         (start_date + timedelta(days=i*step)).strftime("%Y-%m-%d")
@@ -324,7 +324,7 @@ def format_jax_output(intervention_dict, simulation_metadata, population_matrix,
 
             formatted_data["admin_zones"].append({
                     "simulation_job_result_id": unique_id,
-                    "owner": payload['data']['getSimulationJob']['owner'],
+                    "owner": simulation_metadata['owner'],
                     "admin_zone_id": admin_zones_payload[i].get('id', None),
                     "admin_unit_id": admin_zones_payload[i].get('id', None),
                     "time_series": df_nested.to_dict("records")
@@ -362,14 +362,14 @@ def format_jax_output(intervention_dict, simulation_metadata, population_matrix,
             # --- append to admin_zones so overall structure matches dengue path
             formatted_data["admin_zones"].append({
                 "simulation_job_result_id": unique_id,
-                "owner": payload['data']['getSimulationJob']['owner'],
+                "owner": simulation_metadata['owner'],
                 "admin_zone_id": region,
                 "admin_unit_id": region,
                 "time_series": time_series,
             })
 
     formatted_data["compartment_deltas"] = compute_jax_compartment_deltas(population_matrix, disease_type,  n_regions, compartment_list)
-    formatted_data["parent_admin_total"] = compute_parent_admin_total(formatted_data['admin_zones'], payload, unique_id, parent_unique_id, population_matrix.shape[0], step)
+    formatted_data["parent_admin_total"] = compute_parent_admin_total(formatted_data['admin_zones'], simulation_metadata, unique_id, parent_unique_id, population_matrix.shape[0], step)
     return formatted_data
 
 def format_uncertainty_output(means_child, lower_child, upper_child,
@@ -400,7 +400,7 @@ def format_uncertainty_output(means_child, lower_child, upper_child,
     }
     
     base_date = datetime.strptime(start_date, "%Y-%m-%d").date()
-    admin_zones_payload = payload['data']['getSimulationJob']['case_file']['admin_zones']
+    admin_zones_payload = simulation_metadata['admin_zones']
 
     # number of timesteps in the output
     n_outputs_child = means_child.shape[0]
@@ -410,7 +410,7 @@ def format_uncertainty_output(means_child, lower_child, upper_child,
     for zone_idx, zone in enumerate(admin_units):
         zone_obj = {
             "simulation_job_result_id": unique_id,
-            "owner": payload['data']['getSimulationJob']['owner'],
+            "owner": simulation_metadata['owner'],
             "admin_zone_id": admin_zones_payload[zone_idx].get('id', None),
             "admin_unit_id": admin_zones_payload[zone_idx].get('id', None),
             "time_series": []
@@ -445,13 +445,13 @@ def format_uncertainty_output(means_child, lower_child, upper_child,
             }
         parent_time_series.append(record)
 
-    parent_admin_info = next((payload["data"]["getSimulationJob"][key] for key in ["AdminUnit2", "AdminUnit1", "AdminUnit0"] if payload["data"]["getSimulationJob"].get(key)), None)
+    parent_admin_info = next((simulation_metadata["admin_zones"][key] for key in ["AdminUnit2", "AdminUnit1", "AdminUnit0"] if simulation_metadata["admin_zones"].get(key)), None)
     formatted_data["parent_admin_total"] = {
         "id": parent_unique_id,
         "simulation_job_result_id": unique_id,
         "admin_zone_id": parent_admin_info["id"],
         "admin_unit_id": parent_admin_info["id"],
-        "owner": payload['data']['getSimulationJob']['owner'],
+        "owner": simulation_metadata['owner'],
         "time_series": parent_time_series
         }
 
@@ -673,6 +673,10 @@ def clean_payload(payload):
         "start_date": payload['data']['getSimulationJob']['start_date'],
         "end_date": payload['data']['getSimulationJob']['end_date'],
         "time_steps": payload['data']['getSimulationJob']['time_steps'],
+        "admin_zones": admin_zones, #TODO can we just pass bigger admin_units object?
+        "AdminUnit2": payload['data']['getSimulationJob']['AdminUnit2'],
+        "AdminUnit1": payload['data']['getSimulationJob']['AdminUnit1'],
+        "AdminUnit0": payload['data']['getSimulationJob']['AdminUnit0'],
     }
     
     # Create final cleaned payload
@@ -689,7 +693,7 @@ def clean_payload(payload):
         "hemisphere": get_hemisphere(payload),
         "temperature": get_temperature(admin_zones),
         "travel_volume": travel_rates,
-        "simulation_metadata": simulation_metadata
+        "simulation_metadata": simulation_metadata,
     }
     
     return cleaned_payload
