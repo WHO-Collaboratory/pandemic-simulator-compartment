@@ -6,9 +6,7 @@ import time
 import tracemalloc
 from datetime import datetime
 from compartment.batch_helpers.simulation_helpers import get_simulation_params
-
 from compartment.run_simulation import run_simulation
-from compartment.examples.covid_jax_model.model import CovidJaxModel
 
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)

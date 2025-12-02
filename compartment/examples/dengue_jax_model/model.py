@@ -1,40 +1,40 @@
 import jax.numpy as np
 import logging
 import numpy as onp
-from helpers import setup_logging
+from compartment.helpers import setup_logging
 from datetime import datetime
-from interventions import jax_prop_intervention, jax_timestep_intervention
-from temperature import temperature_seasonality_jax, calculate_thermal_responses, calculate_surviving_offspring, get_carrying_capacity
+from compartment.interventions import jax_prop_intervention, jax_timestep_intervention
+from compartment.temperature import temperature_seasonality_jax, calculate_thermal_responses, calculate_surviving_offspring, get_carrying_capacity
 
 # Initialize logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
 class DengueJaxModel:
-    def __init__(self, config, cleaned_config):
+    def __init__(self, config):
         # same as covid jax model
-        self.population_matrix = np.array(cleaned_config["initial_population"])
-        self.compartment_list = cleaned_config["compartment_list"]
-        self.start_date = datetime.strptime(config["data"]["getSimulationJob"]["start_date"], "%Y-%m-%d").date()
+        self.population_matrix = np.array(config["initial_population"])
+        self.compartment_list = config["compartment_list"]
+        self.start_date = datetime.strptime(config["start_date"], "%Y-%m-%d").date()
         self.start_date_ordinal = self.start_date.toordinal()
-        self.n_timesteps = config["data"]["getSimulationJob"]["time_steps"]
+        self.n_timesteps = config["time_steps"]
         # for Jax replace travel matrix diag with 1.0
-        self.travel_matrix = np.fill_diagonal(np.array(cleaned_config["travel_matrix"]), 1.0, inplace=False)
-        self.admin_units = cleaned_config["admin_units"]
-        self.demographics = config["data"]["getSimulationJob"]["case_file"]["demographics"]
+        self.travel_matrix = np.fill_diagonal(np.array(config["travel_matrix"]), 1.0, inplace=False)
+        self.admin_units = config["admin_units"]
+        self.demographics = config["case_file"]["demographics"]
         self.age_stratification = list(self.demographics.values())
         self.age_groups = list(self.demographics.keys())
-        self.disease_type = config['data']['getSimulationJob']['Disease']['disease_type']
-        self.sigma = cleaned_config['travel_volume']['leaving'] 
+        self.disease_type = config['Disease']['disease_type']
+        self.sigma = config['travel_volume']['leaving'] 
 
         # Temperature
-        self.hemisphere = cleaned_config['hemisphere']
-        self.temp_min = cleaned_config['temperature']['temp_min']
-        self.temp_max = cleaned_config['temperature']['temp_max']
-        self.temp_average = cleaned_config['temperature']['temp_mean']
+        self.hemisphere = config['hemisphere']
+        self.temp_min = config['temperature']['temp_min']
+        self.temp_max = config['temperature']['temp_max']
+        self.temp_average = config['temperature']['temp_mean']
 
         # Interventions      
-        self.intervention_dict = cleaned_config["intervention_dict"]
+        self.intervention_dict = config["intervention_dict"]
         self.intervention_statuses = {
             "physical": False,
             "chemical": False
@@ -46,9 +46,9 @@ class DengueJaxModel:
         # Rate of loss of cross-protection
         # zeta = 1/immunity_period, default = 1/240, if immunity_period is 0 then zeta = 0 
         self.zeta = (
-            1 / config['data']['getSimulationJob']['Disease']['immunity_period']
-            if config['data']['getSimulationJob']['Disease'].get('immunity_period') not in [None, 0]
-            else 0 if config['data']['getSimulationJob']['Disease'].get('immunity_period') == 0
+            1 / config['Disease']['immunity_period']
+            if config['Disease']['immunity_period'] not in [None, 0]
+            else 0 if config['Disease']['immunity_period'] == 0
             else 1 / 240
         )
 

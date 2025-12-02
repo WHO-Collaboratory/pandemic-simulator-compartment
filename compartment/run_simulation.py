@@ -24,7 +24,7 @@ from compartment.batch_helpers.s3 import write_to_s3
 from compartment.batch_helpers.simulation_helpers import get_simulation_params
 from compartment.batch_helpers.gql import write_to_gql
 #from compartment.model import DengueJaxModel, CovidJaxModel
-#from compartment.examples.dengue_jax_model.model import DengueJaxModel
+from compartment.examples.dengue_jax_model.model import DengueJaxModel
 from compartment.examples.covid_jax_model.model import CovidJaxModel
 # Makes sure unix implementations don't deadlock
 multiprocessing.set_start_method('spawn', force=True)
@@ -100,7 +100,7 @@ def run_simulation(simulation_params=None, config_path: str = None, output_path:
 
     # Map of disease_type to model_class
     DISEASE_MODEL_MAP = {
-        #"VECTOR_BORNE": DengueJaxModel,
+        "VECTOR_BORNE": DengueJaxModel,
         "RESPIRATORY": CovidJaxModel    
     }
 
