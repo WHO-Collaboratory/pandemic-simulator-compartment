@@ -12,15 +12,23 @@ class CovidVarianceParams(BaseModel):
 
 class CovidTransmissionEdgeData(BaseModel):
     transmission_rate: float = Field(gt=0)
-    variance_params: CovidVarianceParams
-
+    variance_params: Optional[CovidVarianceParams] = None
 
 class CovidTransmissionEdge(BaseModel):
-    id: str
     source: str
     target: str
     type: Optional[str] = None
     data: CovidTransmissionEdgeData
+    id: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def build_id(cls, values):
+        if "id" not in values or not values["id"]:
+            source = values.get("source", "")
+            target = values.get("target", "")
+            values["id"] = f"{source}->{target}"
+        return values
 
 
 class CovidDiseaseNodeData(BaseModel):
