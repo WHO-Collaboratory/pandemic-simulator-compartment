@@ -6,6 +6,8 @@ ENV MODEL_DIR=/opt/pandemic-simulator-compartment/compartment/examples/covid_jax
 ENV MODE=local
 ENV CONFIG_FILE=/opt/reference/pansim-config.json
 
+ENV ENVIRONMENT=dev
+
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /opt/pandemic-simulator-compartment
