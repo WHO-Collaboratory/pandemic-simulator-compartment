@@ -657,49 +657,6 @@ def prepare_covid_initial_state(initial_population, age_transmission, demographi
 
     return age_strat, age_transmission
 
-def clean_payload(payload):
-    # Extract components from payload
-    admin_zones = payload['data']['getSimulationJob']['case_file']['admin_zones']
-    admin_unit_2 = payload['data']['getSimulationJob']['AdminUnit2']
-    admin_unit_1 = payload['data']['getSimulationJob']['AdminUnit1']
-    admin_unit_0 = payload['data']['getSimulationJob']['AdminUnit0']
-    disease_nodes = payload['data']['getSimulationJob']['Disease']['disease_nodes']
-    transmission_edges = payload['data']['getSimulationJob']['Disease']['transmission_edges']
-    interventions = payload['data']['getSimulationJob']['interventions']
-    disease_type = payload['data']['getSimulationJob']['Disease']['disease_type']
-    # Handle travel_volume: None case
-    travel_volume = (payload.get('data', {}).get('getSimulationJob', {}).get('travel_volume', None))
-    travel_rates = get_travel_volume(travel_volume, admin_zones)
-    
-    # Create each component 
-    if disease_type == "VECTOR_BORNE":
-        run_mode = payload['data']['getSimulationJob']['run_mode']
-        compartment_list = create_dengue_compartment_list(disease_type)
-        initial_population = get_dengue_initial_population(admin_zones, compartment_list, run_mode)
-
-    else:
-        compartment_list = create_compartment_list(disease_nodes)
-        initial_population = create_initial_population_matrix(admin_zones, compartment_list)
-
-    transmission_dict = create_transmission_dict(transmission_edges)
-    admin_units = extract_admin_units(admin_zones)
-    intervention_dict = create_intervention_dict(interventions, payload['data']['getSimulationJob']['start_date'])
-    
-    # Create final cleaned payload
-    cleaned_payload = {
-        "initial_population": initial_population,
-        "compartment_list": compartment_list,
-        "transmission_dict": transmission_dict,
-        "admin_units": admin_units,
-        "intervention_dict": intervention_dict,
-        "travel_matrix": get_gravity_model_travel_matrix(admin_zones, travel_rates),
-        "hemisphere": get_hemisphere(admin_unit_2, admin_unit_1, admin_unit_0),
-        "temperature": get_temperature(admin_zones),
-        "travel_volume": travel_rates
-    }
-    
-    return cleaned_payload
-
 # --------------------------------------------------
 # Helper Functions: Gravity Model
 # --------------------------------------------------
