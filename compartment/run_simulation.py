@@ -21,7 +21,6 @@ from compartment.validation import CovidSimulationConfig, DengueSimulationConfig
 from compartment.batch_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.batch_helpers.gql import get_simulation_job
 from compartment.batch_helpers.s3 import write_to_s3
-from compartment.batch_helpers.simulation_helpers import get_simulation_params
 from compartment.batch_helpers.gql import write_to_gql
 #from compartment.model import DengueJaxModel, CovidJaxModel
 from compartment.examples.dengue_jax_model.model import DengueJaxModel
