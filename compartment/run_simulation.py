@@ -21,7 +21,6 @@ from compartment.validation import CovidSimulationConfig, DengueSimulationConfig
 from compartment.batch_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.batch_helpers.gql import get_simulation_job
 from compartment.batch_helpers.s3 import write_to_s3
-from compartment.batch_helpers.simulation_helpers import get_simulation_params
 from compartment.batch_helpers.gql import write_to_gql
 #from compartment.model import DengueJaxModel, CovidJaxModel
 from compartment.examples.dengue_jax_model.model import DengueJaxModel
@@ -50,19 +49,16 @@ def batch_simulate_and_postprocess(model, n_sims, param_list, ci, num_workers):
     processor = SimulationPostProcessor(model, all_output)
     return processor.process(ci=ci)
 
-def run_simulation(simulation_params=None, config_path: str = None, output_path: str = None):
+def run_simulation(simulation_params=None, mode:str='local', config_path: str = None, output_path: str = None):
     logger.info("Starting the simulation...")
-    
-    # Determine if running in local or cloud mode
-    is_local_mode = config_path is not None
-    
-    if is_local_mode:
+        
+    if mode == 'local':
         logger.info("Running in LOCAL mode")
         # Load config from local JSON file
         config = load_config_from_json(config_path)
         simulation_job_id = config['data']['getSimulationJob'].get('id', 'local-simulation')
         owner = "local-user"
-    else:
+    elif mode == 'cloud':
         logger.info("Running in CLOUD mode")
         if simulation_params is None:
             raise ValueError("simulation_params is required for cloud mode")
@@ -72,7 +68,8 @@ def run_simulation(simulation_params=None, config_path: str = None, output_path:
         # Grab simulation job and clean validated config for model
         config = get_simulation_job(simulation_params, GRAPHQL_QUERY)
         owner = config['data']['getSimulationJob'].get('owner')
-    
+    else:
+        raise ValueError(f"Invalid mode: {mode}")
     # Validate and create config object
     disease_type = config['data']['getSimulationJob']['Disease']['disease_type']
     if disease_type == "VECTOR_BORNE":
@@ -172,12 +169,12 @@ def run_simulation(simulation_params=None, config_path: str = None, output_path:
     results_without["control_run"] = True
     results = [results_with, results_without]
     
-    if is_local_mode:
-        # Local mode: write results to local file
+    if mode == 'local':
         if output_path is None:
-            output_path = f"simulation_results_{simulation_job_id}.json"
-        write_results_to_local(results, output_path)
-        logger.info(f"Results saved to: {output_path}")
+            print(results)
+        elif output_path is not None:
+            write_results_to_local(results, output_path)
+            logger.info(f"Results saved to: {output_path}")
     else:
         # Cloud mode: write to GQL and S3, invoke lambda
         s3_results = deepcopy(results)
