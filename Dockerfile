@@ -1,10 +1,10 @@
 FROM python:3.13-slim
 LABEL maintainer="Christian Osborne cosborne@ruvos.com"
 
-#TODO should files be optional?
 ENV MODEL_DIR=/opt/pandemic-simulator-compartment/compartment/examples/covid_jax_model/
+
+ENV MODE=local
 ENV CONFIG_FILE=/opt/pandemic-simulator-compartment/reference/pansim-config.json
-ENV OUTPUT_FILE=/opt/pandemic-simulator-compartment/results/example-run.json
 
 ENV PYTHONUNBUFFERED=1
 
@@ -13,4 +13,9 @@ COPY . /opt/pandemic-simulator-compartment
 
 RUN pip install --no-cache-dir -e .
 
-CMD ["sh", "-c", "cd $MODEL_DIR && python main.py $CONFIG_FILE $OUTPUT_FILE"]
+# Use exec form with shell to allow environment variable substitution
+# This allows runtime overrides via docker run -e flags
+CMD ["sh", "-c", "cd $MODEL_DIR && python main.py \
+    --mode ${MODE} \
+    --config_file ${CONFIG_FILE} \
+    ${OUTPUT_FILE:+--output_file $OUTPUT_FILE}"]
