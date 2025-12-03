@@ -46,7 +46,7 @@ if __name__ == "__main__":
         if simulation_job_id is None:
             raise ValueError("simulation_job_id is required for cloud mode")
         simulation_params = get_simulation_params(simulation_job_id=simulation_job_id)
-        run_metadata = run_simulation(simulation_params=simulation_params)
+        run_metadata = run_simulation(mode='cloud', simulation_params=simulation_params)
     else:
         raise ValueError(f"Invalid mode: {args.mode}")
 
