@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Literal, Optional, List
-from uuid import UUID
-
+from uuid import uuid4
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class TravelVolume(BaseModel):
     leaving: float = Field(default=0.2, ge=0, le=1)
-    returning: float = Field(default=0.1, ge=0, le=1)
+    returning: Optional[float] = Field(default=None, ge=0, le=1)
 
     @field_validator("leaving", "returning", mode="before")
     @classmethod
@@ -26,34 +25,34 @@ class AdminUnit(BaseModel):
     center_lat: float = Field(ge=-90, le=90)
 
 class CaseFileDemographics(BaseModel):
-    age_0_17: float = Field(ge=0, le=100)
-    age_18_55: float = Field(ge=0, le=100)
-    age_56_plus: float = Field(ge=0, le=100)
+    age_0_17: float = Field(default=25.0, ge=0, le=100)
+    age_18_55: float = Field(default=50.0, ge=0, le=100)
+    age_56_plus: float = Field(default=25.0, ge=0, le=100)
 
 
 class CaseFileAdminZone(BaseModel):
-    id: Optional[str] = None
+    id: str = Field(default_factory=lambda: str(uuid4()))
     admin_code: Optional[str] = None
     admin_iso_code: Optional[str] = None
-    admin_level: int = Field(ge=0)
+    admin_level: Optional[int] = None
     center_lat: float = Field(ge=-90, le=90)
     center_lon: float = Field(ge=-180, le=180)
 
     viz_name: Optional[str] = None
-    name: Optional[str] = None
+    name: str
 
     population: int = Field(ge=0)
     osm_id: Optional[str] = None
 
-    infected_population: float = Field(ge=0, le=100) # Covid: infected population, Dengue: first infection
-    seroprevalence: Optional[float] = Field(default=None, ge=0, le=100) # Dengue: susceptible to second infection
+    infected_population: float = Field(default=0.05, ge=0, le=100) # Covid: infected population, Dengue: first infection
+    seroprevalence: Optional[float] = Field(default=10.0, ge=0, le=100) # Dengue: susceptible to second infection
     temp_min: Optional[float] = Field(default=15)
     temp_max: Optional[float] = Field(default=30)
     temp_mean: Optional[float] = Field(default=25)
 
 class CaseFile(BaseModel):
     admin_zones: List[CaseFileAdminZone]
-    demographics: CaseFileDemographics
+    demographics: CaseFileDemographics = CaseFileDemographics()
 
 class BaseSimulationShared(BaseModel):
     """
@@ -62,12 +61,12 @@ class BaseSimulationShared(BaseModel):
     model_config = ConfigDict(extra="ignore") # "forbid" would raise an error for unknown fields
 
     id: Optional[str] = None
-    simulation_name: str
+    simulation_name: str = ""
 
     # Admin units
     admin_unit_0_id: str
-    admin_unit_1_id: Optional[str] = None
-    admin_unit_2_id: Optional[str] = None
+    admin_unit_1_id: str = ""
+    admin_unit_2_id: str = ""
     AdminUnit0: AdminUnit
     AdminUnit1: Optional[AdminUnit] = None
     AdminUnit2: Optional[AdminUnit] = None
@@ -83,9 +82,9 @@ class BaseSimulationShared(BaseModel):
     time_steps: int = Field(gt=0)
 
     # Population / mobility
-    selected_infected_population: float = Field(ge=0)
-    selected_population: int = Field(ge=0)
-    travel_volume: TravelVolume
+    #selected_infected_population: float = Field(ge=0)
+    #selected_population: int = Field(ge=0)
+    travel_volume: TravelVolume = TravelVolume()
 
     case_file: CaseFile
 
