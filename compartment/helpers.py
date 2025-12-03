@@ -7,19 +7,33 @@ import pandas as pd
 import uuid
 import random
 import scipy.stats as stats
+import os
 
 # --------------------------------------------------
 # Helper Functions: Config Loading
 # --------------------------------------------------
 
-def load_config(file_path):
-    """
-    Load the JSON configuration file.
-    :param file_path: Path to the JSON config file.
-    :return: Parsed configuration dictionary.
-    """
-    with open(file_path, 'r') as file:
-        return json.load(file)
+def load_config_from_json(config_path: str) -> dict:
+    """Load simulation config from a local JSON file."""
+    with open(config_path, 'r') as f:
+        config_data = json.load(f)
+    
+    # If the JSON is already in the GraphQL response format, return as-is
+    if 'data' in config_data and 'getSimulationJob' in config_data['data']:
+        return config_data
+    
+    # Otherwise, wrap it in the expected format
+    return {'data': {'getSimulationJob': config_data}}
+
+def write_results_to_local(results: list, output_path: str):
+    """Write simulation results to a local JSON file."""
+    # Create directory if it doesn't exist
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    
+    with open(output_path, 'w') as f:
+        json.dump(results, f, indent=2, default=str)
 
 def setup_logging():
     """Sets up logging in an AWS Batch friendly format."""
@@ -28,6 +42,7 @@ def setup_logging():
         level=INFO,
         handlers=[StreamHandler()]
     )
+
 # --------------------------------------------------
 # Helper Functions: Model Output
 # --------------------------------------------------
@@ -473,6 +488,15 @@ def create_initial_population_matrix(case_file, compartment_list):
 
     return initial_population
 
+def create_dengue_compartment_list(disease_type):
+    if disease_type == "VECTOR_BORNE":
+        return ['SV', 'EV1', 'EV2', 'EV3', 'EV4', 'IV1', 'IV2', 'IV3', 'IV4', 
+                            'S0', 'E1', 'E2', 'E3', 'E4', 'I1', 'I2', 'I3', 'I4', 
+                            'C1', 'C2', 'C3', 'C4', 'Snot1', 'Snot2', 'Snot3', 'Snot4', 
+                            'E12', 'E13', 'E14', 'E21', 'E23', 'E24', 'E31', 'E32', 'E34', 'E41', 'E42', 'E43', 
+                            'I12', 'I13', 'I14', 'I21', 'I23', 'I24', 'I31', 'I32', 'I34', 'I41', 'I42', 'I43', 
+                            'H1', 'H2', 'H3', 'H4', 'R1', 'R2', 'R3', 'R4']
+
 def create_compartment_list(disease_nodes):
     """ Map disease nodes to compartment abbreviations """
     node_to_compartment = {
@@ -503,34 +527,36 @@ def create_transmission_dict(transmission_edges):
 def build_uncertainty_params(transmission_edges: list, interventions: list):
     uncertainty_params = []
     
-    # Process transmission edges
-    for edge in transmission_edges:
-        edge_id = edge.get("id")
-        data = edge.get("data", {})
-        variance_params = data.get("variance_params")
+    if transmission_edges:
+        # Process transmission edges
+        for edge in transmission_edges:
+            edge_id = edge.get("id")
+            data = edge.get("data", {})
+            variance_params = data.get("variance_params")
 
-        if variance_params and variance_params.get("has_variance"):
-            param_name = edge_to_variable.get(edge_id)
-            if param_name:
-                uncertainty_params.append({
-                    "param": param_name,
-                    "dist": variance_params.get("distribution_type", "uniform"),
-                    "min": variance_params.get("min", 0),
-                    "max": variance_params.get("max", 0)
-                })
-
-    # Process interventions
-    for intervention in interventions:
-        for var_param in intervention.get("variance_params", []):
-            if var_param.get("has_variance"):
-                field_name = var_param.get("field_name")
-                if field_name:
+            if variance_params and variance_params.get("has_variance"):
+                param_name = edge_to_variable.get(edge_id)
+                if param_name:
                     uncertainty_params.append({
-                        "param": f"intervention.{intervention['id']}.{field_name}",
-                        "dist": var_param.get("distribution_type", "uniform"),
-                        "min": var_param.get("min", 0) / 100,
-                        "max": var_param.get("max", 0) / 100
+                        "param": param_name,
+                        "dist": variance_params.get("distribution_type", "uniform"),
+                        "min": variance_params.get("min", 0),
+                        "max": variance_params.get("max", 0)
                     })
+
+    if interventions:
+        # Process interventions
+        for intervention in interventions:
+            for var_param in intervention.get("variance_params", []):
+                if var_param.get("has_variance"):
+                    field_name = var_param.get("field_name")
+                    if field_name:
+                        uncertainty_params.append({
+                            "param": f"intervention.{intervention['id']}.{field_name}",
+                            "dist": var_param.get("distribution_type", "uniform"),
+                            "min": var_param.get("min", 0) / 100,
+                            "max": var_param.get("max", 0) / 100
+                        })
 
     return uncertainty_params
 
@@ -574,17 +600,15 @@ def create_intervention_dict(intervention_nodes, start_date):
 
     return intervention_dict
 
-def get_hemisphere(payload):
-    """Crawls to request area's lattitude and returns hemisphere."""
-    parent_admin_info = next(
-        payload["data"]["getSimulationJob"][key]
-        for key in ["AdminUnit2", "AdminUnit1", "AdminUnit0"]
-        if payload["data"]["getSimulationJob"][key] is not None)
-    center_lat = parent_admin_info['center_lat']
-    if center_lat >= 0:
-        return "North"
-    else:
-        return "South"
+def get_hemisphere(admin2, admin1, admin0):
+    """
+    Determine hemisphere using validated AdminUnit models.
+    Priority: AdminUnit2 → AdminUnit1 → AdminUnit0
+    """
+    parent = admin2 or admin1 or admin0
+    center_lat = parent['center_lat']  # already validated
+    return "North" if center_lat >= 0 else "South"
+
 
 def get_temperature(case_file, default_min=0, default_max=38, default_mean=30):
     # Apply first admin zone temperature to all admin zones
@@ -636,13 +660,13 @@ def prepare_covid_initial_state(initial_population, age_transmission, demographi
 def clean_payload(payload):
     # Extract components from payload
     admin_zones = payload['data']['getSimulationJob']['case_file']['admin_zones']
-    demographics = payload['data']['getSimulationJob']['case_file']['demographics']
-    time_steps = payload['data']['getSimulationJob']['time_steps']
-    start_date = datetime.strptime(payload['data']['getSimulationJob']['start_date'], "%Y-%m-%d").date()
+    admin_unit_2 = payload['data']['getSimulationJob']['AdminUnit2']
+    admin_unit_1 = payload['data']['getSimulationJob']['AdminUnit1']
+    admin_unit_0 = payload['data']['getSimulationJob']['AdminUnit0']
     disease_nodes = payload['data']['getSimulationJob']['Disease']['disease_nodes']
     transmission_edges = payload['data']['getSimulationJob']['Disease']['transmission_edges']
     interventions = payload['data']['getSimulationJob']['interventions']
-    disease_type = payload['data']['getSimulationJob']['Disease']['disease_type'] #TODO remove from payload since intrinsic to model.
+    disease_type = payload['data']['getSimulationJob']['Disease']['disease_type']
     # Handle travel_volume: None case
     travel_volume = (payload.get('data', {}).get('getSimulationJob', {}).get('travel_volume', None))
     travel_rates = get_travel_volume(travel_volume, admin_zones)
@@ -650,12 +674,7 @@ def clean_payload(payload):
     # Create each component 
     if disease_type == "VECTOR_BORNE":
         run_mode = payload['data']['getSimulationJob']['run_mode']
-        compartment_list = ['SV', 'EV1', 'EV2', 'EV3', 'EV4', 'IV1', 'IV2', 'IV3', 'IV4', 
-                            'S0', 'E1', 'E2', 'E3', 'E4', 'I1', 'I2', 'I3', 'I4', 
-                            'C1', 'C2', 'C3', 'C4', 'Snot1', 'Snot2', 'Snot3', 'Snot4', 
-                            'E12', 'E13', 'E14', 'E21', 'E23', 'E24', 'E31', 'E32', 'E34', 'E41', 'E42', 'E43', 
-                            'I12', 'I13', 'I14', 'I21', 'I23', 'I24', 'I31', 'I32', 'I34', 'I41', 'I42', 'I43', 
-                            'H1', 'H2', 'H3', 'H4', 'R1', 'R2', 'R3', 'R4']
+        compartment_list = create_dengue_compartment_list(disease_type)
         initial_population = get_dengue_initial_population(admin_zones, compartment_list, run_mode)
 
     else:
@@ -685,15 +704,12 @@ def clean_payload(payload):
         "compartment_list": compartment_list,
         "transmission_dict": transmission_dict,
         "admin_units": admin_units,
-        "demographics": demographics,
-        "time_steps": time_steps,
-        "start_date": start_date,
         "intervention_dict": intervention_dict,
         "travel_matrix": get_gravity_model_travel_matrix(admin_zones, travel_rates),
-        "hemisphere": get_hemisphere(payload),
+        "hemisphere": get_hemisphere(admin_unit_2, admin_unit_1, admin_unit_0),
         "temperature": get_temperature(admin_zones),
         "travel_volume": travel_rates,
-        "simulation_metadata": simulation_metadata,
+        "simulation_metadata": simulation_metadata
     }
     
     return cleaned_payload

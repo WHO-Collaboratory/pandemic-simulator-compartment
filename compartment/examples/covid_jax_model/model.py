@@ -11,16 +11,16 @@ logger = logging.getLogger(__name__)
 
 class CovidJaxModel:
     """ A class representing a compartmental model with dynamic travel and intervention mechanisms """
-    def __init__(self, cleaned_config):
+    def __init__(self, config):
         """ Initialize the CompartmentalModel with a configuration dictionary """
         # Load population and travel data
-        self.population_matrix = np.array(cleaned_config["initial_population"])
-        self.travel_matrix = np.fill_diagonal(np.array(cleaned_config["travel_matrix"]), 1.0, inplace=False)
-        self.compartment_list = cleaned_config["compartment_list"]
-        self.sigma = cleaned_config['travel_volume']['leaving'] 
+        self.population_matrix = np.array(config["initial_population"])
+        self.travel_matrix = np.fill_diagonal(np.array(config["travel_matrix"]), 1.0, inplace=False)
+        self.compartment_list = config["compartment_list"]
+        self.sigma = config['travel_volume']['leaving'] 
 
         # Load disease transmission parameters
-        transmission_dict = cleaned_config.get("transmission_dict", {})
+        transmission_dict = config.get("transmission_dict", {})
         self.beta = transmission_dict.get("beta", None)         # susceptible → infected
         self.gamma = transmission_dict.get("gamma", None)       # infected → recovered
         self.theta = transmission_dict.get("theta", None)       # exposed → infected
@@ -29,15 +29,16 @@ class CovidJaxModel:
         self.eta = transmission_dict.get("eta", None)           # hospitalized → recovered
         self.epsilon = transmission_dict.get("epsilon", None)   # hospitalized → deceased
         self.original_rates = {"beta": self.beta}
+        self.disease_type = config['Disease']['disease_type']
 
         # Simulation parameters
-        self.start_date = cleaned_config["start_date"]
+        self.start_date = datetime.strptime(config["start_date"], "%Y-%m-%d").date()
         self.start_date_ordinal = self.start_date.toordinal()
-        self.n_timesteps = cleaned_config["time_steps"]
+        self.n_timesteps = config["time_steps"]
 
         # Administrative units & demographics
-        self.admin_units = cleaned_config["admin_units"]
-        self.demographics = cleaned_config["demographics"]
+        self.admin_units = config["admin_units"]
+        self.demographics = config["case_file"]["demographics"]
         self.age_stratification = list(self.demographics.values())
         self.age_groups = list(self.demographics.keys())
         self.interaction_matrix = np.array([
@@ -47,7 +48,7 @@ class CovidJaxModel:
         ])
 
         # Interventions      
-        self.intervention_dict = cleaned_config["intervention_dict"]
+        self.intervention_dict = config["intervention_dict"]
         self.intervention_statuses = {
             "lock_down": False,
             "mask_wearing": False,
@@ -56,7 +57,7 @@ class CovidJaxModel:
         }
 
         #TODO Make payload optional/debugging?
-        self.simulation_metadata = cleaned_config["simulation_metadata"]
+        self.simulation_metadata = config["simulation_metadata"]
 
     @property
     def disease_type(self):
