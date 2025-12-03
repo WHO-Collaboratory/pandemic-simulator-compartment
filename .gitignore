@@ -5,3 +5,4 @@ __pycache__/
 .ruff_cache/
 *-config-results-*.json
 reference/temp*.json
+pandemic_simulator_compartment.egg-info/
