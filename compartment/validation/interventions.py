@@ -17,8 +17,8 @@ class Intervention(BaseModel):
     Matches exactly the intervention objects from the uploaded config.
     """
     id: Literal["social_isolation", "vaccination", "mask_wearing", "lock_down", "chemical", "physical"]
-    type: Literal["INTERVENTION"]
-    label: Optional[str]
+    type: Literal["INTERVENTION"] = "INTERVENTION"
+    label: Optional[str] = None
 
     start_date: Optional[str] = None
     end_date: Optional[str] = None
@@ -34,7 +34,7 @@ class Intervention(BaseModel):
     start_threshold_node_id: Optional[str] = None
     end_threshold_node_id: Optional[str] = None
 
-    variance_params: List[InterventionVarianceParams] = Field(default_factory=list)
+    variance_params: Optional[List[InterventionVarianceParams]] = None
 
     @field_validator("start_date", "end_date")
     @classmethod
