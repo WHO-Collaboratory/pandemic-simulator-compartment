@@ -10,5 +10,5 @@ class DengueDiseaseConfig(BaseModel):
 
     id: Optional[str] = None
     disease_name: Optional[str] = None
-    disease_type: Literal["VECTOR_BORNE"]
+    disease_type: Literal["VECTOR_BORNE"] = "VECTOR_BORNE"
     immunity_period: int = Field(ge=0)

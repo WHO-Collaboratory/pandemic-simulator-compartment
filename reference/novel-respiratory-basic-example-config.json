@@ -1,0 +1,82 @@
+{
+    "admin_unit_0_id": "MDG",
+    "start_date": "2025-11-18",
+    "end_date": "2025-12-18",
+    "simulation_type": "COMPARTMENTAL",
+    "run_mode": "DETERMINISTIC",
+    "time_steps": 90,
+    "AdminUnit0": {
+        "id": "MDG",
+        "center_lat": -19.37564815173127
+    },
+    "Disease": {
+        "disease_type": "RESPIRATORY",
+        "compartment_list": [
+            "S",
+            "I",
+            "R"
+        ],
+        "transmission_edges": [
+            {
+                "data": {
+                    "transmission_rate": 0.25
+                },
+                "source": "susceptible",
+                "target": "infected"
+            },
+            {
+                "data": {
+                    "transmission_rate": 0.14
+                },
+                "source": "infected",
+                "target": "recovered"
+            }
+        ]
+    },
+    "case_file": {
+        "admin_zones": [
+            {
+                "center_lat": -18.93585290187204,
+                "center_lon": 46.80467692606311,
+                "name": "Antananarivo",
+                "population": 7982937,
+                "infected_population": 0.05
+            },
+            {
+                "center_lat": -13.869271297424163,
+                "center_lon": 49.413514128028105,
+                "name": "Antsiranana",
+                "population": 2127141,
+                "infected_population": 0.04
+            },
+            {
+                "center_lat": -21.856236442723883,
+                "center_lon": 46.86230787719887,
+                "name": "Fianarantsoa",
+                "population": 5785134,
+                "infected_population": 0.03
+            },
+            {
+                "center_lat": -16.536991119784563,
+                "center_lon": 46.68467040064395,
+                "name": "Mahajanga",
+                "population": 3783162,
+                "infected_population": 0.06
+            },
+            {
+                "center_lat": -17.82287275056714,
+                "center_lon": 48.7510838190036,
+                "name": "Toamasina",
+                "population": 3693480,
+                "infected_population": 0.07
+            },
+            {
+                "center_lat": -22.60126035484297,
+                "center_lon": 45.01750093141163,
+                "name": "Toliary",
+                "population": 4621930,
+                "infected_population": 0.01
+            }
+        ]
+    }
+}
