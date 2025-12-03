@@ -29,7 +29,7 @@ class CovidJaxModel:
         self.eta = transmission_dict.get("eta", None)           # hospitalized → recovered
         self.epsilon = transmission_dict.get("epsilon", None)   # hospitalized → deceased
         self.original_rates = {"beta": self.beta}
-        self.disease_type = config['Disease']['disease_type']
+        #self.disease_type = config['Disease']['disease_type']
 
         # Simulation parameters
         self.start_date = datetime.strptime(config["start_date"], "%Y-%m-%d").date()
@@ -56,8 +56,7 @@ class CovidJaxModel:
             "vaccination": False
         }
 
-        #TODO Make payload optional/debugging?
-        self.simulation_metadata = config["simulation_metadata"]
+        self.payload = config
 
     @property
     def disease_type(self):

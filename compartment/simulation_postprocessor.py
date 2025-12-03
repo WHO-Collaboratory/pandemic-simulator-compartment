@@ -30,7 +30,7 @@ class SimulationPostProcessor:
         self.disease_type = model.disease_type
         self.step = get_simulation_step_size(model.n_timesteps)
         self.intervention_dict = model.intervention_dict
-        self.simulation_metadata = model.simulation_metadata
+        self.payload = model.payload
         self.n_runs = len(self.population_matrix)
 
     def _aggregate_age_groups(self, arr: np.ndarray):
@@ -102,7 +102,7 @@ class SimulationPostProcessor:
             logger.info(f"Handing payload to single run formatter")
             return format_jax_output(
                 self.intervention_dict,
-                self.simulation_metadata,
+                self.payload,
                 self.population_matrix[0],
                 self.compartment_list,
                 len(self.admin_units),
@@ -149,7 +149,7 @@ class SimulationPostProcessor:
         return format_uncertainty_output(
             means_child, lower_child, upper_child,
             means_parent, lower_parent, upper_parent,
-            self.simulation_metadata,
+            self.payload,
             grouped_compartment_list,
             self.admin_units,
             str(self.start_date),

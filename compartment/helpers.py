@@ -99,17 +99,17 @@ def transform_interventions(data):
 
     return transformed
 
-def compute_parent_admin_total(data, simulation_metadata, unique_id, parent_unique_id, num_timesteps, step):
+def compute_parent_admin_total(data, payload, unique_id, parent_unique_id, num_timesteps, step):
     #num_timesteps = len(data[0]["time_series"])
     start_date = datetime.strptime(data[0]["time_series"][0]["date"], "%Y-%m-%d")
     time_series = []
-    parent_admin_info = next((simulation_metadata[key] for key in ["AdminUnit2", "AdminUnit1", "AdminUnit0"] if simulation_metadata.get(key)), None)
+    parent_admin_info = next((payload[key] for key in ["AdminUnit2", "AdminUnit1", "AdminUnit0"] if payload.get(key)), None)
     results = {
         "id": parent_unique_id,
         "simulation_job_result_id": unique_id,
         "admin_zone_id": parent_admin_info["id"],
         "admin_unit_id": parent_admin_info["id"],
-        "owner": simulation_metadata['owner']
+        "owner": payload['owner']
     }
 
     for t in range(num_timesteps):
@@ -289,7 +289,7 @@ def create_jax_intervention_results(population_matrix: np.ndarray, intervention_
 
     return events
 
-def format_jax_output(intervention_dict, simulation_metadata, population_matrix, compartment_list, 
+def format_jax_output(intervention_dict, payload, population_matrix, compartment_list, 
                       n_regions, start_date, n_timesteps, demographics, disease_type, step):
     """ Im hoping this replaces the mess we have above """
     unique_id = str(uuid.uuid4()) # Generate unique id for gql
@@ -302,17 +302,17 @@ def format_jax_output(intervention_dict, simulation_metadata, population_matrix,
     formatted_data = {
         "id": unique_id,
         "parent_time_series_id": parent_unique_id,
-        "simulation_job_id": simulation_metadata['id'],
-        "simulation_type": simulation_metadata['simulation_type'],
-        "owner": simulation_metadata['owner'],
-        "start_date": simulation_metadata['start_date'],
-        "end_date": simulation_metadata['end_date'],
-        "time_steps": simulation_metadata['time_steps'],
+        "simulation_job_id": payload['id'],
+        "simulation_type": payload['simulation_type'],
+        "owner": payload['owner'],
+        "start_date": payload['start_date'],
+        "end_date": payload['end_date'],
+        "time_steps": payload['time_steps'],
         "interventions": intervention_dict,
         "intervention_results": intervention_results, 
         "admin_zones": []
     }
-    admin_zones_payload = simulation_metadata['admin_zones']
+    admin_zones_payload = payload['case_file']['admin_zones']
 
     dates = [
         (start_date + timedelta(days=i*step)).strftime("%Y-%m-%d")
@@ -339,7 +339,7 @@ def format_jax_output(intervention_dict, simulation_metadata, population_matrix,
 
             formatted_data["admin_zones"].append({
                     "simulation_job_result_id": unique_id,
-                    "owner": simulation_metadata['owner'],
+                    "owner": payload['owner'],
                     "admin_zone_id": admin_zones_payload[i].get('id', None),
                     "admin_unit_id": admin_zones_payload[i].get('id', None),
                     "time_series": df_nested.to_dict("records")
@@ -377,19 +377,19 @@ def format_jax_output(intervention_dict, simulation_metadata, population_matrix,
             # --- append to admin_zones so overall structure matches dengue path
             formatted_data["admin_zones"].append({
                 "simulation_job_result_id": unique_id,
-                "owner": simulation_metadata['owner'],
+                "owner": payload['owner'],
                 "admin_zone_id": region,
                 "admin_unit_id": region,
                 "time_series": time_series,
             })
 
     formatted_data["compartment_deltas"] = compute_jax_compartment_deltas(population_matrix, disease_type,  n_regions, compartment_list)
-    formatted_data["parent_admin_total"] = compute_parent_admin_total(formatted_data['admin_zones'], simulation_metadata, unique_id, parent_unique_id, population_matrix.shape[0], step)
+    formatted_data["parent_admin_total"] = compute_parent_admin_total(formatted_data['admin_zones'], payload, unique_id, parent_unique_id, population_matrix.shape[0], step)
     return formatted_data
 
 def format_uncertainty_output(means_child, lower_child, upper_child,
                               means_parent, lower_parent, upper_parent,
-                              simulation_metadata,
+                              payload,
                               compartment_list,
                               admin_units,
                               start_date,
@@ -403,19 +403,19 @@ def format_uncertainty_output(means_child, lower_child, upper_child,
     formatted_data = {
         "id": unique_id,
         "parent_time_series_id": parent_unique_id,
-        "simulation_job_id": simulation_metadata['id'],
-        "simulation_type": simulation_metadata['simulation_type'],
-        "owner": simulation_metadata['owner'],
-        "start_date": simulation_metadata['start_date'],
-        "end_date": simulation_metadata['end_date'],
-        "time_steps": simulation_metadata['time_steps'],
+        "simulation_job_id": payload['id'],
+        "simulation_type": payload['simulation_type'],
+        "owner": payload['owner'],
+        "start_date": payload['start_date'],
+        "end_date": payload['end_date'],
+        "time_steps": payload['time_steps'],
         "admin_zones": [],
         "compartment_deltas": avg_compartment_deltas,
         "parent_admin_total": []
     }
     
     base_date = datetime.strptime(start_date, "%Y-%m-%d").date()
-    admin_zones_payload = simulation_metadata['admin_zones']
+    admin_zones_payload = payload['case_file']['admin_zones']
 
     # number of timesteps in the output
     n_outputs_child = means_child.shape[0]
@@ -425,7 +425,7 @@ def format_uncertainty_output(means_child, lower_child, upper_child,
     for zone_idx, zone in enumerate(admin_units):
         zone_obj = {
             "simulation_job_result_id": unique_id,
-            "owner": simulation_metadata['owner'],
+            "owner": payload['owner'],
             "admin_zone_id": admin_zones_payload[zone_idx].get('id', None),
             "admin_unit_id": admin_zones_payload[zone_idx].get('id', None),
             "time_series": []
@@ -460,13 +460,13 @@ def format_uncertainty_output(means_child, lower_child, upper_child,
             }
         parent_time_series.append(record)
 
-    parent_admin_info = next((simulation_metadata[key] for key in ["AdminUnit2", "AdminUnit1", "AdminUnit0"] if simulation_metadata.get(key)), None)
+    parent_admin_info = next((payload[key] for key in ["AdminUnit2", "AdminUnit1", "AdminUnit0"] if payload.get(key)), None)
     formatted_data["parent_admin_total"] = {
         "id": parent_unique_id,
         "simulation_job_result_id": unique_id,
         "admin_zone_id": parent_admin_info["id"],
         "admin_unit_id": parent_admin_info["id"],
-        "owner": simulation_metadata['owner'],
+        "owner": payload['owner'],
         "time_series": parent_time_series
         }
 
@@ -656,63 +656,6 @@ def prepare_covid_initial_state(initial_population, age_transmission, demographi
     age_strat = comp_by_zone[:, None, :] * weights[None, :, None]
 
     return age_strat, age_transmission
-
-def clean_payload(payload):
-    # Extract components from payload
-    admin_zones = payload['data']['getSimulationJob']['case_file']['admin_zones']
-    admin_unit_2 = payload['data']['getSimulationJob']['AdminUnit2']
-    admin_unit_1 = payload['data']['getSimulationJob']['AdminUnit1']
-    admin_unit_0 = payload['data']['getSimulationJob']['AdminUnit0']
-    disease_nodes = payload['data']['getSimulationJob']['Disease']['disease_nodes']
-    transmission_edges = payload['data']['getSimulationJob']['Disease']['transmission_edges']
-    interventions = payload['data']['getSimulationJob']['interventions']
-    disease_type = payload['data']['getSimulationJob']['Disease']['disease_type']
-    # Handle travel_volume: None case
-    travel_volume = (payload.get('data', {}).get('getSimulationJob', {}).get('travel_volume', None))
-    travel_rates = get_travel_volume(travel_volume, admin_zones)
-    
-    # Create each component 
-    if disease_type == "VECTOR_BORNE":
-        run_mode = payload['data']['getSimulationJob']['run_mode']
-        compartment_list = create_dengue_compartment_list(disease_type)
-        initial_population = get_dengue_initial_population(admin_zones, compartment_list, run_mode)
-
-    else:
-        compartment_list = create_compartment_list(disease_nodes)
-        initial_population = create_initial_population_matrix(admin_zones, compartment_list)
-
-    transmission_dict = create_transmission_dict(transmission_edges)
-    admin_units = extract_admin_units(admin_zones)
-    intervention_dict = create_intervention_dict(interventions, payload['data']['getSimulationJob']['start_date'])
-
-    simulation_metadata = {
-        "id": payload['data']['getSimulationJob']['id'],
-        "simulation_type": payload['data']['getSimulationJob']['simulation_type'],
-        "owner": payload['data']['getSimulationJob']['owner'],
-        "start_date": payload['data']['getSimulationJob']['start_date'],
-        "end_date": payload['data']['getSimulationJob']['end_date'],
-        "time_steps": payload['data']['getSimulationJob']['time_steps'],
-        "admin_zones": admin_zones, #TODO can we just pass bigger admin_units object?
-        "AdminUnit2": payload['data']['getSimulationJob']['AdminUnit2'],
-        "AdminUnit1": payload['data']['getSimulationJob']['AdminUnit1'],
-        "AdminUnit0": payload['data']['getSimulationJob']['AdminUnit0'],
-    }
-    
-    # Create final cleaned payload
-    cleaned_payload = {
-        "initial_population": initial_population,
-        "compartment_list": compartment_list,
-        "transmission_dict": transmission_dict,
-        "admin_units": admin_units,
-        "intervention_dict": intervention_dict,
-        "travel_matrix": get_gravity_model_travel_matrix(admin_zones, travel_rates),
-        "hemisphere": get_hemisphere(admin_unit_2, admin_unit_1, admin_unit_0),
-        "temperature": get_temperature(admin_zones),
-        "travel_volume": travel_rates,
-        "simulation_metadata": simulation_metadata
-    }
-    
-    return cleaned_payload
 
 # --------------------------------------------------
 # Helper Functions: Gravity Model
