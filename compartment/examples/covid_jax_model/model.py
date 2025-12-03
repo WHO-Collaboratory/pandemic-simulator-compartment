@@ -56,8 +56,12 @@ class CovidJaxModel:
             "vaccination": False
         }
 
-        # Extra
-        self.payload = config
+        #TODO Make payload optional/debugging?
+        self.simulation_metadata = config["simulation_metadata"]
+
+    @property
+    def disease_type(self):
+        return "RESPIRATORY"
 
     def get_params(self):
         """ Get params tuple for ODE solver """
