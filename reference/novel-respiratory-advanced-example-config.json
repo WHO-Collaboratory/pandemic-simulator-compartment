@@ -184,6 +184,14 @@
                 "population": 4621930,
                 "infected_population": 0.01
             }
-        ]
+        ],
+        "demographics": {
+            "age_0_17": 10.0,
+            "age_18_55": 55.0,
+            "age_56_plus": 35.0
+        }
+    },
+    "travel_volume": {
+        "leaving": 20.0    
     }
 }
