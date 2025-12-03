@@ -4,7 +4,7 @@ LABEL maintainer="Christian Osborne cosborne@ruvos.com"
 ENV MODEL_DIR=/opt/pandemic-simulator-compartment/compartment/examples/covid_jax_model/
 
 ENV MODE=local
-ENV CONFIG_FILE=/opt/pandemic-simulator-compartment/reference/pansim-config.json
+ENV CONFIG_FILE=/opt/reference/pansim-config.json
 
 ENV PYTHONUNBUFFERED=1
 
@@ -18,4 +18,5 @@ RUN pip install --no-cache-dir -e .
 CMD ["sh", "-c", "cd $MODEL_DIR && python main.py \
     --mode ${MODE} \
     --config_file ${CONFIG_FILE} \
-    ${OUTPUT_FILE:+--output_file $OUTPUT_FILE}"]
+    ${OUTPUT_FILE:+--output_file $OUTPUT_FILE} \
+    ${SIMULATION_JOB_ID:+--simulation_job_id $SIMULATION_JOB_ID}"]

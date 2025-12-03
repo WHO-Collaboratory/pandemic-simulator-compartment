@@ -20,6 +20,7 @@ if __name__ == "__main__":
     parser.add_argument('--mode', choices=['local', 'cloud'], default='local')
     parser.add_argument('--config_file', help='Path to the JSON config file for the simulation')
     parser.add_argument('--output_file', nargs='?', default=None, help='Pass a relative path from your execution directory. Use * to generate a default output filename with timestamp.')
+    parser.add_argument('--simulation_job_id', nargs='?', default=None, help='Existing simulation job id in a graphql backend.')
     args = parser.parse_args()
 
     # Start tracking memory usage
@@ -41,7 +42,10 @@ if __name__ == "__main__":
             output_file = None
         run_metadata = run_simulation(config_path=args.config_file, output_path=output_file)
     elif args.mode == 'cloud':
-        simulation_params = get_simulation_params()
+        simulation_job_id = args.simulation_job_id
+        if simulation_job_id is None:
+            raise ValueError("simulation_job_id is required for cloud mode")
+        simulation_params = get_simulation_params(simulation_job_id=simulation_job_id)
         run_metadata = run_simulation(simulation_params=simulation_params)
     else:
         raise ValueError(f"Invalid mode: {args.mode}")
