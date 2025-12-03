@@ -41,7 +41,7 @@ class DengueJaxModel:
         }
 
         # Extra
-        self.simulation_metadata = config["simulation_metadata"]
+        self.simulation_metadata = config
         
         # Rate of loss of cross-protection
         # zeta = 1/immunity_period, default = 1/240, if immunity_period is 0 then zeta = 0 
