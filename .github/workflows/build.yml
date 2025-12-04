@@ -37,6 +37,6 @@ jobs:
       - name: Install uv
         run: pip install uv
       - name: Install compartment and dependencies
-        run: uv pip install ${{ matrix.pip-pre}}
+        run: uv pip install pandemic-simulator-compartment ${{ matrix.pip-pre}}
     
     
