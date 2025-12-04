@@ -17,17 +17,14 @@ from compartment.helpers import (
   load_config_from_json,
   write_results_to_local
 )
-from compartment.validation import CovidSimulationConfig, DengueSimulationConfig
+from compartment.validation import load_simulation_config
 from compartment.batch_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.batch_helpers.gql import get_simulation_job
 from compartment.batch_helpers.s3 import write_to_s3
 from compartment.batch_helpers.gql import write_to_gql
-#from compartment.model import DengueJaxModel, CovidJaxModel
 from compartment.examples.dengue_jax_model.model import DengueJaxModel
 from compartment.examples.covid_jax_model.model import CovidJaxModel
 
-from pydantic import ValidationError
-from compartment.validation import load_simulation_config
 # Makes sure unix implementations don't deadlock
 multiprocessing.set_start_method('spawn', force=True)
 
@@ -73,13 +70,10 @@ def run_simulation(simulation_params=None, mode:str='local', config_path: str = 
         owner = config['data']['getSimulationJob'].get('owner')
     else:
         raise ValueError(f"Invalid mode: {mode}")
-        
+
     # Validate and create config object
     disease_type = config['data']['getSimulationJob']['Disease']['disease_type']
-    try:
-        cleaned_config = load_simulation_config(config, disease_type)
-    except ValidationError as e:
-        raise RuntimeError(f"{disease_type} simulation config failed validation") from e
+    cleaned_config = load_simulation_config(config, disease_type)
 
     run_metadata = {
         "simulation_job_id": simulation_job_id,

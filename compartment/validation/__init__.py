@@ -17,6 +17,7 @@ from .covid_simulation_config import CovidSimulationConfig
 from .dengue_simulation_config import DengueSimulationConfig
 
 import logging
+import sys
 from pydantic import ValidationError
 
 __all__ = [
@@ -33,6 +34,8 @@ __all__ = [
     "CovidSimulationConfig",
     "DengueDiseaseConfig",
     "DengueSimulationConfig",
+    "log_pydantic_errors",
+    "load_simulation_config",
 ]
 
 logger = logging.getLogger("compartment.validation")
@@ -71,4 +74,6 @@ def load_simulation_config(config: dict, disease_type: str):
         return model_cls(**config["data"]["getSimulationJob"])
     except ValidationError as e:
         log_pydantic_errors(e, context=context)
-        raise
+        logger.error("Simulation config validation failed; aborting.")
+        # exit with non-zero code, NO traceback
+        sys.exit(2)
