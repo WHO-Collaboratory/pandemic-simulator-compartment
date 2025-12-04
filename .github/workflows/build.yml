@@ -36,7 +36,7 @@ jobs:
           cache: "pip"
       - name: Install uv
         run: pip install uv
-      - name: Install compartment and dependencies
-        run: uv pip install ${{ matrix.pip-pre}}
+      - name: Setup venv
+        run: uv venv && uv sync
     
     
