@@ -77,8 +77,8 @@ class BaseSimulationShared(BaseModel):
     run_mode: Literal["UNCERTAINTY", "DETERMINISTIC"]
 
     # Time
-    start_date: str
-    end_date: str
+    start_date: date
+    end_date: date
     time_steps: int = Field(gt=0)
 
     # Population / mobility
@@ -88,20 +88,10 @@ class BaseSimulationShared(BaseModel):
 
     case_file: CaseFile
 
-    @field_validator("start_date", "end_date")
-    @classmethod
-    def must_be_iso_date(cls, v: str) -> str:
-        try:
-            date.fromisoformat(v)  # ensure valid YYYY-MM-DD
-        except ValueError:
-            raise ValueError("Date must be an ISO string formatted as YYYY-MM-DD")
-        return v
-
     @field_validator("end_date")
     @classmethod
-    def end_not_before_start(cls, v: str, info):
+    def end_not_before_start(cls, v: date, info):
         start = info.data.get("start_date")
-        if start:
-            if date.fromisoformat(v) < date.fromisoformat(start):
-                raise ValueError("end_date must be on or after start_date")
+        if start and v < start:
+            raise ValueError("end_date must be on or after start_date")
         return v

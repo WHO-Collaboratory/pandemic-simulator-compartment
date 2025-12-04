@@ -15,7 +15,7 @@ class DengueJaxModel:
         # same as covid jax model
         self.population_matrix = np.array(config["initial_population"])
         self.compartment_list = config["compartment_list"]
-        self.start_date = datetime.strptime(config["start_date"], "%Y-%m-%d").date()
+        self.start_date = config["start_date"]
         self.start_date_ordinal = self.start_date.toordinal()
         self.n_timesteps = config["time_steps"]
         # for Jax replace travel matrix diag with 1.0
