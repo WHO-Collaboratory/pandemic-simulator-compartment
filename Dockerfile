@@ -7,13 +7,16 @@ LABEL maintainer="Christian Osborne cosborne@ruvos.com"
 
 # Note that to use configs or save results to your local filesystem, you must mount the appropriate directories.
 
+
 # MODEL_DIR sets the model to run.
 # Currently, we expect every model to have a main.py file that takes the MODE argument. 
-# It is recommended to also take the CONFIG_FILE argument.
 # To use a different model, change the MODEL_DIR to the appropriate model directory.
-ENV MODEL_DIR=/opt/pandemic-simulator-compartment/compartment/examples/covid_jax_model/
+ARG MODEL_DIR=compartment/examples/covid_jax_model/
+ENV MODEL_DIR=/opt/pandemic-simulator-compartment/${MODEL_DIR}
 
 ENV MODE=local
+# The CONFIG_FILE argument points to a custom config file 
+# Use the -v flag to mount the reference directory to your local filesystem.
 ENV CONFIG_FILE=/opt/pandemic-simulator-compartment/reference/pansim-config.json
 
 ENV ENVIRONMENT=dev
