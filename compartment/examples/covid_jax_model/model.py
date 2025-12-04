@@ -32,7 +32,7 @@ class CovidJaxModel:
         #self.disease_type = config['Disease']['disease_type']
 
         # Simulation parameters
-        self.start_date = datetime.strptime(config["start_date"], "%Y-%m-%d").date()
+        self.start_date = config["start_date"]
         self.start_date_ordinal = self.start_date.toordinal()
         self.n_timesteps = config["time_steps"]
 
