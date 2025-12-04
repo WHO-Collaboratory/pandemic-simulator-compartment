@@ -1,13 +1,11 @@
 {
     "admin_unit_0_id": "MDG",
     "start_date": "2025-11-18",
-    "end_date": "2025-12-18",
     "simulation_type": "COMPARTMENTAL",
-    "run_mode": "DETERMINISTIC",
+    "run_mode": "NOTDETERMINISTIC",
     "time_steps": 90,
     "AdminUnit0": {
-        "id": "MDG",
-        "center_lat": -19.37564815173127
+        "id": "MDG"
     },
     "Disease": {
         "disease_type": "RESPIRATORY",
