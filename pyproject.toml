@@ -1,6 +1,7 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 
 [project]
 name = "pandemic-simulator-compartment"
@@ -14,13 +15,10 @@ dependencies = [
     "jax>=0.8.1",
     "numpy>=2.3.5",
     "pandas>=2.3.3",
-    "pydantic>=2.11.7",
+    "pydantic>=2.12.5",
     "requests>=2.32.3",
     "scipy>=1.16.3",
 ]
 
-[tool.setuptools]
+[tool.hatch.build.targets.wheel]
 packages = ["compartment"]
-
-[tool.setuptools.package-data]
-"*" = ["*.json", "*.txt", "*.md"]
