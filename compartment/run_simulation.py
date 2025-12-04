@@ -1,7 +1,6 @@
 import logging
 import json
 import os
-import sys
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np # should we use jax.numpy?
@@ -18,8 +17,7 @@ from compartment.helpers import (
   load_config_from_json,
   write_results_to_local
 )
-from pydantic import ValidationError
-from compartment.validation import load_simulation_config, log_pydantic_errors
+from compartment.validation import load_simulation_config
 from compartment.batch_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.batch_helpers.gql import get_simulation_job
 from compartment.batch_helpers.s3 import write_to_s3
