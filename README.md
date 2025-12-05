@@ -49,7 +49,7 @@ Cloud mode is intended for use in the Pandemic Simulator app, and is not support
 
 Configuration files define the parameters for running simulations. These JSON files specify the disease model, geographic regions, population data, interventions, and simulation settings. Example configuration files are available in the `reference/` directory. We encourage modelers to add their own reference files to this directory when experimenting with models locally.
 
-### Required Fields (Covid and Dengue Jax models)
+### Required Fields (covid_jax_model and dengue_jax_model)
 
 All configuration files must include the following shared fields:
 
@@ -67,23 +67,22 @@ All configuration files must include the following shared fields:
   - `admin_zones` (array): List of administrative zones, each containing:
     - `name` (string): Zone name
     - `center_lat` (float): Latitude (-90 to 90)
-    - `center_lon` (float): Longitude (-180 to 180)
+    - `center_lon` (float): Longitude (-180.0 to 180.0)
     - `population` (integer): Population count (≥ 0)
     - `infected_population` (float): Initial infected population percentage (0-100)
-    - Additional optional fields which are used in the Pandemic Simulator app: `id`, `admin_code`, `admin_iso_code`, `admin_level`, `viz_name`, `osm_id`
+    - Additional optional fields which are used in the Pandemic Simulator app, but not in local simulations: `id` (string), `admin_code`(string), `admin_iso_code`(string), `admin_level`(integer), `viz_name`(string), `osm_id`(string)
 
-### Optional Fields (Covid and Dengue Jax models)
+### Optional Fields (covid_jax_model and dengue_jax_model)
 
-- **`admin_unit_1_id`** (string, default: `""`): Secondary administrative unit identifier
-- **`admin_unit_2_id`** (string, default: `""`): Tertiary administrative unit identifier
-- **`AdminUnit1`** (object, optional): Secondary administrative unit (same structure as `AdminUnit0`)
-- **`AdminUnit2`** (object, optional): Tertiary administrative unit (same structure as `AdminUnit0`)
-- **`id`** (string, optional): Simulation identifier, used by the web application.
-- **`simulation_name`** (string, default: `""`): Name for the simulation, used by the web application.
+- **`admin_unit_1_id`** (string, default: `""`): Secondary administrative unit identifier used by the webapp.
+- **`admin_unit_2_id`** (string, default: `""`): Tertiary administrative unit identifier used by the webapp.
+- **`AdminUnit1`** (object, optional): Secondary administrative unit (same structure as `AdminUnit0`) a major administrative territory within a country, like a state or prefacture.
+- **`AdminUnit2`** (object, optional): Tertiary administrative unit (same structure as `AdminUnit0`) a minor administrative territory within a level 1 admin unit, such as a county or ward.
+- **`id`** (string, optional): Simulation identifier, random string used by the web application.
+- **`simulation_name`** (string, default: `""`): Friendly name for the simulation, used by the web application for display.
 - **`owner`** (string, optional): Owner identifier, used by the web application.
 - **`travel_volume`** (object, optional): Travel/mobility parameters:
   - `leaving` (float, default: 0.2): Percentage of population leaving their admin zone, causing mixing across admin zones (0-1, or 0-100 which will be normalized)
-  - `returning` (float, optional): Percentage returning (0-1, or 0-100)
 - **`case_file.demographics`** (object, optional): Age structure, used for a social mixing function:
   - `age_0_17` (float, default: 25.0): Percentage aged 0-17 (0-100)
   - `age_18_55` (float, default: 50.0): Percentage aged 18-55 (0-100)
@@ -138,13 +137,9 @@ Interventions can be triggered at a certain date, or when the percentage of popu
 - **`start_date`** (string, optional): Start date in ISO format (YYYY-MM-DD)
 - **`end_date`** (string, optional): End date in ISO format (YYYY-MM-DD)
 - **`adherence_min`** (float, optional): Minimum adherence percentage, sets adherence in deterministic simulations and bounds adherence in stochastic simulations.
-- **`adherence_max`** (float, optional): Maximum adherence percentage, bounds adherence in stochastic simulations.
 - **`transmission_percentage`** (float, optional): Percentage reduction in transmission caused by adhering to the intervention.
-- **`hour_reduction`** (float, optional): Hours reduced (for certain interventions)
 - **`start_threshold`** (float, optional): Threshold to start intervention
 - **`end_threshold`** (float, optional): Threshold to end intervention
-- **`start_threshold_node_id`** (string, optional): Compartment to monitor for start threshold
-- **`end_threshold_node_id`** (string, optional): Compartment to monitor for end threshold
 - **`variance_params`** (array, optional): List of variance parameters for uncertainty quantification:
   - `has_variance` (boolean): Whether to vary this parameter
   - `distribution_type` (string): `"UNIFORM"` or `"NORMAL"`
