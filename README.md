@@ -116,7 +116,7 @@ For vector-borne diseases (e.g., Dengue), the `Disease` object must include:
 - **`immunity_period`** (integer): Duration of temporary cross-protection between first and second infection in days (≥ 0)
 
 Additionally, `admin_zones` in the `case_file` should include:
-- **`seroprevalence`** (float, optional): Percentage of population susceptible to second infection (0-100)
+- **`seroprevalence`** (float, optional): Percentage of population susceptible to second infection (0-100), defaults to 0
 - **`temp_min`** (float, optional): Minimum annual temperature (default: 15)
 - **`temp_max`** (float, optional): Maximum annual temperature (default: 30)
 - **`temp_mean`** (float, optional): Mean annual temperature (default: 25)
@@ -142,7 +142,7 @@ Interventions can be triggered at a certain date, or when the percentage of popu
 - **`end_threshold`** (float, optional): Threshold to end intervention
 - **`variance_params`** (array, optional): List of variance parameters for uncertainty quantification:
   - `has_variance` (boolean): Whether to vary this parameter
-  - `distribution_type` (string): `"UNIFORM"` or `"NORMAL"`
+  - `distribution_type` (string): `"UNIFORM"` 
   - `field_name` (string): Field to vary (e.g., `"adherence_min"`, `"transmission_percentage"`)
   - `min` (float): Minimum value
   - `max` (float): Maximum value
