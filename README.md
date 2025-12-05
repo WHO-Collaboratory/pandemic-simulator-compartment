@@ -114,7 +114,7 @@ For respiratory diseases (e.g., COVID-19), the `Disease` object must include:
 For vector-borne diseases (e.g., Dengue), the `Disease` object must include:
 
 - **`disease_type`** (string): Must be `"VECTOR_BORNE"`
-- **`immunity_period`** (integer): Duration of immunity in time steps (≥ 0)
+- **`immunity_period`** (integer): Duration of temporary cross-protection between first and second infection in days (≥ 0)
 
 Additionally, `admin_zones` in the `case_file` should include:
 - **`seroprevalence`** (float, optional): Percentage of population susceptible to second infection (0-100)
