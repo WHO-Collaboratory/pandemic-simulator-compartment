@@ -101,7 +101,7 @@ For respiratory diseases (e.g., COVID-19), the `Disease` object must include:
     - `transmission_rate` (float): Rate of transition (> 0) from source to target compartment
     - `variance_params` (object, optional): For uncertainty quantification:
       - `has_variance` (boolean): Whether to vary this parameter
-      - `distribution_type` (string): `"UNIFORM"` or `"NORMAL"`
+      - `distribution_type` (string): `"UNIFORM"`
       - `min` (float): Minimum value for uniform distribution
       - `max` (float): Maximum value for uniform distribution
       - `field_name` (string, optional): Field to vary
