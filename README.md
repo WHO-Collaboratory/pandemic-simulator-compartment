@@ -99,7 +99,7 @@ For respiratory diseases (e.g., COVID-19), the `Disease` object must include:
   - `source` (string): Source compartment name (e.g., `"susceptible"`, `"infected"`)
   - `target` (string): Target compartment name (e.g., `"exposed"`, `"recovered"`)
   - `data` (object):
-    - `transmission_rate` (float): Rate of transition (> 0)
+    - `transmission_rate` (float): Rate of transition (> 0) from source to target compartment
     - `variance_params` (object, optional): For uncertainty quantification:
       - `has_variance` (boolean): Whether to vary this parameter
       - `distribution_type` (string): `"UNIFORM"` or `"NORMAL"`
