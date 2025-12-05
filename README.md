@@ -142,7 +142,7 @@ Interventions can be triggered at a certain date, or when the percentage of popu
 - **`end_threshold`** (float, optional): Threshold to end intervention
 - **`variance_params`** (array, optional): List of variance parameters for uncertainty quantification:
   - `has_variance` (boolean): Whether to vary this parameter
-  - `distribution_type` (string): `"UNIFORM"` or `"NORMAL"`
+  - `distribution_type` (string): `"UNIFORM"` 
   - `field_name` (string): Field to vary (e.g., `"adherence_min"`, `"transmission_percentage"`)
   - `min` (float): Minimum value
   - `max` (float): Maximum value
