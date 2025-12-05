@@ -208,4 +208,4 @@ Join our project and provide assistance by:
 Checking out the list of open issues where we need help.
 If you need new features, please open a new issue or start a discussion. 
 
-Example models submitted to this repository will be reviewed by community subject matter experts. Public release is subject to approval and cannot be guaranteed. Users who contribute models are also expected to contribute example configs for those models.
+Example models submitted to this repository will be reviewed by community subject matter experts. Public release is subject to approval and cannot be guaranteed. Users who contribute models should include example configs for those models.
