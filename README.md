@@ -14,8 +14,12 @@ You can run simulations using this repository by either running commands to the 
 # Ensure you are at the root of this project. You should be in the "pandemic-simulator-compartment" folder.
 # Initialize a virtual environment using the require packages under uv.
 uv venv
+# Install the project's dependencies into your virtual environment
+uv sync
+# Activate the virtual environment which you've created for this project.
 source .venv/bin/activate
-python -m compartment.examples.covid_jax_model.main --config_file pansim
+# Run a covid model using the sample configuration: Madagascar.
+python -m compartment.examples.covid_jax_model.main --mode local --config_file reference/pansim-config.json --output_file results/example-run.json
 ```
 
 ### To run a command in that Dockerfile
@@ -40,6 +44,123 @@ docker run \
 ```
 
 Cloud mode is intended for use in the Pandemic Simulator app, and is not supported for use by the wider community at this time.
+
+## Using Reference Files
+
+Configuration files define the parameters for running simulations. These JSON files specify the disease model, geographic regions, population data, interventions, and simulation settings. Example configuration files are available in the `reference/` directory. We encourage modelers to add their own reference files to this directory when experimenting with models locally.
+
+### Required Fields (Covid and Dengue Jax models)
+
+All configuration files must include the following shared fields:
+
+- **`admin_unit_0_id`** (string): Identifier for the primary administrative unit (e.g., country code like "DEU")
+- **`start_date`** (string): Simulation start date in ISO format (YYYY-MM-DD)
+- **`end_date`** (string): Simulation end date in ISO format (YYYY-MM-DD), must be on or after `start_date`
+- **`simulation_type`** (string): Must be `"COMPARTMENTAL"`
+- **`run_mode`** (string): Either `"DETERMINISTIC"` or `"UNCERTAINTY"` for uncertainty quantification
+- **`time_steps`** (integer): Number of time steps to run the simulation (must be > 0)
+- **`AdminUnit0`** (object): Primary administrative unit with:
+  - `id` (string): Unit identifier
+  - `center_lat` (float): Latitude of the unit center (-90 to 90). Used for selecting hemisphere for the dengue model.
+- **`Disease`** (object): Disease-specific configuration (see below)
+- **`case_file`** (object): Population and geographic data with:
+  - `admin_zones` (array): List of administrative zones, each containing:
+    - `name` (string): Zone name
+    - `center_lat` (float): Latitude (-90 to 90)
+    - `center_lon` (float): Longitude (-180 to 180)
+    - `population` (integer): Population count (≥ 0)
+    - `infected_population` (float): Initial infected population percentage (0-100)
+    - Additional optional fields which are used in the Pandemic Simulator app: `id`, `admin_code`, `admin_iso_code`, `admin_level`, `viz_name`, `osm_id`
+
+### Optional Fields (Covid and Dengue Jax models)
+
+- **`admin_unit_1_id`** (string, default: `""`): Secondary administrative unit identifier
+- **`admin_unit_2_id`** (string, default: `""`): Tertiary administrative unit identifier
+- **`AdminUnit1`** (object, optional): Secondary administrative unit (same structure as `AdminUnit0`)
+- **`AdminUnit2`** (object, optional): Tertiary administrative unit (same structure as `AdminUnit0`)
+- **`id`** (string, optional): Simulation identifier, used by the web application.
+- **`simulation_name`** (string, default: `""`): Name for the simulation, used by the web application.
+- **`owner`** (string, optional): Owner identifier, used by the web application.
+- **`travel_volume`** (object, optional): Travel/mobility parameters:
+  - `leaving` (float, default: 0.2): Percentage of population leaving their admin zone, causing mixing across admin zones (0-1, or 0-100 which will be normalized)
+  - `returning` (float, optional): Percentage returning (0-1, or 0-100)
+- **`case_file.demographics`** (object, optional): Age structure, used for a social mixing function:
+  - `age_0_17` (float, default: 25.0): Percentage aged 0-17 (0-100)
+  - `age_18_55` (float, default: 50.0): Percentage aged 18-55 (0-100)
+  - `age_56_plus` (float, default: 25.0): Percentage aged 56+ (0-100)
+
+### Respiratory Disease Configuration
+
+For respiratory diseases (e.g., COVID-19), the `Disease` object must include:
+
+- **`disease_type`** (string): Must be `"RESPIRATORY"`
+- **`compartment_list`** (array of strings): List of disease compartments (e.g., `["S", "E", "I", "R", "H", "D"]` for Susceptible, Exposed, Infected, Recovered, Hospitalized, Dead)
+- **`transmission_edges`** (array): List of transitions between compartments used to fill in rates in the jax models, each containing:
+  - `source` (string): Source compartment name (e.g., `"susceptible"`, `"infected"`)
+  - `target` (string): Target compartment name (e.g., `"exposed"`, `"recovered"`)
+  - `data` (object):
+    - `transmission_rate` (float): Rate of transition (> 0)
+    - `variance_params` (object, optional): For uncertainty quantification:
+      - `has_variance` (boolean): Whether to vary this parameter
+      - `distribution_type` (string): `"UNIFORM"` or `"NORMAL"`
+      - `min` (float): Minimum value for uniform distribution
+      - `max` (float): Maximum value for uniform distribution
+      - `field_name` (string, optional): Field to vary
+
+**Example:** See `reference/novel-respiratory-basic-example-config.json` for a simple SIR model, or `reference/novel-respiratory-advanced-example-config.json` for a more complex model with multiple compartments and interventions.
+
+### Vector-Borne Disease Configuration
+
+For vector-borne diseases (e.g., Dengue), the `Disease` object must include:
+
+- **`disease_type`** (string): Must be `"VECTOR_BORNE"`
+- **`immunity_period`** (integer): Duration of immunity in time steps (≥ 0)
+
+Additionally, `admin_zones` in the `case_file` should include:
+- **`seroprevalence`** (float, optional): Percentage of population susceptible to second infection (0-100)
+- **`temp_min`** (float, optional): Minimum temperature (default: 15)
+- **`temp_max`** (float, optional): Maximum temperature (default: 30)
+- **`temp_mean`** (float, optional): Mean temperature (default: 25)
+
+**Example:** See `reference/novel-vector-borne-basic-example-config.json` for a vector-borne disease configuration.
+
+### Interventions
+
+Interventions are optional and can be included for both disease types. Different disease_types have different interventions available.
+
+Interventions can be triggered at a certain date, or when the percentage of population in a particular compartment reaches a certain threshold. If dates and thresholds are both provided, the intervention begins when the first condition which could trigger the intervention is reached, and the other condition trigger is ignored.
+
+ The `interventions` array contains objects with:
+
+- **`id`** (string): Intervention type, must be one of:
+  - Respiratory: `"social_isolation"`, `"vaccination"`, `"mask_wearing"`, `"lock_down"`
+  - Vector-borne: `"chemical"`, `"physical"`
+- **`start_date`** (string, optional): Start date in ISO format (YYYY-MM-DD)
+- **`end_date`** (string, optional): End date in ISO format (YYYY-MM-DD)
+- **`adherence_min`** (float, optional): Minimum adherence percentage, sets adherence in deterministic simulations and bounds adherence in stochastic simulations.
+- **`adherence_max`** (float, optional): Maximum adherence percentage, bounds adherence in stochastic simulations.
+- **`transmission_percentage`** (float, optional): Percentage reduction in transmission caused by adhering to the intervention.
+- **`hour_reduction`** (float, optional): Hours reduced (for certain interventions)
+- **`start_threshold`** (float, optional): Threshold to start intervention
+- **`end_threshold`** (float, optional): Threshold to end intervention
+- **`start_threshold_node_id`** (string, optional): Compartment to monitor for start threshold
+- **`end_threshold_node_id`** (string, optional): Compartment to monitor for end threshold
+- **`variance_params`** (array, optional): List of variance parameters for uncertainty quantification:
+  - `has_variance` (boolean): Whether to vary this parameter
+  - `distribution_type` (string): `"UNIFORM"` or `"NORMAL"`
+  - `field_name` (string): Field to vary (e.g., `"adherence_min"`, `"transmission_percentage"`)
+  - `min` (float): Minimum value
+  - `max` (float): Maximum value
+
+### Example Files
+
+The `reference/` directory contains example configuration files:
+
+- **`novel-respiratory-basic-example-config.json`**: Simple SIR model with deterministic run mode
+- **`novel-respiratory-advanced-example-config.json`**: Complex model with multiple compartments, uncertainty quantification, and interventions
+- **`novel-vector-borne-basic-example-config.json`**: Vector-borne disease configuration with temperature parameters and interventions
+
+These files serve as templates for creating your own simulation configurations. All configuration files are validated using Pydantic models defined in `compartment/validation/` to ensure they meet the required structure and constraints.
 
 ## Features
 Current:
@@ -66,15 +187,13 @@ For detail on our methods please refer to our documentation:
 
 ```
 pandemic-simulator-compartment/
-├── compartment/
-│   ├── abstract/                   # Abstract base classes and interfaces
-│   ├── concrete/                   # Concrete model implementations
-│   │   └── respiratory/            # Respiratory disease models
-│   ├── examples/                   # Community-vetted example models
-│   │   └── README.md
-│   └── migration/                  # Legacy code from private repository
-│       ├── batch_helpers/          # AWS service utilities (to be moved to extensions)
-│       ├── compartment/            # Current core compartment model implementation
+├── compartment/                    # Top level contains helpers and classes used across models and to execute models.
+│   ├── batch_helpers/              # Helper files used for the pandemic-simulator web application
+│   ├── examples/                   # Models which implement the tools in this repository. Likely available in the pandemic-simulator app.
+│   │   |── covid_jax_model/        # Respiratory disease model
+|   |   |── dengue_jax_model/       # Vector-borne disease model
+│   ├── validation/                 # Pydantic syntax models which verify that a config is an acceptable input for a model.
+├── reference/                      # Model configurations for running models locally. You can add your own reference configs.
 ```
 
 ## Caveats/Limitations
@@ -89,4 +208,4 @@ Join our project and provide assistance by:
 Checking out the list of open issues where we need help.
 If you need new features, please open a new issue or start a discussion. 
 
-Example models submitted to this repository will be reviewed by community subject matter experts. Public release is subject to approval and cannot be guaranteed.
+Example models submitted to this repository will be reviewed by community subject matter experts. Public release is subject to approval and cannot be guaranteed. Users who contribute models are also expected to contribute example configs for those models.
