@@ -116,7 +116,7 @@ For vector-borne diseases (e.g., Dengue), the `Disease` object must include:
 - **`immunity_period`** (integer): Duration of temporary cross-protection between first and second infection in days (≥ 0)
 
 Additionally, `admin_zones` in the `case_file` should include:
-- **`seroprevalence`** (float, optional): Percentage of population susceptible to second infection (0-100)
+- **`seroprevalence`** (float, optional): Percentage of population susceptible to second infection (0-100), defaults to 0
 - **`temp_min`** (float, optional): Minimum annual temperature (default: 15)
 - **`temp_max`** (float, optional): Maximum annual temperature (default: 30)
 - **`temp_mean`** (float, optional): Mean annual temperature (default: 25)
