@@ -102,8 +102,8 @@ For respiratory diseases (e.g., COVID-19), the `Disease` object must include:
     - `variance_params` (object, optional): For uncertainty quantification:
       - `has_variance` (boolean): Whether to vary this parameter
       - `distribution_type` (string): `"UNIFORM"`
-      - `min` (float): Minimum value for uniform distribution
-      - `max` (float): Maximum value for uniform distribution
+      - `min` (float): Minimum value for distribution
+      - `max` (float): Maximum value for distribution
       - `field_name` (string, optional): Field to vary
 
 **Example:** See `reference/novel-respiratory-basic-example-config.json` for a simple SIR model, or `reference/novel-respiratory-advanced-example-config.json` for a more complex model with multiple compartments and interventions.

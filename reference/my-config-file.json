@@ -1,0 +1,337 @@
+{
+    "data": {
+        "getSimulationJob": {
+            "id": "43d96740-3ed4-494f-93ee-0a2ce2686e57",
+            "admin_unit_0_id": "MDG",
+            "admin_unit_1_id": "MDG.1_1",
+            "admin_unit_2_id": "",
+            "createdAt": "2025-10-22T19:10:01.939Z",
+            "disease_id": "e2f49c5a-346b-446a-948f-b1ad292ecb48",
+            "end_date": "2026-10-22",
+            "owner": "f4f804b8-a0d1-70a7-fdc3-3a82f6460862",
+            "selected_infected_population": 1.0,
+            "selected_population": 0,
+            "simulation_name": "2025-10-22 19:10 UTC Simulation",
+            "simulation_type": "COMPARTMENTAL",
+            "run_mode": "DETERMINISTIC",
+            "start_date": "2025-10-22",
+            "tag_id": null,
+            "time_steps": 365,
+            "travel_volume": {
+                "leaving": 20.0,
+                "returning": 10.0
+            },
+            "updatedAt": "2025-10-22T19:11:18.144Z",
+            "AdminUnit0": {
+                "id": "MDG",
+                "center_lat": -19.37564815173127
+            },
+            "AdminUnit1": {
+                "id": "MDG.1_1",
+                "center_lat": -18.93585290187204
+            },
+            "AdminUnit2": null,
+            "Disease": {
+                "id": "e2f49c5a-346b-446a-948f-b1ad292ecb48",
+                "createdAt": "2025-10-22T19:10:01.719Z",
+                "disease_name": "RESPIRATORY 2025-10-22 19:10 UTC",
+                "disease_type": "RESPIRATORY",
+                "disease_nodes": [
+                    {
+                        "type": "DISEASE_STATE_NODE",
+                        "data": {
+                            "alias": null,
+                            "label": "Susceptible"
+                        },
+                        "id": "susceptible"
+                    },
+                    {
+                        "type": "DISEASE_STATE_NODE",
+                        "data": {
+                            "alias": null,
+                            "label": "Infected"
+                        },
+                        "id": "infected"
+                    },
+                    {
+                        "type": "DISEASE_STATE_NODE",
+                        "data": {
+                            "alias": null,
+                            "label": "Recovered"
+                        },
+                        "id": "recovered"
+                    },
+                    {
+                        "type": "DISEASE_STATE_NODE",
+                        "data": {
+                            "alias": null,
+                            "label": "Exposed"
+                        },
+                        "id": "exposed"
+                    },
+                    {
+                        "type": "DISEASE_STATE_NODE",
+                        "data": {
+                            "alias": null,
+                            "label": "Hospitalized"
+                        },
+                        "id": "hospitalized"
+                    },
+                    {
+                        "type": "DISEASE_STATE_NODE",
+                        "data": {
+                            "alias": null,
+                            "label": "Deceased"
+                        },
+                        "id": "deceased"
+                    }
+                ],
+                "immunity_period": 14,
+                "interactions_per_period": 1,
+                "intervention_nodes": null,
+                "model_type": null,
+                "transmission_edges": [
+                    {
+                        "data": {
+                            "transmission_rate": 0.25,
+                            "variance_params": {
+                                "has_variance": false,
+                                "distribution_type": "UNIFORM",
+                                "field_name": null,
+                                "min": 0.2,
+                                "max": 0.3
+                            }
+                        },
+                        "id": "susceptible->infected",
+                        "source": "susceptible",
+                        "target": "infected",
+                        "type": null
+                    },
+                    {
+                        "data": {
+                            "transmission_rate": 0.25,
+                            "variance_params": {
+                                "has_variance": false,
+                                "distribution_type": "UNIFORM",
+                                "field_name": null,
+                                "min": 0.2,
+                                "max": 0.3
+                            }
+                        },
+                        "id": "susceptible->exposed",
+                        "source": "susceptible",
+                        "target": "exposed",
+                        "type": null
+                    },
+                    {
+                        "data": {
+                            "transmission_rate": 0.2,
+                            "variance_params": {
+                                "has_variance": false,
+                                "distribution_type": "UNIFORM",
+                                "field_name": null,
+                                "min": 0.071,
+                                "max": 0.5
+                            }
+                        },
+                        "id": "exposed->infected",
+                        "source": "exposed",
+                        "target": "infected",
+                        "type": null
+                    },
+                    {
+                        "data": {
+                            "transmission_rate": 0.0004,
+                            "variance_params": {
+                                "has_variance": false,
+                                "distribution_type": "UNIFORM",
+                                "field_name": null,
+                                "min": 0.0004,
+                                "max": 0.004
+                            }
+                        },
+                        "id": "infected->hospitalized",
+                        "source": "infected",
+                        "target": "hospitalized",
+                        "type": null
+                    },
+                    {
+                        "data": {
+                            "transmission_rate": 0.0001,
+                            "variance_params": {
+                                "has_variance": false,
+                                "distribution_type": "UNIFORM",
+                                "field_name": null,
+                                "min": 0.0001,
+                                "max": 0.001
+                            }
+                        },
+                        "id": "infected->deceased",
+                        "source": "infected",
+                        "target": "deceased",
+                        "type": null
+                    },
+                    {
+                        "data": {
+                            "transmission_rate": 0.001,
+                            "variance_params": {
+                                "has_variance": false,
+                                "distribution_type": "UNIFORM",
+                                "field_name": null,
+                                "min": 0.001,
+                                "max": 0.005
+                            }
+                        },
+                        "id": "hospitalized->deceased",
+                        "source": "hospitalized",
+                        "target": "deceased",
+                        "type": null
+                    },
+                    {
+                        "data": {
+                            "transmission_rate": 0.14,
+                            "variance_params": {
+                                "has_variance": false,
+                                "distribution_type": "UNIFORM",
+                                "field_name": null,
+                                "min": 0.1,
+                                "max": 0.25
+                            }
+                        },
+                        "id": "infected->recovered",
+                        "source": "infected",
+                        "target": "recovered",
+                        "type": null
+                    },
+                    {
+                        "data": {
+                            "transmission_rate": 0.14,
+                            "variance_params": {
+                                "has_variance": false,
+                                "distribution_type": "UNIFORM",
+                                "field_name": null,
+                                "min": 0.071,
+                                "max": 0.33
+                            }
+                        },
+                        "id": "hospitalized->recovered",
+                        "source": "hospitalized",
+                        "target": "recovered",
+                        "type": null
+                    }
+                ],
+                "updatedAt": "2025-10-22T19:10:01.719Z"
+            },
+            "interventions": [
+                {
+                    "adherence_max": null,
+                    "adherence_min": 20.0,
+                    "end_date": "2026-10-22",
+                    "end_threshold": null,
+                    "end_threshold_node_id": null,
+                    "id": "mask_wearing",
+                    "label": null,
+                    "start_date": "2025-10-22",
+                    "start_threshold": null,
+                    "start_threshold_node_id": null,
+                    "type": "INTERVENTION",
+                    "transmission_percentage": 25.0,
+                    "hour_reduction": null,
+                    "variance_params": [
+                        {
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "field_name": "adherence_min",
+                            "min": 20.0,
+                            "max": 30.0
+                        },
+                        {
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "field_name": "transmission_percentage",
+                            "min": 25.0,
+                            "max": 35.0
+                        }
+                    ]
+                }
+            ],
+            "case_file": {
+                "admin_zones": [
+                    {
+                        "id": "MDG.1.1_1",
+                        "admin_code": null,
+                        "admin_iso_code": null,
+                        "admin_level": 2,
+                        "center_lat": -18.42098621718364,
+                        "center_lon": 47.421698530836274,
+                        "viz_name": "Analamanga",
+                        "name": "Analamanga",
+                        "population": 4738613,
+                        "osm_id": null,
+                        "infected_population": 1.0,
+                        "seroprevalence": 0.0,
+                        "temp_min": 15.0,
+                        "temp_max": 30.0,
+                        "temp_mean": 25.0
+                    },
+                    {
+                        "id": "MDG.1.2_1",
+                        "admin_code": null,
+                        "admin_iso_code": null,
+                        "admin_level": 2,
+                        "center_lat": -18.586949228719952,
+                        "center_lon": 46.14807512716985,
+                        "viz_name": "Bongolava",
+                        "name": "Bongolava",
+                        "population": 659585,
+                        "osm_id": null,
+                        "infected_population": 1.0,
+                        "seroprevalence": 0.0,
+                        "temp_min": 15.0,
+                        "temp_max": 30.0,
+                        "temp_mean": 25.0
+                    },
+                    {
+                        "id": "MDG.1.3_1",
+                        "admin_code": null,
+                        "admin_iso_code": null,
+                        "admin_level": 2,
+                        "center_lat": -19.05434047851351,
+                        "center_lon": 46.892065442303824,
+                        "viz_name": "Itasy",
+                        "name": "Itasy",
+                        "population": 762479,
+                        "osm_id": null,
+                        "infected_population": 1.0,
+                        "seroprevalence": 0.0,
+                        "temp_min": 15.0,
+                        "temp_max": 30.0,
+                        "temp_mean": 25.0
+                    },
+                    {
+                        "id": "MDG.1.4_1",
+                        "admin_code": null,
+                        "admin_iso_code": null,
+                        "admin_level": 2,
+                        "center_lat": -19.72948285651432,
+                        "center_lon": 46.83565369349379,
+                        "viz_name": "Vakinankaratra",
+                        "name": "Vakinankaratra",
+                        "population": 1910631,
+                        "osm_id": null,
+                        "infected_population": 1.0,
+                        "seroprevalence": 0.0,
+                        "temp_min": 15.0,
+                        "temp_max": 30.0,
+                        "temp_mean": 25.0
+                    }
+                ],
+                "demographics": {
+                    "age_0_17": 25.0,
+                    "age_18_55": 50.0,
+                    "age_56_plus": 25.0
+                }
+            }
+        }
+    }
+}
