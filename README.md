@@ -118,9 +118,9 @@ For vector-borne diseases (e.g., Dengue), the `Disease` object must include:
 
 Additionally, `admin_zones` in the `case_file` should include:
 - **`seroprevalence`** (float, optional): Percentage of population susceptible to second infection (0-100)
-- **`temp_min`** (float, optional): Minimum temperature (default: 15)
-- **`temp_max`** (float, optional): Maximum temperature (default: 30)
-- **`temp_mean`** (float, optional): Mean temperature (default: 25)
+- **`temp_min`** (float, optional): Minimum annual temperature (default: 15)
+- **`temp_max`** (float, optional): Maximum annual temperature (default: 30)
+- **`temp_mean`** (float, optional): Mean annual temperature (default: 25)
 
 **Example:** See `reference/novel-vector-borne-basic-example-config.json` for a vector-borne disease configuration.
 
