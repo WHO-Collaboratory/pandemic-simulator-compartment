@@ -121,23 +121,7 @@
             "end_date": "2025-01-31",
             "id": "social_isolation",
             "start_date": "2025-11-18",
-            "transmission_percentage": 50.0,
-            "variance_params": [
-                {
-                    "has_variance": false,
-                    "distribution_type": "UNIFORM",
-                    "field_name": "adherence_min",
-                    "min": 20.0,
-                    "max": 70.0
-                },
-                {
-                    "has_variance": false,
-                    "distribution_type": "UNIFORM",
-                    "field_name": "transmission_percentage",
-                    "min": 35.0,
-                    "max": 75.0
-                }
-            ]
+            "transmission_percentage": 50.0
         }
     ],
     "case_file": {

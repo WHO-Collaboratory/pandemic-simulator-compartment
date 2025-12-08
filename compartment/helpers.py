@@ -547,16 +547,18 @@ def build_uncertainty_params(transmission_edges: list, interventions: list):
     if interventions:
         # Process interventions
         for intervention in interventions:
-            for var_param in intervention.get("variance_params", []):
-                if var_param.get("has_variance"):
-                    field_name = var_param.get("field_name")
-                    if field_name:
-                        uncertainty_params.append({
-                            "param": f"intervention.{intervention['id']}.{field_name}",
-                            "dist": var_param.get("distribution_type", "uniform"),
-                            "min": var_param.get("min", 0) / 100,
-                            "max": var_param.get("max", 0) / 100
-                        })
+            variance_params = intervention.get("variance_params", [])
+            if variance_params:
+                for var_param in variance_params:
+                    if var_param.get("has_variance"):
+                        field_name = var_param.get("field_name")
+                        if field_name:
+                            uncertainty_params.append({
+                                "param": f"intervention.{intervention['id']}.{field_name}",
+                                "dist": var_param.get("distribution_type", "uniform"),
+                                "min": var_param.get("min", 0) / 100,
+                                "max": var_param.get("max", 0) / 100
+                            })
 
     return uncertainty_params
 

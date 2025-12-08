@@ -22,23 +22,7 @@
             "end_date": "2026-11-21",
             "id": "chemical",
             "start_date": "2025-11-21",
-            "transmission_percentage": 50.0,
-            "variance_params": [
-                {
-                    "has_variance": false,
-                    "distribution_type": "UNIFORM",
-                    "field_name": "adherence_min",
-                    "min": 50.0,
-                    "max": 30.0
-                },
-                {
-                    "has_variance": false,
-                    "distribution_type": "UNIFORM",
-                    "field_name": "transmission_percentage",
-                    "min": 50.0,
-                    "max": 35.0
-                }
-            ]
+            "transmission_percentage": 50.0
         }
     ],
     "case_file": {
