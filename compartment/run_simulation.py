@@ -3,7 +3,6 @@ import json
 import os
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any
 import numpy as np # should we use jax.numpy?
 from copy import deepcopy
 from math import ceil
