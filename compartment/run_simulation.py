@@ -3,6 +3,7 @@ import json
 import os
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
+from typing import Any
 import numpy as np # should we use jax.numpy?
 from copy import deepcopy
 from math import ceil
@@ -164,7 +165,6 @@ def run_simulation(simulation_params=None, mode:str='local', config_path: str = 
     results_with["control_run"] = False
     results_without["control_run"] = True
     results = [results_with, results_without]
-    print(type(results))
     
     if mode == 'local':
         if output_path is None:
