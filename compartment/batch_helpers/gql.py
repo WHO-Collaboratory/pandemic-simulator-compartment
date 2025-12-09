@@ -1,5 +1,6 @@
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from compartment.helpers import convert_dates
 
 # --------------------------------------------------
 # Helper Functions: GQL query
@@ -85,7 +86,7 @@ def gql_write_helper(job_params, results, query):
         headers["x-api-key"] = api_key
 
     try:
-        response = requests.post(GRAPHQL_ENDPOINT, json=payload, headers=headers)
+        response = requests.post(GRAPHQL_ENDPOINT, json=convert_dates(payload), headers=headers)
         status_code = response.status_code
         response.raise_for_status()
         gql_response = response.json()

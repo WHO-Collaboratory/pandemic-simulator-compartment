@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 from logging import basicConfig, StreamHandler, INFO
 import geopy.distance
 import json
@@ -81,6 +81,16 @@ edge_to_variable = {
     "hospitalized->recovered": "eta",
     "hospitalized->deceased": "epsilon"
 }
+
+def convert_dates(obj):
+    if isinstance(obj, dict):
+        return {k: convert_dates(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_dates(v) for v in obj]
+    elif isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    else:
+        return obj
 
 def transform_interventions(data):
     """
