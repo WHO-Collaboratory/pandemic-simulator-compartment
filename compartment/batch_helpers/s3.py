@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 import boto3
 from compartment.helpers import convert_dates
+from compartment.validation import load_simulation_config
 
 def s3_write_helper(s3_client, bucket_name, key, payload):
     payload = convert_dates(payload)
@@ -56,3 +57,47 @@ def upload_validation_result_to_s3(simulation_job_id: str, result: dict, success
     s3 = boto3.client("s3", region_name="us-east-1")
     s3_write_helper(s3, bucket, key, result)
     return f"s3://{bucket}/{key}"
+
+def record_and_upload_validation(
+    simulation_job_id,
+    config,
+    disease_type,
+    environment=None,
+    mode='local'
+):
+    validation_result = None
+    validation_success = False
+    try:
+        cleaned_config = load_simulation_config(config, disease_type)
+        validation_result = {
+            "event": "validation_success",
+            "job_id": simulation_job_id,
+            "schema": type(cleaned_config).__name__,
+            "timestamp": datetime.now().isoformat(),
+            "payload": config['data']['getSimulationJob'],
+            "model_dump": cleaned_config.model_dump() if hasattr(cleaned_config, "model_dump") else None,
+        }
+        validation_success = True
+    except Exception as e:
+        from pydantic import ValidationError
+        err_obj = e if isinstance(e, ValidationError) else None
+        validation_result = {
+            "event": "validation_failure",
+            "job_id": simulation_job_id,
+            "schema": getattr(e, 'model', None) or "UnknownConfig",
+            "timestamp": datetime.now().isoformat(),
+            "payload": config['data']['getSimulationJob'],
+            "error": err_obj.errors() if err_obj else str(e),
+            "error_str": str(e),
+        }
+        validation_success = False
+    # Write to S3 if in cloud mode
+    if mode == 'cloud' and environment and simulation_job_id:
+        s3_path = upload_validation_result_to_s3(
+            simulation_job_id,
+            validation_result,
+            validation_success,
+            environment
+        )
+        print(f"Validation result persisted to S3 at: {s3_path}")
+    return validation_success, cleaned_config
