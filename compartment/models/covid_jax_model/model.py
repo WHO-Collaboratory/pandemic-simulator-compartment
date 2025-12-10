@@ -4,12 +4,12 @@ import numpy as onp
 from datetime import datetime
 from compartment.helpers import setup_logging, prepare_covid_initial_state
 from compartment.interventions import jax_timestep_intervention, jax_prop_intervention
-
+from compartment.model import Model
 # Initialize logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
-class CovidJaxModel:
+class CovidJaxModel(Model):
     """ A class representing a compartmental model with dynamic travel and intervention mechanisms """
     def __init__(self, config):
         """ Initialize the CompartmentalModel with a configuration dictionary """
@@ -29,7 +29,6 @@ class CovidJaxModel:
         self.eta = transmission_dict.get("eta", None)           # hospitalized → recovered
         self.epsilon = transmission_dict.get("epsilon", None)   # hospitalized → deceased
         self.original_rates = {"beta": self.beta}
-        #self.disease_type = config['Disease']['disease_type']
 
         # Simulation parameters
         self.start_date = config["start_date"]

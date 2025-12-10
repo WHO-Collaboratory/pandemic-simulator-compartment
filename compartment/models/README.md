@@ -1,2 +1,2 @@
-# Compartmental Core Examples
+# Pandemic Simulator Compartment Core Example Models
 This repository will include example compartmental models built using this module’s tools. These examples demonstrate the package’s capabilities and provide starting points for further development.
