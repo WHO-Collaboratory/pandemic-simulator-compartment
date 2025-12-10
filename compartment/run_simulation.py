@@ -20,7 +20,7 @@ from compartment.helpers import (
 from compartment.validation import load_simulation_config
 from compartment.batch_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.batch_helpers.gql import get_simulation_job
-from compartment.batch_helpers.s3 import write_to_s3
+from compartment.batch_helpers.s3 import write_to_s3, record_and_upload_validation
 from compartment.batch_helpers.gql import write_to_gql
 from compartment.model import Model
 
@@ -72,7 +72,16 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
 
     # Validate and create config object
     disease_type = config['data']['getSimulationJob']['Disease']['disease_type']
-    cleaned_config = load_simulation_config(config, disease_type)
+    validation_success, cleaned_config = record_and_upload_validation(
+        simulation_job_id,
+        config,
+        disease_type,
+        environment=simulation_params.get("ENVIRONMENT", "dev") if simulation_params else None,
+        mode=mode
+    )
+    if not validation_success:
+        logger.error("Halting due to validation failure. See S3 logs for details.")
+        return None
 
     run_metadata = {
         "simulation_job_id": simulation_job_id,
