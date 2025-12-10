@@ -22,8 +22,8 @@ from compartment.batch_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.batch_helpers.gql import get_simulation_job
 from compartment.batch_helpers.s3 import write_to_s3
 from compartment.batch_helpers.gql import write_to_gql
-from compartment.examples.dengue_jax_model.model import DengueJaxModel
-from compartment.examples.covid_jax_model.model import CovidJaxModel
+from compartment.models.dengue_jax_model.model import DengueJaxModel #TODO use ABC instead of specific models.
+from compartment.models.covid_jax_model.model import CovidJaxModel
 
 # Makes sure unix implementations don't deadlock
 multiprocessing.set_start_method('spawn', force=True)

@@ -19,7 +19,7 @@ uv sync
 # Activate the virtual environment which you've created for this project.
 source .venv/bin/activate
 # Run a covid model using the sample configuration: Madagascar.
-python -m compartment.examples.covid_jax_model.main --mode local --config_file reference/pansim-config.json --output_file results/example-run.json
+python -m compartment.models.covid_jax_model.main --mode local --config_file compartment/models/covid_jax_model/pansim-config.json --output_file results/example-run.json
 ```
 
 ### To run a command in that Dockerfile
@@ -184,7 +184,7 @@ For detail on our methods please refer to our documentation:
 pandemic-simulator-compartment/
 ├── compartment/                    # Top level contains helpers and classes used across models and to execute models.
 │   ├── batch_helpers/              # Helper files used for the pandemic-simulator web application
-│   ├── examples/                   # Models which implement the tools in this repository. Likely available in the pandemic-simulator app.
+│   ├── models/                     # Models which implement the tools in this repository. Likely available in the pandemic-simulator app.
 │   │   |── covid_jax_model/        # Respiratory disease model
 |   |   |── dengue_jax_model/       # Vector-borne disease model
 │   ├── validation/                 # Pydantic syntax models which verify that a config is an acceptable input for a model.

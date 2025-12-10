@@ -11,7 +11,7 @@ LABEL maintainer="Christian Osborne cosborne@ruvos.com"
 # MODEL_DIR sets the model to run.
 # Currently, we expect every model to have a main.py file that takes the MODE argument. 
 # To use a different model, change the MODEL_DIR to the appropriate model directory.
-ARG MODEL_DIR=compartment/examples/covid_jax_model/
+ARG MODEL_DIR=compartment/models/covid_jax_model/
 ENV MODEL_DIR=/opt/pandemic-simulator-compartment/${MODEL_DIR}
 
 ENV MODE=local

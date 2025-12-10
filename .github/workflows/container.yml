@@ -44,5 +44,5 @@ jobs:
           ghcr.io/who-collaboratory/pandemic-simulator-compartment/pansim-compartment-${{matrix.disease_path}}:${{ github.ref_name }}
           ghcr.io/who-collaboratory/pandemic-simulator-compartment/pansim-compartment-${{matrix.disease_path}}:latest
         build-args: |
-          MODEL_DIR=compartment/examples/${{matrix.disease_path}}/
+          MODEL_DIR=compartment/models/${{matrix.disease_path}}/
         
