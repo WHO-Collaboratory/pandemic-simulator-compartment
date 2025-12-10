@@ -15,10 +15,11 @@ ARG MODEL_DIR=compartment/examples/covid_jax_model/
 ENV MODEL_DIR=/opt/pandemic-simulator-compartment/${MODEL_DIR}
 
 ENV MODE=local
-# The CONFIG_FILE argument points to a custom config file 
+# The CONFIG_FILE environment variable points to a custom config file 
 # Use the -v flag to mount the reference directory to your local filesystem.
-ENV CONFIG_FILE=/opt/pandemic-simulator-compartment/reference/pansim-config.json
+ENV CONFIG_FILE=${MODEL_DIR}/example-config.json
 
+# This is used for cloud mode.
 ENV ENVIRONMENT=dev
 
 ENV PYTHONUNBUFFERED=1
