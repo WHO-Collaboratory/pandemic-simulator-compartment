@@ -7,7 +7,7 @@ import numpy as np # should we use jax.numpy?
 from copy import deepcopy
 from math import ceil
 import boto3
-from compartment.model import Model
+from datetime import datetime
 from compartment.simulation_manager import SimulationManager
 from compartment.simulation_postprocessor import SimulationPostProcessor
 from compartment.batch_simulation_manager import BatchSimulationManager
@@ -20,7 +20,7 @@ from compartment.helpers import (
 from compartment.validation import load_simulation_config
 from compartment.batch_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.batch_helpers.gql import get_simulation_job
-from compartment.batch_helpers.s3 import write_to_s3
+from compartment.batch_helpers.s3 import write_to_s3, upload_validation_result_to_s3
 from compartment.batch_helpers.gql import write_to_gql
 from compartment.examples.dengue_jax_model.model import DengueJaxModel
 from compartment.examples.covid_jax_model.model import CovidJaxModel
@@ -73,7 +73,45 @@ def run_simulation(simulation_params=None, mode:str='local', config_path: str = 
 
     # Validate and create config object
     disease_type = config['data']['getSimulationJob']['Disease']['disease_type']
-    cleaned_config = load_simulation_config(config, disease_type)
+
+    validation_result = None
+    validation_success = False
+    try:
+        cleaned_config = load_simulation_config(config, disease_type)
+        
+        # prepare result details for success
+        validation_result = {
+            "event": "validation_success",
+            "job_id": simulation_job_id,
+            "schema": type(cleaned_config).__name__,
+            "timestamp": datetime.now().isoformat(),
+            "payload": config['data']['getSimulationJob'],
+            "model_dump": cleaned_config.model_dump() if hasattr(cleaned_config, "model_dump") else None,
+        }
+        validation_success = True
+    except Exception as e:
+        # Log details of failure
+        from pydantic import ValidationError
+        err_obj = e if isinstance(e, ValidationError) else None
+        validation_result = {
+            "event": "validation_failure",
+            "job_id": simulation_job_id,
+            "schema": (getattr(e, 'model', None) or "UnknownConfig"),
+            "timestamp": datetime.now().isoformat(),
+            "payload": config['data']['getSimulationJob'],
+            "error": err_obj.errors() if err_obj else str(e),
+            "error_str": str(e),
+        }
+        validation_success = False
+
+    # Write to S3 if in cloud mode
+    if mode == 'cloud':
+        s3_path = upload_validation_result_to_s3(simulation_job_id, validation_result, validation_success, simulation_params.get("ENVIRONMENT", "dev"))
+        logger.info(f"Validation result persisted to S3 at: {s3_path}")
+    # If failed, do not proceed
+    if not validation_success:
+        logger.error("Halting due to validation failure. See S3 logs for details.")
+        return None
 
     run_metadata = {
         "simulation_job_id": simulation_job_id,

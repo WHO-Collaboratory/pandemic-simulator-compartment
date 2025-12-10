@@ -75,5 +75,4 @@ def load_simulation_config(config: dict, disease_type: str):
     except ValidationError as e:
         log_pydantic_errors(e, context=context)
         logger.error("Simulation config validation failed; aborting.")
-        # exit with non-zero code, NO traceback
-        sys.exit(2)
+        raise
