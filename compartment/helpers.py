@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta, date
 from logging import basicConfig, StreamHandler, INFO
 import geopy.distance
 import json
@@ -83,12 +83,15 @@ edge_to_variable = {
 }
 
 def convert_dates(obj):
+    """Recursively convert date, datetime, and ndarray objects for JSON serialization."""
     if isinstance(obj, dict):
         return {k: convert_dates(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
         return [convert_dates(v) for v in obj]
     elif isinstance(obj, (date, datetime)):
         return obj.isoformat()
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
     else:
         return obj
 
