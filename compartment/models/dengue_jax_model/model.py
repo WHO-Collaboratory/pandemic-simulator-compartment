@@ -4,13 +4,14 @@ import numpy as onp
 from compartment.helpers import setup_logging
 from datetime import datetime
 from compartment.interventions import jax_prop_intervention, jax_timestep_intervention
+from compartment.model import Model
 from compartment.temperature import temperature_seasonality_jax, calculate_thermal_responses, calculate_surviving_offspring, get_carrying_capacity
 
 # Initialize logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
-class DengueJaxModel:
+class DengueJaxModel(Model):
     def __init__(self, config):
         # same as covid jax model
         self.population_matrix = np.array(config["initial_population"])
@@ -24,7 +25,6 @@ class DengueJaxModel:
         self.demographics = config["case_file"]["demographics"]
         self.age_stratification = list(self.demographics.values())
         self.age_groups = list(self.demographics.keys())
-        self.disease_type = config['Disease']['disease_type']
         self.sigma = config['travel_volume']['leaving'] 
 
         # Temperature
@@ -62,6 +62,10 @@ class DengueJaxModel:
         self.kappa = 1e-5      # Helper population for mosquitos 
         self.theta = 0.01       # hospitalized --> infected. This value is from pg. 4 of Paz-Bailey et al.
         self.omega = 1/4.9      # hospitalized --> recovered
+
+    @property
+    def disease_type(self):
+        return "VECTOR_BORNE"
 
     def get_params(self):
         """ Get params tuple for ODE solver """

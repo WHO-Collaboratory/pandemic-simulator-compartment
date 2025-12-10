@@ -7,6 +7,7 @@ import tracemalloc
 from datetime import datetime
 from compartment.batch_helpers.simulation_helpers import get_simulation_params
 from compartment.run_simulation import run_simulation
+from compartment.models.dengue_jax_model.model import DengueJaxModel
 
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)
@@ -40,13 +41,13 @@ if __name__ == "__main__":
             output_file = f"{config_basename}-results-{timestamp}.json"
         elif args.output_file is None:
             output_file = None
-        run_metadata = run_simulation(config_path=args.config_file, output_path=output_file)
+        run_metadata = run_simulation(model_class=DengueJaxModel, config_path=args.config_file, output_path=output_file)
     elif args.mode == 'cloud':
         simulation_job_id = args.simulation_job_id
         if simulation_job_id is None:
             raise ValueError("simulation_job_id is required for cloud mode")
         simulation_params = get_simulation_params(simulation_job_id=simulation_job_id)
-        run_metadata = run_simulation(mode='cloud', simulation_params=simulation_params)
+        run_metadata = run_simulation(model_class=DengueJaxModel, mode='cloud', simulation_params=simulation_params)
     else:
         raise ValueError(f"Invalid mode: {args.mode}")
 

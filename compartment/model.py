@@ -1,7 +1,6 @@
 """Abstract base class for all models"""
 from abc import ABC,abstractmethod
 class Model(ABC):
-    #TODO concrete models should only take one config, the cleaned config
     def __init__(self, config:dict):
         self.config = config
     

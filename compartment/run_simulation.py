@@ -22,8 +22,7 @@ from compartment.batch_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.batch_helpers.gql import get_simulation_job
 from compartment.batch_helpers.s3 import write_to_s3
 from compartment.batch_helpers.gql import write_to_gql
-from compartment.models.dengue_jax_model.model import DengueJaxModel #TODO use ABC instead of specific models.
-from compartment.models.covid_jax_model.model import CovidJaxModel
+from compartment.model import Model
 
 # Makes sure unix implementations don't deadlock
 multiprocessing.set_start_method('spawn', force=True)
@@ -49,7 +48,7 @@ def batch_simulate_and_postprocess(model, n_sims, param_list, ci, num_workers):
     processor = SimulationPostProcessor(model, all_output)
     return processor.process(ci=ci)
 
-def run_simulation(simulation_params=None, mode:str='local', config_path: str = None, output_path: str = None):
+def run_simulation(model_class, simulation_params=None, mode:str='local', config_path: str = None, output_path: str = None):
     logger.info("Starting the simulation...")
         
     if mode == 'local':
@@ -91,17 +90,10 @@ def run_simulation(simulation_params=None, mode:str='local', config_path: str = 
         logger.info(f"transmission_dict: {cleaned_config.transmission_dict}")
     logger.info(f"intervention_dict: {cleaned_config.intervention_dict}")
 
-    # Map of disease_type to model_class
-    DISEASE_MODEL_MAP = {
-        "VECTOR_BORNE": DengueJaxModel,
-        "RESPIRATORY": CovidJaxModel    
-    }
-
-    try:
-        model_class = DISEASE_MODEL_MAP[disease_type]
-    except KeyError:
-        logger.error(f"Invalid disease type: {disease_type}")
-        raise ValueError(f"Invalid disease type: {disease_type}")
+    # Validate that model_class is a subclass of Model
+    if not issubclass(model_class, Model):
+        logger.error(f"model_class must be a subclass of Model, got {model_class}")
+        raise ValueError(f"model_class must be a subclass of Model, got {model_class}")
     
     run_mode = cleaned_config.run_mode
     logger.info(f"run_mode: {run_mode}")
