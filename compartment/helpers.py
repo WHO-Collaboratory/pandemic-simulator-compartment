@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, date
 from logging import basicConfig, StreamHandler, INFO
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import geopy.distance
 import json
 import numpy as np
@@ -890,3 +891,12 @@ def get_dengue_initial_population(case_file, compartment_list, run_mode, vector_
         initial_population[i, column_mapping['I4']] = I4
     
     return initial_population
+
+def get_executor_class():
+    """Get the appropriate executor class, falling back to ThreadPoolExecutor if multiprocessing fails."""
+    try:
+        with ProcessPoolExecutor(max_workers=1) as test_executor:
+            pass
+        return ProcessPoolExecutor
+    except (OSError, RuntimeError, ValueError):
+        return ThreadPoolExecutor
