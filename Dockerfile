@@ -27,12 +27,17 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /opt/pandemic-simulator-compartment
 COPY . /opt/pandemic-simulator-compartment
 
-RUN pip install --no-cache-dir -e .
+# Copy and make entrypoint script executable
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Use exec form with shell to allow environment variable substitution
-# This allows runtime overrides via docker run -e flags
-CMD ["sh", "-c", "cd $MODEL_DIR && python main.py \
-    --mode ${MODE} \
-    --config_file ${CONFIG_FILE} \
-    ${OUTPUT_FILE:+--output_file $OUTPUT_FILE} \
-    ${SIMULATION_JOB_ID:+--simulation_job_id $SIMULATION_JOB_ID}"]
+# Install dependencies including Lambda Runtime Interface Client
+RUN pip install --no-cache-dir -e . && \
+    pip install --no-cache-dir awslambdaric
+
+# Default handler for Lambda (can be overridden via Lambda function config)
+# Lambda will set _HANDLER automatically, but we provide a default
+ENV _HANDLER=compartment.models.covid_jax_model.main.lambda_handler
+
+# Use entrypoint script that handles both Lambda and local modes
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
