@@ -41,8 +41,8 @@ jobs:
         context: .
         push: true
         tags: |
-          ghcr.io/who-collaboratory/pandemic-simulator-compartment/pansim-compartment-${{matrix.disease_path}}:${{ github.ref_name }}
-          ghcr.io/who-collaboratory/pandemic-simulator-compartment/pansim-compartment-${{matrix.disease_path}}:latest
+          ${{secrets.DOCKER_REGISTRY}}/pandemic-simulator-compartment/${{matrix.disease_path}}:${{ github.ref_name }}
+          ${{secrets.DOCKER_REGISTRY}}/pandemic-simulator-compartment/${{matrix.disease_path}}:latest
         build-args: |
           MODEL_DIR=compartment/models/${{matrix.disease_path}}/
         
