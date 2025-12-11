@@ -34,11 +34,15 @@ jobs:
     - name: Verify Image will build when not a tag
       if: ${{ !startsWith(github.ref, 'refs/tags/') }}
       run: docker build . -t pansim-compartment-${{matrix.disease_path}}
-    - name: Log into AWS
+    - name: Log in to AWS
+      if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment' && startsWith(github.ref, 'refs/tags/')
       uses: aws-actions/configure-aws-credentials@v5
       with:
         role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
         aws-region: us-east-1
+    - name: Log in to ECR
+      if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment' && startsWith(github.ref, 'refs/tags/')
+      uses: aws-actions/amazon-ecr-login@v2        
     - name: Build and push Docker image
       if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment' && startsWith(github.ref, 'refs/tags/')
       uses: docker/build-push-action@v5
