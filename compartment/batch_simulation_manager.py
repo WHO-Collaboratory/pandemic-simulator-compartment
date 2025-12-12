@@ -1,6 +1,8 @@
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import as_completed
+from compartment.helpers import get_executor_class
 from compartment.simulation_manager import SimulationManager
 
+ExecutorClass = get_executor_class()
 class BatchSimulationManager:
     def __init__(self, max_workers: int = None):
         self.max_workers = max_workers
@@ -20,7 +22,7 @@ class BatchSimulationManager:
 
     def run_batch(self, model, n_sims, param_list):
         results = [None] * n_sims
-        with ProcessPoolExecutor(max_workers=self.max_workers) as pool:
+        with ExecutorClass(max_workers=self.max_workers) as pool:
             futures = {
                 pool.submit(self._single_run, model, param_list[i]): i
                 for i in range(n_sims)

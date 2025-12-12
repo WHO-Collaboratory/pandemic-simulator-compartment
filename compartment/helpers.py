@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, date
+import logging
 from logging import basicConfig, StreamHandler, INFO
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import geopy.distance
 import json
 import numpy as np
@@ -8,6 +10,7 @@ import uuid
 import random
 import scipy.stats as stats
 import os
+import sys
 
 # --------------------------------------------------
 # Helper Functions: Config Loading
@@ -36,12 +39,25 @@ def write_results_to_local(results: list, output_path: str):
         json.dump(results, f, indent=2, default=str)
 
 def setup_logging():
-    """Sets up logging in an AWS Batch friendly format."""
-    basicConfig(
-        format="[%(levelname)s] %(name)s: %(message)s",
-        level=INFO,
-        handlers=[StreamHandler()]
-    )
+    """Sets up logging in an AWS Lambda/CloudWatch friendly format."""
+    root_logger = logging.getLogger()
+    
+    # Remove all existing handlers to ensure clean configuration
+    # This is important for AWS Lambda where handlers might already exist
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # Create a stream handler that writes to stdout (required for CloudWatch)
+    handler = StreamHandler(sys.stdout)
+    handler.setLevel(INFO)
+    
+    # Create formatter
+    formatter = logging.Formatter("[%(levelname)s] %(name)s: %(message)s")
+    handler.setFormatter(formatter)
+    
+    # Configure root logger
+    root_logger.setLevel(INFO)
+    root_logger.addHandler(handler)
 
 # --------------------------------------------------
 # Helper Functions: Model Output
@@ -890,3 +906,12 @@ def get_dengue_initial_population(case_file, compartment_list, run_mode, vector_
         initial_population[i, column_mapping['I4']] = I4
     
     return initial_population
+
+def get_executor_class():
+    """Get the appropriate executor class, falling back to ThreadPoolExecutor if multiprocessing fails."""
+    try:
+        with ProcessPoolExecutor(max_workers=1) as test_executor:
+            pass
+        return ProcessPoolExecutor
+    except (OSError, RuntimeError, ValueError):
+        return ThreadPoolExecutor

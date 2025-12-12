@@ -2,11 +2,11 @@ import logging
 import json
 import os
 import multiprocessing
-from concurrent.futures import ProcessPoolExecutor
 import numpy as np # should we use jax.numpy?
 from copy import deepcopy
 from math import ceil
 import boto3
+from compartment.helpers import get_executor_class
 from compartment.model import Model
 from compartment.simulation_manager import SimulationManager
 from compartment.simulation_postprocessor import SimulationPostProcessor
@@ -26,6 +26,7 @@ from compartment.model import Model
 
 # Makes sure unix implementations don't deadlock
 multiprocessing.set_start_method('spawn', force=True)
+ExecutorClass = get_executor_class()
 
 # Remove unnecessary jax INFO logging
 logging.getLogger("jax").setLevel(logging.WARNING)
@@ -121,7 +122,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     logger.info(f"low_level_workers: {low_level_workers}")
     
     if run_mode == "DETERMINISTIC":
-        with ProcessPoolExecutor(max_workers=top_level_workers) as executor:
+        with ExecutorClass(max_workers=top_level_workers) as executor:
             future_with = executor.submit(simulate_and_postprocess, model_with)
             future_without = executor.submit(simulate_and_postprocess, model_without)
             results_with = future_with.result()
@@ -156,7 +157,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         ]
 
         # Run both batches in parallel
-        with ProcessPoolExecutor(max_workers=top_level_workers) as executor:
+        with ExecutorClass(max_workers=top_level_workers) as executor:
             future_with = executor.submit(batch_simulate_and_postprocess, model_with, n_sims, param_list, ci, low_level_workers)
             future_without = executor.submit(batch_simulate_and_postprocess, model_without, n_sims, interventionless_param_list, ci, low_level_workers)
             results_with = future_with.result()
