@@ -5,6 +5,7 @@ import time
 import tracemalloc
 from datetime import datetime
 from compartment.batch_helpers.simulation_helpers import get_simulation_params
+from compartment.helpers import setup_logging
 from compartment.model import Model
 from compartment.run_simulation import run_simulation
 
@@ -14,6 +15,7 @@ logging.getLogger("jax._src.xla_bridge").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 def drive_simulation(model_class:Model, args:dict):
+    setup_logging()
     tracemalloc.start()
     start_time = time.time()
     logger.info("Memory tracking started...")
