@@ -5,7 +5,7 @@ from compartment.models.covid_jax_model.model import CovidJaxModel
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)
 logging.getLogger("jax._src.xla_bridge").setLevel(logging.WARNING)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 def lambda_handler(event, context):
     drive_simulation(
