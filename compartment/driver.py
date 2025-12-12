@@ -12,9 +12,11 @@ from compartment.run_simulation import run_simulation
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)
 logging.getLogger("jax._src.xla_bridge").setLevel(logging.WARNING)
-logger = logging.getLogger()
 
 def drive_simulation(model_class:Model, args:dict):
+    # Setup logging first to ensure CloudWatch logs work properly
+    setup_logging()
+    logger = logging.getLogger()
     tracemalloc.start()
     start_time = time.time()
     logger.info("Memory tracking started...")
