@@ -18,10 +18,10 @@ from compartment.helpers import (
   write_results_to_local
 )
 from compartment.validation import load_simulation_config
-from compartment.batch_helpers.graphql_queries import GRAPHQL_QUERY
-from compartment.batch_helpers.gql import get_simulation_job
-from compartment.batch_helpers.s3 import write_to_s3, record_and_upload_validation
-from compartment.batch_helpers.gql import write_to_gql
+from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
+from compartment.cloud_helpers.gql import get_simulation_job
+from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
+from compartment.cloud_helpers.gql import write_to_gql
 from compartment.model import Model
 
 # Makes sure unix implementations don't deadlock
