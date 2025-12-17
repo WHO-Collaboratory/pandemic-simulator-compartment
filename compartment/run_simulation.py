@@ -23,6 +23,7 @@ from compartment.cloud_helpers.gql import get_simulation_job
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
 from compartment.cloud_helpers.gql import write_to_gql
 from compartment.model import Model
+import tracemalloc
 
 # Makes sure unix implementations don't deadlock
 multiprocessing.set_start_method('spawn', force=True)
@@ -51,7 +52,8 @@ def batch_simulate_and_postprocess(model, n_sims, param_list, ci, num_workers):
 
 def run_simulation(model_class, simulation_params=None, mode:str='local', config_path: str = None, output_path: str = None):
     logger.info("Starting the simulation...")
-        
+    tracemalloc.start()
+
     if mode == 'local':
         logger.info("Running in LOCAL mode")
         # Load config from local JSON file
@@ -120,6 +122,10 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     low_level_workers = ceil(os.cpu_count() / top_level_workers) - 1
     logger.info(f"top_level_workers: {top_level_workers}")
     logger.info(f"low_level_workers: {low_level_workers}")
+
+    current, peak = tracemalloc.get_traced_memory() 
+    tracemalloc.stop()
+    logger.info(f"Memory tracking stopped for initializing model. Peak memory usage: {peak / (1024 * 1024):.2f} MB, current memory usage: {current / (1024 * 1024):.2f} MB")
     
     if run_mode == "DETERMINISTIC":
         with ExecutorClass(max_workers=top_level_workers) as executor:

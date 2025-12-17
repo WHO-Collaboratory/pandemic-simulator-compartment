@@ -18,7 +18,6 @@ def drive_simulation(model_class:Model, args:dict):
     setup_logging()
     logger = logging.getLogger()
     start_time = time.time()
-    logger.info("Memory tracking started...")
     if args["mode"] == 'local':
         if args["config_file"] is None:
             raise ValueError("config_file is required for local mode")
@@ -41,7 +40,7 @@ def drive_simulation(model_class:Model, args:dict):
         # Capture and log memory usage
         current, peak = tracemalloc.get_traced_memory() 
         tracemalloc.stop()
-        logger.info(f"Memory tracking stopped for initial setup. Peak memory usage: {peak / (1024 * 1024):.2f} MB")
+        logger.info(f"Memory tracking stopped for initial setup. Peak memory usage: {peak / (1024 * 1024):.2f} MB, current memory usage: {current / (1024 * 1024):.2f} MB")
         run_metadata = run_simulation(model_class=model_class, mode='cloud', simulation_params=simulation_params)
     else:
         raise ValueError(f"Invalid mode: {args["mode"]}")
