@@ -2,6 +2,7 @@ import logging
 import numpy as np
 from compartment.helpers import get_simulation_step_size, setup_logging
 from jax.experimental.ode import odeint
+import tracemalloc
 
 # Initialize logging
 setup_logging()
@@ -14,6 +15,7 @@ class SimulationManager:
     def run_simulation(self):
         """ Run the simulation over the specified number of timesteps """
         logger.info(f"run_simulation function STARTING")
+        tracemalloc.start()
 
         # Set up timesteps, and step size
         logger.info(f"n_timesteps: {self.model.n_timesteps}")
@@ -27,6 +29,8 @@ class SimulationManager:
 
         # Solve the ODE
         pred = odeint(self.model.derivative, init_state, ts, params)
-
+        tracemalloc.stop()
+        current, peak = tracemalloc.get_traced_memory()
+        logger.info(f"Memory tracking stopped. Peak memory usage: {peak / (1024 * 1024):.4f} MB")
         logger.info(f"run_simulation function ENDING")
         return np.array(pred)
