@@ -374,47 +374,60 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
                     "time_series": df_nested.to_dict("records")
                 })
     else:
-        age_labels = list(demographics.keys())
-        regions = [admin_zones_payload[i].get('id', None) for i in range(n_regions)]
-
-        # remove totals from compartment_list
-        master_list = ["S", "E", "I", "H", "D", "R"]
-        #compartments = [x for x in compartment_list if x in master_list]
-
-        index = pd.MultiIndex.from_product(
-            [dates, compartment_list, age_labels, regions],
-            names=["date", "compartment", "age_group", "region"]
+        formatted_data["admin_zones"] = fast_format_jax_output_respiratory(
+            population_matrix, compartment_list, demographics, admin_zones_payload, n_regions, n_timesteps, step, unique_id, payload
         )
-
-        df = pd.DataFrame({"value": population_matrix.ravel()},index=index).reset_index()
-        df = df[df["compartment"].isin(master_list)]
-        
-        for region, df_r in df.groupby("region"):
-            time_series = []
-            for date, df_rd in df_r.groupby("date"):
-                # pivot to get compartments × ages in a compact DataFrame
-                piv = df_rd.pivot(index="compartment",columns="age_group",values="value")
-
-                # add the column that totals across ages
-                piv["age_all"] = piv.sum(axis=1)
-
-                # build the nested structure: {compartment: {age: value, ...}}
-                rec = {"date": date}
-                rec.update(piv.to_dict(orient="index"))
-                time_series.append(rec)
-
-            # --- append to admin_zones so overall structure matches dengue path
-            formatted_data["admin_zones"].append({
-                "simulation_job_result_id": unique_id,
-                "owner": payload['owner'],
-                "admin_zone_id": region,
-                "admin_unit_id": region,
-                "time_series": time_series,
-            })
 
     formatted_data["compartment_deltas"] = compute_jax_compartment_deltas(population_matrix, disease_type,  n_regions, compartment_list)
     formatted_data["parent_admin_total"] = compute_parent_admin_total(formatted_data['admin_zones'], payload, unique_id, parent_unique_id, population_matrix.shape[0], step)
     return formatted_data
+
+def fast_format_jax_output_respiratory(
+    population_matrix, compartment_list, demographics, admin_zones_payload, n_regions, n_timesteps, step, unique_id, payload
+):
+    # Build index arrays
+    master_list = ["S", "E", "I", "H", "D", "R"]
+    age_labels = list(demographics.keys())
+    dates = [
+        (payload["start_date"] + timedelta(days=i * step)).strftime("%Y-%m-%d")
+        for i in range(population_matrix.shape[0])
+    ]
+    regions = [admin_zones_payload[i].get('id', None) for i in range(n_regions)]
+    index = pd.MultiIndex.from_product(
+        [dates, compartment_list, age_labels, regions],
+        names=["date", "compartment", "age_group", "region"]
+    )
+
+    # Flatten the population_matrix for DataFrame
+    df = pd.DataFrame({"value": population_matrix.ravel()}, index=index).reset_index()
+    df = df[df["compartment"].isin(master_list)]
+
+    # Pivot ALL data at once: grouped by region, then by date
+    df_piv = df.pivot_table(index=["region", "date", "compartment"], columns="age_group", values="value", fill_value=0)
+
+    # Compute 'age_all' for all (region,date,compartment) groups
+    df_piv["age_all"] = df_piv.sum(axis=1)
+
+    # Unstack to region, then date for efficient extraction
+    all_regions = []
+    for region, group in df_piv.groupby(level="region"):
+        # group is indexed by (region, date, compartment)
+        time_series = []
+        for date, group_date in group.groupby(level="date"):
+            # group_date is (region, date, compartment) x [ages]
+            # We need compartment as keys, age dicts as values
+            rec = {"date": date}
+            for comp, row in group_date.droplevel(["region", "date"]).iterrows():
+                rec[comp] = row.to_dict()
+            time_series.append(rec)
+        all_regions.append({
+            "simulation_job_result_id": unique_id,
+            "owner": payload['owner'],
+            "admin_zone_id": region,
+            "admin_unit_id": region,
+            "time_series": time_series,
+        })
+    return all_regions
 
 def format_uncertainty_output(means_child, lower_child, upper_child,
                               means_parent, lower_parent, upper_parent,
