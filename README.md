@@ -183,7 +183,7 @@ For detail on our methods please refer to our documentation:
 ```
 pandemic-simulator-compartment/
 ├── compartment/                    # Top level contains helpers and classes used across models and to execute models.
-│   ├── batch_helpers/              # Helper files used for the pandemic-simulator web application
+│   ├── cloud_helpers/              # Helper files used for the pandemic-simulator web application
 │   ├── models/                     # Models which implement the tools in this repository. Likely available in the pandemic-simulator app.
 │   │   |── covid_jax_model/        # Respiratory disease model
 |   |   |── dengue_jax_model/       # Vector-borne disease model

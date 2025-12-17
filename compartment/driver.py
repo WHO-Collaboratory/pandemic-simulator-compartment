@@ -4,7 +4,7 @@ import os
 import time
 import tracemalloc
 from datetime import datetime
-from compartment.batch_helpers.simulation_helpers import get_simulation_params
+from compartment.cloud_helpers.simulation_helpers import get_simulation_params
 from compartment.helpers import setup_logging
 from compartment.model import Model
 from compartment.run_simulation import run_simulation
