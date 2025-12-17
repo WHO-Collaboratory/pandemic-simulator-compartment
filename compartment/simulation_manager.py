@@ -29,8 +29,8 @@ class SimulationManager:
 
         # Solve the ODE
         pred = odeint(self.model.derivative, init_state, ts, params)
-        tracemalloc.stop()
         current, peak = tracemalloc.get_traced_memory()
-        logger.info(f"Memory tracking stopped. Peak memory usage: {peak / (1024 * 1024):.4f} MB")
+        tracemalloc.stop()
+        logger.info(f"Memory tracking stopped for solving ODE. Peak memory usage: {peak / (1024 * 1024):.2f} MB, current memory usage: {current / (1024 * 1024):.2f} MB")
         logger.info(f"run_simulation function ENDING")
         return np.array(pred)
