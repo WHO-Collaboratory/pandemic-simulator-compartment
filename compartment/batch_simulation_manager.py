@@ -28,7 +28,7 @@ class BatchSimulationManager:
 
     def run_batch(self, model, n_sims, param_list):
         results = [None] * n_sims
-        batch_size = self.max_workers or 1
+        batch_size = self.max_workers or 2
         for batch_indices in self._chunked(range(n_sims), batch_size):
             with ExecutorClass(max_workers=batch_size) as pool:
                 futures = {

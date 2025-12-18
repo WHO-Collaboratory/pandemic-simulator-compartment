@@ -2,7 +2,6 @@
 import logging
 import os
 import time
-import tracemalloc
 from datetime import datetime
 from compartment.cloud_helpers.simulation_helpers import get_simulation_params
 from compartment.helpers import setup_logging
@@ -32,15 +31,16 @@ def drive_simulation(model_class:Model, args:dict):
             output_file = None
         run_metadata = run_simulation(model_class=model_class, config_path=args["config_file"], output_path=output_file)
     elif args["mode"] == 'cloud':
-        tracemalloc.start()
         simulation_job_id = args["simulation_job_id"]
         if simulation_job_id is None:
             raise ValueError("simulation_job_id is required for cloud mode")
-        simulation_params = get_simulation_params(simulation_job_id=simulation_job_id)
-        # Capture and log memory usage
-        current, peak = tracemalloc.get_traced_memory() 
-        tracemalloc.stop()
-        logger.info(f"Memory tracking stopped for initial setup. Peak memory usage: {peak / (1024 * 1024):.2f} MB, current memory usage: {current / (1024 * 1024):.2f} MB")
+        #simulation_params = get_simulation_params(simulation_job_id=simulation_job_id)
+        simulation_params = {
+            "SIMULATION_JOB_ID": simulation_job_id,
+            "GRAPHQL_ENDPOINT": "https://ftvz6ss74ncwxnn2a4a6dia664.appsync-api.us-east-1.amazonaws.com/graphql",
+            "GRAPHQL_APIKEY": "da2-4pf5tbnxgfddlel57zztt6id4y",
+            "ENVIRONMENT": "dev"
+        }
         run_metadata = run_simulation(model_class=model_class, mode='cloud', simulation_params=simulation_params)
     else:
         raise ValueError(f"Invalid mode: {args["mode"]}")
