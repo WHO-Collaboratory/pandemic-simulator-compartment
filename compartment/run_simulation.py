@@ -119,7 +119,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     # Split cpu in half for top level workers
     # Then split the remaining cpu in half for low level workers
     top_level_workers = 2
-    low_level_workers = 4#ceil(os.cpu_count() / top_level_workers) - 1
+    low_level_workers = 2#ceil(os.cpu_count() / top_level_workers) - 1
     logger.info(f"top_level_workers: {top_level_workers}")
     logger.info(f"low_level_workers: {low_level_workers}")
 
