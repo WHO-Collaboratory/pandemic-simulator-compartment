@@ -184,12 +184,44 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         s3_results = deepcopy(results)
         s3_client = boto3.client('s3', region_name='us-east-1')
         bucket_name = f'compartmental-results-{simulation_params.get("ENVIRONMENT")}'
+        # for i in range(len(results)):
+        #     logger.info(f"id: {results[i].get('id')}")
+        #     gql_statuses = write_to_gql(simulation_params, results[i])
+        #     print("written to GQL")
+        #     logger.info(f"gql_statuses_{i}: {gql_statuses}")
+        #     s3_statuses = write_to_s3(s3_client, bucket_name, s3_results[i], simulation_job_id)
+        #     print("written to S3")
+        #     logger.info(f"s3_statuses_{i}: {s3_statuses}")
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        max_workers = min(32, max(4, len(results) * 2))  # tune as needed
+        gql_statuses_by_i = [None] * len(results)
+        s3_statuses_by_i = [None] * len(results)
+
+        future_to_meta = {}
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for i, result in enumerate(results):
+                future_to_meta[executor.submit(write_to_gql, simulation_params, result)] = (i, "gql")
+                future_to_meta[
+                    executor.submit(write_to_s3, s3_client, bucket_name, s3_results[i], simulation_job_id)
+                ] = (i, "s3")
+
+            for fut in as_completed(future_to_meta):
+                i, kind = future_to_meta[fut]
+                try:
+                    out = fut.result()
+                except Exception as e:
+                    logger.exception("Write failed", extra={"i": i, "kind": kind})
+                    out = {"status": "error", "error": str(e)}
+
+                if kind == "gql":
+                    gql_statuses_by_i[i] = out
+                else:
+                    s3_statuses_by_i[i] = out
+
         for i in range(len(results)):
-            logger.info(f"id: {results[i].get('id')}")
-            gql_statuses = write_to_gql(simulation_params, results[i])
-            logger.info(f"gql_statuses_{i}: {gql_statuses}")
-            s3_statuses = write_to_s3(s3_client, bucket_name, s3_results[i], simulation_job_id)
-            logger.info(f"s3_statuses_{i}: {s3_statuses}")
+            logger.info(f"gql_statuses_{i}: {gql_statuses_by_i[i]}")
+            logger.info(f"s3_statuses_{i}: {s3_statuses_by_i[i]}")
         
         # Invoke get-ai-summary lambda
         lambda_client = boto3.client('lambda', region_name='us-east-1')
