@@ -184,14 +184,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         s3_results = deepcopy(results)
         s3_client = boto3.client('s3', region_name='us-east-1')
         bucket_name = f'compartmental-results-{simulation_params.get("ENVIRONMENT")}'
-        # for i in range(len(results)):
-        #     logger.info(f"id: {results[i].get('id')}")
-        #     gql_statuses = write_to_gql(simulation_params, results[i])
-        #     print("written to GQL")
-        #     logger.info(f"gql_statuses_{i}: {gql_statuses}")
-        #     s3_statuses = write_to_s3(s3_client, bucket_name, s3_results[i], simulation_job_id)
-        #     print("written to S3")
-        #     logger.info(f"s3_statuses_{i}: {s3_statuses}")
+
         from concurrent.futures import ThreadPoolExecutor, as_completed
         max_workers = min(32, max(4, len(results) * 2))  # tune as needed
         gql_statuses_by_i = [None] * len(results)
