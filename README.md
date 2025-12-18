@@ -22,7 +22,7 @@ source .venv/bin/activate
 python -m compartment.models.covid_jax_model.main --mode local --config_file compartment/models/covid_jax_model/pansim-config.json --output_file results/example-run.json
 ```
 
-### To run a command in that Dockerfile
+### To run a command in a container
 ```
 # First, build the Dockerfile while in the root of this project.
 docker build . -t compartment 
@@ -30,6 +30,12 @@ docker build . -t compartment
 
 docker run compartment
 ```
+
+### To build a container with a specific model.
+```
+# Pass the build-arg parameter to docker build, with your target directory specified.
+docker build --build-arg MODEL_DIR=compartment/models/dengue_jax_model/ . -t local-dengue
+``` 
 
 ### To use your own local config in the reference/ directory and write the output to a custom file in the results/ directory
 ```
