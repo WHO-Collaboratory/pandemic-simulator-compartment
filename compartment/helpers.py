@@ -947,8 +947,8 @@ def get_dengue_initial_population(case_file, compartment_list, run_mode, vector_
 def get_executor_class():
     """Get the appropriate executor class, falling back to ThreadPoolExecutor if multiprocessing fails."""
     try:
-        with ThreadPoolExecutor(max_workers=1) as test_executor:
+        with ProcessPoolExecutor(max_workers=1) as test_executor:
             pass
-        return ThreadPoolExecutor
+        return ProcessPoolExecutor
     except (OSError, RuntimeError, ValueError):
         return ThreadPoolExecutor
