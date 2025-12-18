@@ -19,7 +19,7 @@ uv sync
 # Activate the virtual environment which you've created for this project.
 source .venv/bin/activate
 # Run a covid model using the sample configuration: Madagascar.
-python -m compartment.models.covid_jax_model.main --mode local --config_file compartment/models/covid_jax_model/pansim-config.json --output_file results/example-run.json
+python -m compartment.models.covid_jax_model.main --mode local --config_file compartment/models/covid_jax_model/example-config.json --output_file results/example-run.json
 ```
 
 ### To run a command in a container
