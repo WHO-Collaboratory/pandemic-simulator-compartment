@@ -13,6 +13,30 @@ import os
 import sys
 
 # --------------------------------------------------
+# Helper Functions: temporary memory tracking for jax
+# --------------------------------------------------
+
+def rss_mb() -> float:
+    # Linux (Lambda) fast path
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    return int(line.split()[1]) / 1024  # kB -> MB
+    except FileNotFoundError:
+        pass  # not Linux /proc
+
+    # Cross-platform fallback
+    try:
+        import psutil
+        return psutil.Process(os.getpid()).memory_info().rss / (1024**2)
+    except Exception:
+        return float("nan")
+
+def log_mem(tag: str) -> None:
+    print(f"[mem] pid={os.getpid()} {tag}: RSS={rss_mb():.1f} MB")
+
+# --------------------------------------------------
 # Helper Functions: Config Loading
 # --------------------------------------------------
 
@@ -923,8 +947,8 @@ def get_dengue_initial_population(case_file, compartment_list, run_mode, vector_
 def get_executor_class():
     """Get the appropriate executor class, falling back to ThreadPoolExecutor if multiprocessing fails."""
     try:
-        with ProcessPoolExecutor(max_workers=1) as test_executor:
+        with ThreadPoolExecutor(max_workers=1) as test_executor:
             pass
-        return ProcessPoolExecutor
+        return ThreadPoolExecutor
     except (OSError, RuntimeError, ValueError):
         return ThreadPoolExecutor

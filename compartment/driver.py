@@ -36,7 +36,13 @@ def drive_simulation(model_class:Model, args:dict):
         simulation_job_id = args["simulation_job_id"]
         if simulation_job_id is None:
             raise ValueError("simulation_job_id is required for cloud mode")
-        simulation_params = get_simulation_params(simulation_job_id=simulation_job_id)
+        #simulation_params = get_simulation_params(simulation_job_id=simulation_job_id)
+        simulation_params = {
+            "SIMULATION_JOB_ID": simulation_job_id,
+            "GRAPHQL_ENDPOINT": "https://ftvz6ss74ncwxnn2a4a6dia664.appsync-api.us-east-1.amazonaws.com/graphql",
+            "GRAPHQL_APIKEY": "da2-4pf5tbnxgfddlel57zztt6id4y",
+            "ENVIRONMENT": "dev"
+        }
         # Capture and log memory usage
         current, peak = tracemalloc.get_traced_memory() 
         tracemalloc.stop()
