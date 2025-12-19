@@ -34,13 +34,7 @@ def drive_simulation(model_class:Model, args:dict):
         simulation_job_id = args["simulation_job_id"]
         if simulation_job_id is None:
             raise ValueError("simulation_job_id is required for cloud mode")
-        #simulation_params = get_simulation_params(simulation_job_id=simulation_job_id)
-        simulation_params = {
-            "SIMULATION_JOB_ID": simulation_job_id,
-            "GRAPHQL_ENDPOINT": "https://ftvz6ss74ncwxnn2a4a6dia664.appsync-api.us-east-1.amazonaws.com/graphql",
-            "GRAPHQL_APIKEY": "da2-4pf5tbnxgfddlel57zztt6id4y",
-            "ENVIRONMENT": "dev"
-        }
+        simulation_params = get_simulation_params(simulation_job_id=simulation_job_id)
         run_metadata = run_simulation(model_class=model_class, mode='cloud', simulation_params=simulation_params)
     else:
         raise ValueError(f"Invalid mode: {args["mode"]}")
