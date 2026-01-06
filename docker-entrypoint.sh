@@ -5,7 +5,7 @@
 if [ -n "${AWS_LAMBDA_RUNTIME_API}" ]; then
     # Lambda mode: use aws-lambda-ric
     # _HANDLER is set by Lambda based on function configuration.
-    HANDLER="${_HANDLER:}"
+    HANDLER="${_HANDLER}"
     exec /usr/local/bin/python -m awslambdaric "$HANDLER"
 else
     # Use exec form to override defaults
