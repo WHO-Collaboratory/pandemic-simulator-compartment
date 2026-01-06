@@ -37,7 +37,7 @@ RUN pip install --no-cache-dir -e . && \
 
 # Default handler for Lambda (can be overridden via Lambda function config)
 # Lambda will set _HANDLER automatically, but we provide a default
-ENV _HANDLER=compartment.models.covid_jax_model.main.lambda_handler
+ENV _HANDLER=compartment.models.${MODEL_DIR}.main.lambda_handler
 
 # Use entrypoint script that handles both Lambda and local modes
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
