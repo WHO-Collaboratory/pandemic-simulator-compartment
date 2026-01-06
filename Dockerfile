@@ -35,9 +35,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 RUN pip install --no-cache-dir -e . && \
     pip install --no-cache-dir awslambdaric
 
-# Default handler for Lambda (can be overridden via Lambda function config)
-# Lambda will set _HANDLER automatically, but we provide a default
-ENV _HANDLER=compartment.models.${MODEL_DIR}.main.lambda_handler
+# Extract model name from MODEL_DIR, validate it, and set _HANDLER
+RUN MODEL_NAME=$(echo "${MODEL_DIR}" | sed 's|compartment/models/||' | sed 's|/$||') && \
+    echo "compartment.models.${MODEL_NAME}.main.lambda_handler" > /tmp/default_handler.txt
 
 # Use entrypoint script that handles both Lambda and local modes
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

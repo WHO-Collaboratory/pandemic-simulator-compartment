@@ -5,6 +5,16 @@
 if [ -n "${AWS_LAMBDA_RUNTIME_API}" ]; then
     # Lambda mode: use aws-lambda-ric
     # _HANDLER is set by Lambda based on function configuration.
+    # If not set, use the default handler from the build
+    if [ -z "${_HANDLER}" ]; then
+        if [ -f /tmp/default_handler.txt ]; then
+            _HANDLER=$(cat /tmp/default_handler.txt)
+            echo "Using default handler from build: ${_HANDLER}"
+        else
+            echo "Error: _HANDLER is not set and no default handler found" >&2
+            exit 1
+        fi
+    fi
     HANDLER="${_HANDLER}"
     exec /usr/local/bin/python -m awslambdaric "$HANDLER"
 else
