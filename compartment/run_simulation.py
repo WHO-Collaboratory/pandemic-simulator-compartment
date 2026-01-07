@@ -23,6 +23,7 @@ from compartment.cloud_helpers.gql import get_simulation_job
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
 from compartment.cloud_helpers.gql import write_to_gql
 from compartment.model import Model
+import tracemalloc
 
 # Makes sure unix implementations don't deadlock
 multiprocessing.set_start_method('spawn', force=True)
@@ -51,7 +52,8 @@ def batch_simulate_and_postprocess(model, n_sims, param_list, ci, num_workers):
 
 def run_simulation(model_class, simulation_params=None, mode:str='local', config_path: str = None, output_path: str = None):
     logger.info("Starting the simulation...")
-        
+    tracemalloc.start()
+
     if mode == 'local':
         logger.info("Running in LOCAL mode")
         # Load config from local JSON file
@@ -117,9 +119,13 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     # Split cpu in half for top level workers
     # Then split the remaining cpu in half for low level workers
     top_level_workers = 2
-    low_level_workers = ceil(os.cpu_count() / top_level_workers) - 1
+    low_level_workers = 2#ceil(os.cpu_count() / top_level_workers) - 1
     logger.info(f"top_level_workers: {top_level_workers}")
     logger.info(f"low_level_workers: {low_level_workers}")
+
+    current, peak = tracemalloc.get_traced_memory() 
+    tracemalloc.stop()
+    logger.info(f"Memory tracking stopped for initializing model. Peak memory usage: {peak / (1024 * 1024):.2f} MB, current memory usage: {current / (1024 * 1024):.2f} MB")
     
     if run_mode == "DETERMINISTIC":
         with ExecutorClass(max_workers=top_level_workers) as executor:
@@ -178,12 +184,37 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         s3_results = deepcopy(results)
         s3_client = boto3.client('s3', region_name='us-east-1')
         bucket_name = f'compartmental-results-{simulation_params.get("ENVIRONMENT")}'
+
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        max_workers = min(32, max(4, len(results) * 2))  # tune as needed
+        gql_statuses_by_i = [None] * len(results)
+        s3_statuses_by_i = [None] * len(results)
+
+        future_to_meta = {}
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for i, result in enumerate(results):
+                future_to_meta[executor.submit(write_to_gql, simulation_params, result)] = (i, "gql")
+                future_to_meta[
+                    executor.submit(write_to_s3, s3_client, bucket_name, s3_results[i], simulation_job_id)
+                ] = (i, "s3")
+
+            for fut in as_completed(future_to_meta):
+                i, kind = future_to_meta[fut]
+                try:
+                    out = fut.result()
+                except Exception as e:
+                    logger.exception("Write failed", extra={"i": i, "kind": kind})
+                    out = {"status": "error", "error": str(e)}
+
+                if kind == "gql":
+                    gql_statuses_by_i[i] = out
+                else:
+                    s3_statuses_by_i[i] = out
+
         for i in range(len(results)):
-            logger.info(f"id: {results[i].get('id')}")
-            gql_statuses = write_to_gql(simulation_params, results[i])
-            logger.info(f"gql_statuses_{i}: {gql_statuses}")
-            s3_statuses = write_to_s3(s3_client, bucket_name, s3_results[i], simulation_job_id)
-            logger.info(f"s3_statuses_{i}: {s3_statuses}")
+            logger.info(f"gql_statuses_{i}: {gql_statuses_by_i[i]}")
+            logger.info(f"s3_statuses_{i}: {s3_statuses_by_i[i]}")
         
         # Invoke get-ai-summary lambda
         lambda_client = boto3.client('lambda', region_name='us-east-1')

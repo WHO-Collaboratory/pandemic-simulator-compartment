@@ -2,7 +2,6 @@
 import logging
 import os
 import time
-import tracemalloc
 from datetime import datetime
 from compartment.cloud_helpers.simulation_helpers import get_simulation_params
 from compartment.helpers import setup_logging
@@ -17,9 +16,7 @@ def drive_simulation(model_class:Model, args:dict):
     # Setup logging first to ensure CloudWatch logs work properly
     setup_logging()
     logger = logging.getLogger()
-    tracemalloc.start()
     start_time = time.time()
-    logger.info("Memory tracking started...")
     if args["mode"] == 'local':
         if args["config_file"] is None:
             raise ValueError("config_file is required for local mode")
@@ -43,14 +40,8 @@ def drive_simulation(model_class:Model, args:dict):
         raise ValueError(f"Invalid mode: {args["mode"]}")
     
     logger.info(f"run_metadata: {run_metadata}")
-    # Capture and log memory usage
-    current, peak = tracemalloc.get_traced_memory() 
-    tracemalloc.stop()
     end_time = time.time()
-
     elapsed_time = round(end_time - start_time, 2)
-
-    logger.info(f"Memory tracking stopped. Peak memory usage: {peak / (1024 * 1024):.2f} MB")
     logger.info(f"Elapsed time: {elapsed_time} seconds")
     
     return None
