@@ -39,9 +39,9 @@ def drive_simulation(model_class:Model, args:dict):
     else:
         raise ValueError(f"Invalid mode: {args["mode"]}")
     
-    logger.info(f"run_metadata: {run_metadata}")
+    #logger.info(f"run_metadata: {run_metadata}")
     end_time = time.time()
     elapsed_time = round(end_time - start_time, 2)
     logger.info(f"Elapsed time: {elapsed_time} seconds")
     
-    return None
+    return run_metadata

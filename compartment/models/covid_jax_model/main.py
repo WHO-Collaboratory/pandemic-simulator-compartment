@@ -17,7 +17,7 @@ def lambda_handler(event, context):
     )
     return None
 
-if __name__ == "__main__":
+def run_local():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Run pandemic simulation with specified config file')
     parser.add_argument('--mode', choices=['local', 'cloud'], default='local')
@@ -26,4 +26,4 @@ if __name__ == "__main__":
     parser.add_argument('--simulation_job_id', nargs='?', default=None, help='Existing simulation job id in a graphql backend.')
     args = parser.parse_args()
 
-    drive_simulation(model_class=CovidJaxModel, args=vars(args))
+    return drive_simulation(model_class=CovidJaxModel, args=vars(args))

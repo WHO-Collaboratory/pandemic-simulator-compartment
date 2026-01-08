@@ -175,7 +175,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     
     if mode == 'local':
         if output_path is None:
-            print(results)
+            run_metadata["results"] = results
         elif output_path is not None:
             write_results_to_local(results, output_path)
             logger.info(f"Results saved to: {output_path}")
@@ -225,5 +225,4 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
             InvocationType='Event',
             Payload=payload
         )
-
     return run_metadata
