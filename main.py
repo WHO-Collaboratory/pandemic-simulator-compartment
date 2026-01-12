@@ -17,7 +17,7 @@ def gcp_handler(request):
     # Get the config path from JSON, or use your default
     config_path = request_json.get(
         "config_file", 
-        "compartment/models/covid_jax_model/example-config.json"
+        "reference/novel-respiratory-advanced-example-config.json"
     )
 
     # 2. Prepare the arguments for your function
