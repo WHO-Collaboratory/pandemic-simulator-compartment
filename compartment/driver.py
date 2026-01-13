@@ -37,7 +37,7 @@ def drive_simulation(model_class:Model, args:dict):
         simulation_params = get_simulation_params(simulation_job_id=simulation_job_id)
         run_metadata = run_simulation(model_class=model_class, mode='cloud', simulation_params=simulation_params)
     else:
-        raise ValueError(f"Invalid mode: {args["mode"]}")
+        raise ValueError(f"Invalid mode: {args['mode']}")
     
     logger.info(f"run_metadata: {run_metadata}")
     end_time = time.time()
