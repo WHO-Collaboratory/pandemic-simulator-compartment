@@ -182,6 +182,7 @@ Planned
 For detail on our methods please refer to our documentation:
 * [Respiratory compartmental documentation](https://drive.google.com/file/d/1Ff4gEKu5gu3MuwTdgzRIH1A7jjzZerCj/view?usp=drive_link)
 * [Vector-borne compartmental documentation](https://drive.google.com/file/d/1g5wkayJ9dUL4WuZjvTCj8OvRrAdq2LxG/view?usp=drive_link)
+
 Reference for the methods:
 * García-Carreras, B., Yang, B., Grabowski, M. K., Sheppard, L. W., et al. (2022). Periodic synchronisation of dengue epidemics in Thailand over the last 5 decades driven by temperature and immunity. PLoS Biology, 20(3), e3001160.: https://pmc.ncbi.nlm.nih.gov/articles/PMC8967062/
 * Huber, J. H., Childs, M. L., Caldwell, J. M., & Mordecai, E. A. (2018). Seasonal temperature variation influences climate suitability for dengue, chikungunya, and Zika transmission. PLoS Neglected Tropical Diseases, 12(5), e0006451.: https://doi.org/10.1371/journal.pntd.0006451
