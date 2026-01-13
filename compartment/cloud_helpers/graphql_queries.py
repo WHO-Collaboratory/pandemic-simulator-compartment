@@ -105,6 +105,37 @@ GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
         max
       }
     }
+    Interventions {
+      items {
+        id
+        intervention_id
+        Intervention {
+          id
+          name
+          display_name
+        }
+        adherence_min
+        adherence_max
+        transmission_percentage
+        start_date
+        end_date
+        start_threshold
+        end_threshold
+        start_threshold_node_id
+        end_threshold_node_id
+        hour_reduction
+        FieldConfigs {
+          items {
+            id
+            field_key
+            has_variance
+            distribution_type
+            min
+            max
+          }
+        }
+      }
+    }
     case_file {
       admin_zones {
         id
