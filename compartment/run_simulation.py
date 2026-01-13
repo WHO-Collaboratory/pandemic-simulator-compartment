@@ -22,6 +22,7 @@ from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.cloud_helpers.gql import get_simulation_job
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
 from compartment.cloud_helpers.gql import write_to_gql
+from compartment.cloud_helpers.simulation_helpers import transform_normalized_interventions
 from compartment.model import Model
 import tracemalloc
 
@@ -69,6 +70,22 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         logger.info(f"graphql_endpoint: {simulation_params.get('GRAPHQL_ENDPOINT')}")
         # Grab simulation job and clean validated config for model
         config = get_simulation_job(simulation_params, GRAPHQL_QUERY)
+
+        ########### START NORMALIZATION OF INTERVENTIONS ###########
+        # Transform normalized interventions from join tables to legacy format
+        # Priority: Use new Interventions join table if available, fall back to embedded interventions
+        normalized_interventions = config['data']['getSimulationJob'].get('Interventions', {})
+        normalized_items = normalized_interventions.get('items', []) if normalized_interventions else []
+
+        logger.info(f"normalized_items: {normalized_items}")
+        
+        if normalized_items:
+            logger.info(f"Using {len(normalized_items)} interventions from normalized join tables")
+            config['data']['getSimulationJob']['interventions'] = transform_normalized_interventions(normalized_items)
+        else:
+            logger.info("No normalized interventions found, using embedded interventions field")
+        ########### END NORMALIZATION OF INTERVENTIONS ###########
+
         owner = config['data']['getSimulationJob'].get('owner')
     else:
         raise ValueError(f"Invalid mode: {mode}")
