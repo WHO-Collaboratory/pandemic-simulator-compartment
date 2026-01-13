@@ -182,6 +182,12 @@ Planned
 For detail on our methods please refer to our documentation:
 * [Respiratory compartmental documentation](https://drive.google.com/file/d/1Ff4gEKu5gu3MuwTdgzRIH1A7jjzZerCj/view?usp=drive_link)
 * [Vector-borne compartmental documentation](https://drive.google.com/file/d/1g5wkayJ9dUL4WuZjvTCj8OvRrAdq2LxG/view?usp=drive_link)
+Reference for the methods:
+* García-Carreras, B., Yang, B., Grabowski, M. K., Sheppard, L. W., et al. (2022). Periodic synchronisation of dengue epidemics in Thailand over the last 5 decades driven by temperature and immunity. PLoS Biology, 20(3), e3001160.: https://pmc.ncbi.nlm.nih.gov/articles/PMC8967062/
+* Huber, J. H., Childs, M. L., Caldwell, J. M., & Mordecai, E. A. (2018). Seasonal temperature variation influences climate suitability for dengue, chikungunya, and Zika transmission. PLoS Neglected Tropical Diseases, 12(5), e0006451.: https://doi.org/10.1371/journal.pntd.0006451
+* Mistry, D., Litvinova, M., Piontti, A., et al. (2021). Inferring high-resolution human mixing patterns for disease modeling. Nature Communications, 12(1), 323.: https://doi.org/10.1038/s41467-020-20544-y
+* Mossong, J., Hens, N., Jit, M., et al. (2008). Social contacts and mixing patterns relevant to the spread of infectious diseases. PLOS Medicine, 5(3), e74.: https://doi.org/10.1371/journal.pmed.0050074
+* Sattenspiel, L., & Dietz, K. (1995). A structured epidemic model incorporating geographic mobility among regions. Mathematical Biosciences, 128(1–2), 71–91.: https://doi.org/10.1016/0025-5564(94)00068-B
 
 
 ## Directory Structure
