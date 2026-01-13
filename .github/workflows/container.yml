@@ -51,7 +51,6 @@ jobs:
         push: true
         tags: |
           ${{secrets.DOCKER_REGISTRY}}/pandemic-simulator-compartment/${{matrix.disease_path}}:${{ github.ref_name }}
-          ${{secrets.DOCKER_REGISTRY}}/pandemic-simulator-compartment/${{matrix.disease_path}}:latest
         build-args: |
           MODEL_DIR=compartment/models/${{matrix.disease_path}}/
         
