@@ -772,7 +772,7 @@ def create_travel_matrix(input_df, sigma):
                             columns='name_destination', 
                             values='gravity_rate', 
                             aggfunc='sum')
-    travel_matrix = pivot_df#.T
+    travel_matrix = pivot_df.T
     travel_matrix = travel_matrix.fillna(0) + np.diag(1-travel_matrix.sum(axis=1))
 
     travel_matrix = travel_matrix * sigma
