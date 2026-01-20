@@ -1,6 +1,6 @@
 # 1. Define your variables for easy updates
 export PROJECT_ID=$(gcloud config get-value project)
-export REPO_PATH="us-east1-docker.pkg.dev/${PROJECT_ID}/simulations/covid-jax-tpu"
+export REPO_PATH="us-central1-docker.pkg.dev/${PROJECT_ID}/simulations/covid-jax-tpu"
 
 # 2. Build the image for the correct architecture (linux/amd64)
 # We use --platform to ensure it runs correctly on the GCP TPU nodes
