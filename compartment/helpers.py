@@ -111,6 +111,12 @@ covid_compartment_grouping = {
     "R": ["R"]
 }
 
+monkeypox_compartment_grouping = {
+    "S": ["S"],
+    "I": ["I"],
+    "R": ["R"]
+}
+
 edge_to_variable = {
     "susceptible->infected": "beta",
     "susceptible->exposed": "beta",
@@ -372,9 +378,12 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
         for i in range(population_matrix.shape[0])
     ]
 
-    if disease_type == "VECTOR_BORNE":
+    if disease_type != "RESPIRATORY":
         # create dictoinary mapping of compartments to generalized compartments for df groupby
-        col2grp = {c:grp for grp, cols in dengue_compartment_grouping.items() for c in cols}
+        if disease_type == "VECTOR_BORNE":
+            col2grp = {c:grp for grp, cols in dengue_compartment_grouping.items() for c in cols}
+        elif disease_type == "MONKEYPOX":
+            col2grp = {c:grp for grp, cols in monkeypox_compartment_grouping.items() for c in cols}
 
         zero_ages = dict.fromkeys(list(demographics.keys()), 0)
         

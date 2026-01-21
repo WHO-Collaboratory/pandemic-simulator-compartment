@@ -23,7 +23,10 @@ class MonkeypoxJaxModel(Model):
             # If shape is (n_regions, n_compartments), transpose to (n_compartments, n_regions)
             initial_pop = initial_pop.T
         self.population_matrix = initial_pop
-        self.travel_matrix = np.fill_diagonal(np.array(config["travel_matrix"]), 1.0, inplace=False)
+        # travel_matrix from helpers already has correct structure:
+        # diagonal = 1-sigma (staying), off-diagonal = sigma * gravity_rate (moving)
+        # Do NOT modify it!
+        self.travel_matrix = np.array(config["travel_matrix"])
         self.sigma = config.get('travel_volume', {}).get('leaving', 0.05)
 
         # Load disease transmission parameters
@@ -82,11 +85,19 @@ class MonkeypoxJaxModel(Model):
         dIdt = S * omega - gamma * I
         dRdt = gamma * I
         
-        # Add travel between regions (people move between S, I, R compartments)
-        # Travel matrix: rows = destination, cols = origin
-        # People leaving region j go to other regions according to travel_matrix
-        dSdt = dSdt + np.dot(self.travel_matrix.T - np.eye(self.travel_matrix.shape[0]), S)
-        dIdt = dIdt + np.dot(self.travel_matrix.T - np.eye(self.travel_matrix.shape[0]), I)
-        dRdt = dRdt + np.dot(self.travel_matrix.T - np.eye(self.travel_matrix.shape[0]), R)
+        # Travel between regions
+        # travel_matrix structure: rows = destination, columns = origin
+        # travel_matrix[i,j] = probability of person in region j ending up in region i
+        # Diagonal = 1-sigma (staying), off-diagonal = sigma * normalized_gravity_rate
+        # Each column sums to 1, so it's a proper stochastic matrix
+        
+        # For ODE: travel_matrix @ compartment gives the distribution after travel
+        # The rate of change is: (travel_matrix @ compartment) - compartment
+        # This conserves total population since columns sum to 1
+        
+        # Apply travel flow (this should conserve population)
+        dSdt = dSdt + (self.travel_matrix @ S - S)
+        dIdt = dIdt + (self.travel_matrix @ I - I)
+        dRdt = dRdt + (self.travel_matrix @ R - R)
         
         return np.stack([dSdt, dIdt, dRdt])
