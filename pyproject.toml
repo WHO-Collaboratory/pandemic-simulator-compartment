@@ -13,6 +13,7 @@ dependencies = [
     "boto3>=1.39.13",
     "geopy>=2.4.1",
     "jax>=0.8.1",
+    "matplotlib>=3.10.8",
     "numpy>=2.3.5",
     "pandas>=2.3.3",
     "psutil>=7.1.3",
