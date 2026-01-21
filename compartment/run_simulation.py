@@ -115,7 +115,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     logger.info(f"number of admin units: {len(cleaned_config.admin_units)}")
     logger.info(f"compartment_list: {cleaned_config.compartment_list}")
     logger.info(f"disease_type: {disease_type}")
-    if disease_type == "RESPIRATORY":
+    if disease_type == "RESPIRATORY" or disease_type == "MONKEYPOX":
         logger.info(f"transmission_dict: {cleaned_config.transmission_dict}")
     logger.info(f"intervention_dict: {cleaned_config.intervention_dict}")
 
