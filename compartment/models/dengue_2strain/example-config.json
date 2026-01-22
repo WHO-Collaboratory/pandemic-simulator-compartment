@@ -16,15 +16,6 @@
         "disease_type": "VECTOR_BORNE_2STRAIN",
         "immunity_period": 240
     },
-    "interventions": [
-        {
-            "adherence_min": 50.0,
-            "end_date": "2026-11-21",
-            "id": "chemical",
-            "start_date": "2025-11-21",
-            "transmission_percentage": 50.0
-        }
-    ],
     "case_file": {
         "admin_zones": [
             {
