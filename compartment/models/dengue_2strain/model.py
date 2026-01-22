@@ -94,9 +94,9 @@ class Dengue2StrainModel(Model):
     
     def _add_cumulative_compartments(self):
         # stack compartment totals
-        E_total = I_total = C_total = Snot_total = E2_total = I2_total = H_total = R_total = onp.zeros(len(self.admin_units))
-        self.population_matrix = onp.vstack((self.population_matrix, E_total, I_total, C_total, Snot_total, E2_total, I2_total, H_total, R_total))
-        self.compartment_list = self.compartment_list + ['E_total', 'I_total', 'C_total', 'Snot_total', 'E2_total', 'I2_total', 'H_total', 'R_total']
+        I_total = R1_total = S2_total = I2_total = R2_total = onp.zeros(len(self.admin_units))
+        self.population_matrix = onp.vstack((self.population_matrix, I_total, R1_total, S2_total, I2_total, R2_total))
+        self.compartment_list = self.compartment_list + ['I_total', 'R1_total', 'S2_total', 'I2_total', 'R2_total']
 
     def prepare_initial_state(self):
         # For jax dengue we are switching from rows being regions to columns being regions
@@ -156,7 +156,7 @@ class Dengue2StrainModel(Model):
 
         R2_total = gamma * (I12 + I21)
         
-        return np.stack([dS_dt, dI1_dt, dI2_dt, dR1_dt, dR2_dt, dS1_dt, dS2_dt, dI12_dt, dI21_dt, dR_dt])
+        return np.stack([dS_dt, dI1_dt, dI2_dt, I_total, dR1_dt, dR2_dt, R1_total, dS1_dt, dS2_dt, S2_total, dI12_dt, dI21_dt, I2_total, dR_dt, R2_total])
             
         
         #Compartments
