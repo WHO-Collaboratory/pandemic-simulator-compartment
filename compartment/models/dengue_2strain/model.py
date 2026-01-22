@@ -65,7 +65,6 @@ class Dengue2StrainModel(Model):
 
 
         # Dengue 2-strain parameters
-        # Define parameters
         self.beta_0 = .03
         self.eta = .2
         self.omega=0.5*np.pi/365
@@ -133,19 +132,29 @@ class Dengue2StrainModel(Model):
         
         dI2_dt = beta/N * S * (I2 + rho*N + epsilon*I12) - (gamma + mu) * I2
         
+        I_total = beta/N * S * (I1 + I2 + 2*(rho*N) + epsilon*(I21 + I12))
+
         dR1_dt = gamma * I1 - (alpha + mu) * R1
         
         dR2_dt = gamma * I2 - (alpha + mu) * R2
         
+        R1_total = gamma * (I1 + I2)
+
         dS1_dt = -beta/N * S1 * (I2 + rho*N + epsilon*I12) + alpha*R1 - mu*S1
         
         dS2_dt = -beta/N * S2 * (I1 + rho*N + epsilon*I21) + alpha*R2 - mu*S2
+        
+        S2_total = -beta/N * S1 * (I2 + rho*N + epsilon*I12) + alpha*R1 + -beta/N * S2 * (I1 + rho*N + epsilon*I21) + alpha*R2
         
         dI12_dt = beta/N * S1 * (I2 + rho*N + epsilon*I12) - (gamma + mu) * I12
         
         dI21_dt = beta/N * S2 * (I1 + rho*N + epsilon*I21) - (gamma + mu) * I21
         
+        I2_total = beta/N * (S1 * (I2 + rho*N + epsilon*I12) + S2 * (I1 + rho*N + epsilon*I21))
+
         dR_dt = gamma * (I12 + I21) - mu * R
+
+        R2_total = gamma * (I12 + I21)
         
         return np.stack([dS_dt, dI1_dt, dI2_dt, dR1_dt, dR2_dt, dS1_dt, dS2_dt, dI12_dt, dI21_dt, dR_dt])
             
