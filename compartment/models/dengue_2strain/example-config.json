@@ -13,7 +13,7 @@
         "center_lat": -19.37564815173127
     },
     "Disease": {
-        "disease_type": "VECTOR_BORNE",
+        "disease_type": "VECTOR_BORNE_2STRAIN",
         "immunity_period": 240
     },
     "interventions": [
