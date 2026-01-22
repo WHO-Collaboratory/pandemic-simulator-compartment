@@ -59,7 +59,11 @@ class DengueSimulationConfig(BaseSimulationShared):
         self.admin_units = extract_admin_units(admin_zones_dicts)
         self.intervention_dict = create_intervention_dict(interventions_list, self.start_date)
 
-        self.travel_matrix = get_gravity_model_travel_matrix(admin_zones_dicts, travel_volume_dict)
+        # Build travel matrix - will return identity if travel_volume is None
+        self.travel_matrix = get_gravity_model_travel_matrix(
+            admin_zones_dicts, 
+            travel_volume_dict if self.travel_volume else None
+        )
         self.hemisphere = get_hemisphere(admin2_dict, admin1_dict, admin0_dict)
         self.temperature = get_temperature(admin_zones_dicts)
 
