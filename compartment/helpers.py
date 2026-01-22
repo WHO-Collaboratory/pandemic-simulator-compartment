@@ -372,9 +372,12 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
         for i in range(population_matrix.shape[0])
     ]
 
-    if disease_type == "VECTOR_BORNE":
-        # create dictoinary mapping of compartments to generalized compartments for df groupby
-        col2grp = {c:grp for grp, cols in dengue_compartment_grouping.items() for c in cols}
+    if population_matrix.ndim == 3:
+        if disease_type == "VECTOR_BORNE":
+            # create dictoinary mapping of compartments to generalized compartments for df groupby
+            col2grp = {c:grp for grp, cols in dengue_compartment_grouping.items() for c in cols}
+        else:
+            col2grp = {c:c for c in compartment_list}
 
         zero_ages = dict.fromkeys(list(demographics.keys()), 0)
         
@@ -397,10 +400,12 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
                     "admin_unit_id": admin_zones_payload[i].get('id', None),
                     "time_series": df_nested.to_dict("records")
                 })
-    else:
+    elif population_matrix.ndim == 4 and disease_type == "RESPIRATORY":
         formatted_data["admin_zones"] = fast_format_jax_output_respiratory(
             population_matrix, compartment_list, demographics, admin_zones_payload, n_regions, n_timesteps, step, unique_id, payload
         )
+    else:
+        raise ValueError(f"Unsupported population matrix dimension: {population_matrix.ndim}")
 
     formatted_data["compartment_deltas"] = compute_jax_compartment_deltas(population_matrix, disease_type,  n_regions, compartment_list)
     formatted_data["parent_admin_total"] = compute_parent_admin_total(formatted_data['admin_zones'], payload, unique_id, parent_unique_id, population_matrix.shape[0], step)
@@ -451,6 +456,7 @@ def fast_format_jax_output_respiratory(
             "admin_unit_id": region,
             "time_series": time_series,
         })
+        
     return all_regions
 
 def format_uncertainty_output(means_child, lower_child, upper_child,
@@ -678,6 +684,35 @@ def get_hemisphere(admin2, admin1, admin0):
     return "North" if center_lat >= 0 else "South"
 
 
+def has_age_stratification(demographics):
+    """
+    Check if demographics represent actual age stratification.
+    Returns False if demographics is None or represents a single age group.
+    """
+    if demographics is None:
+        return False
+    
+    # If it's a dict-like object with age groups
+    if hasattr(demographics, 'keys'):
+        age_keys = list(demographics.keys())
+        # More than one age group means stratification
+        return len(age_keys) > 1
+    
+    return False
+
+def get_demographics_or_default(case_file_dict):
+    """
+    Get demographics from case_file, or return a simple default.
+    Returns a dict with either age groups or just 'age_all'.
+    """
+    if "demographics" in case_file_dict:
+        demographics = case_file_dict["demographics"]
+        if has_age_stratification(demographics):
+            return demographics
+    
+    # No stratification - return simple single-age group
+    return {"age_all": 100.0}
+
 def get_temperature(case_file, default_min=0, default_max=38, default_mean=30):
     # Apply first admin zone temperature to all admin zones
     case_file = case_file[0]
@@ -780,8 +815,27 @@ def create_travel_matrix(input_df, sigma):
     return travel_matrix.to_numpy()
 
 def get_gravity_model_travel_matrix(case_file, travel_rates):
+    """
+    Create a travel matrix using the gravity model.
+    Returns identity matrix if travel_rates is None or if only one region.
+    """
+    if travel_rates is None:
+        # No travel - return identity matrix
+        n_regions = len(case_file)
+        return np.eye(n_regions)
+    
+    if len(case_file) == 1:
+        # Single region - no travel needed
+        return np.array([[1.0]])
+    
     df = get_admin_zone_df(case_file)
-    sigma = travel_rates.get("leaving")
+    sigma = travel_rates.get("leaving", 0.0)
+    
+    if sigma == 0.0:
+        # No travel rate specified - return identity
+        n_regions = len(case_file)
+        return np.eye(n_regions)
+    
     return create_travel_matrix(df, sigma)
 
 # --------------------------------------------------

@@ -84,7 +84,8 @@ class BaseSimulationShared(BaseModel):
     # Population / mobility
     #selected_infected_population: float = Field(ge=0)
     #selected_population: int = Field(ge=0)
-    travel_volume: TravelVolume = TravelVolume()
+    # Make travel_volume optional - models can declare if they need it
+    travel_volume: Optional[TravelVolume] = TravelVolume()
 
     case_file: CaseFile
 

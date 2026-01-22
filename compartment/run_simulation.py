@@ -4,7 +4,6 @@ import os
 import multiprocessing
 import numpy as np # should we use jax.numpy?
 from copy import deepcopy
-from math import ceil
 import boto3
 from compartment.helpers import get_executor_class
 from compartment.model import Model
@@ -17,14 +16,12 @@ from compartment.helpers import (
   load_config_from_json,
   write_results_to_local
 )
-from compartment.validation import load_simulation_config
 from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.cloud_helpers.gql import get_simulation_job
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
 from compartment.cloud_helpers.gql import write_to_gql
 from compartment.cloud_helpers.simulation_helpers import transform_normalized_interventions
 from compartment.model import Model
-import tracemalloc
 
 # Makes sure unix implementations don't deadlock
 multiprocessing.set_start_method('spawn', force=True)
@@ -53,7 +50,6 @@ def batch_simulate_and_postprocess(model, n_sims, param_list, ci, num_workers):
 
 def run_simulation(model_class, simulation_params=None, mode:str='local', config_path: str = None, output_path: str = None):
     logger.info("Starting the simulation...")
-    tracemalloc.start()
 
     if mode == 'local':
         logger.info("Running in LOCAL mode")
@@ -115,7 +111,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     logger.info(f"number of admin units: {len(cleaned_config.admin_units)}")
     logger.info(f"compartment_list: {cleaned_config.compartment_list}")
     logger.info(f"disease_type: {disease_type}")
-    if disease_type == "RESPIRATORY":
+    if getattr(cleaned_config, "transmission_dict", None) is not None:
         logger.info(f"transmission_dict: {cleaned_config.transmission_dict}")
     logger.info(f"intervention_dict: {cleaned_config.intervention_dict}")
 
@@ -139,10 +135,6 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     low_level_workers = 2#ceil(os.cpu_count() / top_level_workers) - 1
     logger.info(f"top_level_workers: {top_level_workers}")
     logger.info(f"low_level_workers: {low_level_workers}")
-
-    current, peak = tracemalloc.get_traced_memory() 
-    tracemalloc.stop()
-    logger.info(f"Memory tracking stopped for initializing model. Peak memory usage: {peak / (1024 * 1024):.2f} MB, current memory usage: {current / (1024 * 1024):.2f} MB")
     
     if run_mode == "DETERMINISTIC":
         with ExecutorClass(max_workers=top_level_workers) as executor:
