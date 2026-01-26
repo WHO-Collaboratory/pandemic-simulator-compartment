@@ -12,7 +12,7 @@ from .interventions import (
     Intervention,
     InterventionVarianceParams,
 )
-
+from .mpox_disease import MpoxConfig
 from .covid_simulation_config import CovidSimulationConfig
 from .dengue_simulation_config import DengueSimulationConfig
 
@@ -34,6 +34,7 @@ __all__ = [
     "CovidSimulationConfig",
     "DengueDiseaseConfig",
     "DengueSimulationConfig",
+    "MpoxConfig",
     "log_pydantic_errors",
     "load_simulation_config",
 ]
@@ -67,7 +68,14 @@ def load_simulation_config(config: dict, disease_type: str):
     - Validates config["data"]["getSimulationJob"]
     - Logs nice error messages on ValidationError
     """
-    model_cls = DengueSimulationConfig if disease_type == "VECTOR_BORNE" else CovidSimulationConfig
+    if disease_type == "VECTOR_BORNE":
+        model_cls = DengueSimulationConfig
+    elif disease_type == "RESPIRATORY":
+        model_cls = CovidSimulationConfig
+    elif disease_type == "MONKEYPOX":
+        model_cls = MpoxConfig
+    else:
+        raise ValueError(f"Invalid disease type: {disease_type}")
     context = model_cls.__name__
 
     try:

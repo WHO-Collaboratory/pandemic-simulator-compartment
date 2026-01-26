@@ -1,0 +1,62 @@
+{
+    "admin_unit_0_id": "USA",
+    "start_date": "2025-01-01",
+    "end_date": "2025-04-01",
+    "simulation_type": "COMPARTMENTAL",
+    "run_mode": "DETERMINISTIC",
+    "time_steps": 90,
+    "AdminUnit0": {
+        "id": "USA",
+        "center_lat": 37.0902
+    },
+    "Disease": {
+        "disease_type": "MONKEYPOX",
+        "compartment_list": [
+            "S",
+            "I",
+            "R"
+        ],
+        "transmission_edges": [
+            {
+                "data": {
+                    "transmission_rate": 0.3
+                },
+                "source": "susceptible",
+                "target": "infected"
+            },
+            {
+                "data": {
+                    "transmission_rate": 0.1
+                },
+                "source": "infected",
+                "target": "recovered"
+            }
+        ]
+    },
+    "case_file": {
+        "admin_zones": [
+            {
+                "center_lat": 40.7128,
+                "center_lon": -74.0060,
+                "name": "New York",
+                "population": 8000000,
+                "infected_population": 100
+            },
+            {
+                "center_lat": 34.0522,
+                "center_lon": -118.2437,
+                "name": "Los Angeles",
+                "population": 4000000,
+                "infected_population": 50
+            },
+            {
+                "center_lat": 41.8781,
+                "center_lon": -87.6298,
+                "name": "Chicago",
+                "population": 2700000,
+                "infected_population": 30
+            }
+        ]
+    }
+}
+

@@ -145,13 +145,20 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     else:
         n_sims = 30
         ci = 0.95
+        print(cleaned_config.transmission_dict)
 
-        if disease_type == "VECTOR_BORNE":
-          transmission_edges_dicts = None
+        if getattr(cleaned_config, "transmission_dict", None) is not None:
+            transmission_edges_dicts = [
+                edge.model_dump() for edge in cleaned_config.Disease.transmission_edges
+            ]
         else:
-          transmission_edges_dicts = [
-              edge.model_dump() for edge in cleaned_config.Disease.transmission_edges
-          ]
+            transmission_edges_dicts = None
+        # if disease_type == "VECTOR_BORNE":
+        #   transmission_edges_dicts = None
+        # else:
+        #   transmission_edges_dicts = [
+        #       edge.model_dump() for edge in cleaned_config.Disease.transmission_edges
+        #   ]
 
         interventions_dicts = [intervention.model_dump() for intervention in cleaned_config.interventions]
 
