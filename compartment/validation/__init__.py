@@ -8,13 +8,19 @@ from .covid_disease import (
     CovidVarianceParams,
 )
 from .dengue_disease import DengueDiseaseConfig
+from .mpox_disease import (
+    MpoxDiseaseConfig,
+    TransmissionEdge,
+    TransmissionEdgeData,
+)
+
 from .interventions import (
     Intervention,
     InterventionVarianceParams,
 )
-from .mpox_disease import MpoxConfig
 from .covid_simulation_config import CovidSimulationConfig
 from .dengue_simulation_config import DengueSimulationConfig
+from .mpox_simulation_config import MpoxSimulationConfig
 
 import logging
 import sys
@@ -34,7 +40,10 @@ __all__ = [
     "CovidSimulationConfig",
     "DengueDiseaseConfig",
     "DengueSimulationConfig",
-    "MpoxConfig",
+    "MpoxDiseaseConfig",
+    "TransmissionEdge",
+    "TransmissionEdgeData",
+    "MpoxSimulationConfig",
     "log_pydantic_errors",
     "load_simulation_config",
 ]
@@ -73,7 +82,7 @@ def load_simulation_config(config: dict, disease_type: str):
     elif disease_type == "RESPIRATORY":
         model_cls = CovidSimulationConfig
     elif disease_type == "MONKEYPOX":
-        model_cls = MpoxConfig
+        model_cls = MpoxSimulationConfig
     else:
         raise ValueError(f"Invalid disease type: {disease_type}")
     context = model_cls.__name__

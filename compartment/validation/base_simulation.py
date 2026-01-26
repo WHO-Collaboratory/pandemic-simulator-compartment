@@ -58,7 +58,7 @@ class BaseSimulationShared(BaseModel):
     """
     Shared fields for all disease simulations (COVID, Dengue, etc.).
     """
-    model_config = ConfigDict(extra="ignore") # "forbid" would raise an error for unknown fields
+    model_config = ConfigDict(extra="allow") # "forbid" would raise an error for unknown fields
 
     id: Optional[str] = None
     simulation_name: str = ""

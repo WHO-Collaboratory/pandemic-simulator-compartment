@@ -26,10 +26,10 @@ class SimulationPostProcessor:
         self.admin_units = model.admin_units
         self.start_date = model.start_date
         self.n_timesteps = model.n_timesteps
-        self.demographics = model.demographics
+        self.demographics = getattr(model, "demographics", None) or {'age_0_17': 25.0, 'age_18_55': 50.0, 'age_56_plus': 25.0}
         self.disease_type = model.disease_type
         self.step = get_simulation_step_size(model.n_timesteps)
-        self.intervention_dict = model.intervention_dict
+        self.intervention_dict = getattr(model, "intervention_dict", {})
         self.payload = model.payload
         self.n_runs = len(self.population_matrix)
 

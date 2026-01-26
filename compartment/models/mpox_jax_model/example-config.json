@@ -40,21 +40,21 @@
                 "center_lon": -74.0060,
                 "name": "New York",
                 "population": 8000000,
-                "infected_population": 100
+                "infected_population": 1
             },
             {
                 "center_lat": 34.0522,
                 "center_lon": -118.2437,
                 "name": "Los Angeles",
                 "population": 4000000,
-                "infected_population": 50
+                "infected_population": 5
             },
             {
                 "center_lat": 41.8781,
                 "center_lon": -87.6298,
                 "name": "Chicago",
                 "population": 2700000,
-                "infected_population": 30
+                "infected_population": 8
             }
         ]
     }
