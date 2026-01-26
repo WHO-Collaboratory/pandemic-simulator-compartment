@@ -1,7 +1,6 @@
 import json
 from datetime import datetime
 import boto3
-import logging
 from compartment.helpers import convert_dates
 from compartment.validation import load_simulation_config
 
@@ -101,14 +100,4 @@ def record_and_upload_validation(
             environment
         )
         print(f"Validation result persisted to S3 at: {s3_path}")
-    # else:
-    #     # In local mode, surface the validation result to logs for debugging
-    #     try:
-    #         logging.getLogger(__name__).info(
-    #             "Validation result: %s",
-    #             json.dumps(validation_result, default=str, indent=2),
-    #         )
-    #     except Exception:
-    #         # Fallback to plain print if logging/jsonification fails
-    #         print("Validation result:", validation_result)
     return validation_success, cleaned_config
