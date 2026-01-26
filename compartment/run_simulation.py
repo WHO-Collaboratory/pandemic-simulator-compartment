@@ -57,8 +57,6 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         config = load_config_from_json(config_path)
         simulation_job_id = config['data']['getSimulationJob'].get('id', 'local-simulation')
         owner = "local-user"
-        #config["data"]["getSimulationJob"]["owner"] = owner
-        #config["data"]["getSimulationJob"]["id"] = simulation_job_id
     elif mode == 'cloud':
         logger.info("Running in CLOUD mode")
         if simulation_params is None:
@@ -140,7 +138,6 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     logger.info(f"low_level_workers: {low_level_workers}")
     
     if run_mode == "DETERMINISTIC":
-        print(cleaned_config.model_dump())
         with ExecutorClass(max_workers=top_level_workers) as executor:
             future_with = executor.submit(simulate_and_postprocess, model_with)
             future_without = executor.submit(simulate_and_postprocess, model_without)
@@ -157,12 +154,6 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
             ]
         else:
             transmission_edges_dicts = None
-        # if disease_type == "VECTOR_BORNE":
-        #   transmission_edges_dicts = None
-        # else:
-        #   transmission_edges_dicts = [
-        #       edge.model_dump() for edge in cleaned_config.Disease.transmission_edges
-        #   ]
 
         interventions_dicts = [intervention.model_dump() for intervention in cleaned_config.interventions]
 
