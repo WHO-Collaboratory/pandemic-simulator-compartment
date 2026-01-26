@@ -68,7 +68,7 @@ def record_and_upload_validation(
     validation_result = None
     validation_success = False
     try:
-        cleaned_config = load_simulation_config(config, disease_type) 
+        cleaned_config = load_simulation_config(config, disease_type)
         validation_result = {
             "event": "validation_success",
             "job_id": simulation_job_id,
