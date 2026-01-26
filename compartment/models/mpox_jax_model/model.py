@@ -39,13 +39,6 @@ class MpoxJaxModel(Model):
         """ Get params tuple for ODE solver """
         return (self.beta, self.gamma)
     
-    # def _add_cumulative_compartments(self):
-    #     # Add cumulative infected compartment
-    #     S_idx = self.compartment_list.index('S')
-    #     cumulative_shape = onp.zeros_like(self.population_matrix[S_idx])
-    #     self.population_matrix = onp.vstack((self.population_matrix, cumulative_shape))
-    #     self.compartment_list = self.compartment_list + ['I_total']
-    
     def prepare_initial_state(self):
         #self._add_cumulative_compartments()
         return self.population_matrix, self.compartment_list
@@ -76,8 +69,5 @@ class MpoxJaxModel(Model):
         derivs['I'] = S * lambda_force - gamma * I
         derivs['R'] = gamma * I
         
-        # Cumulative infected
-        #derivs['I_total'] = S * lambda_force
-        
-        return np.stack([derivs['S'], derivs['I'], derivs['R']]) #, derivs['I_total']])
+        return np.stack([derivs['S'], derivs['I'], derivs['R']])
 
