@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: False
       matrix:
-        disease_path: [covid_jax_model, dengue_jax_model]
+        disease_path: [covid_jax_model, dengue_jax_model, mpox_jax_model]
     steps:
     - uses: actions/checkout@v6
     - name: Log in to GitHub Container Registry
