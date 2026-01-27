@@ -17,7 +17,30 @@ class TransmissionEdge(BaseModel):
             target = values.get("target", "")
             values["id"] = f"{source}->{target}"
         return values
+
+class DiseaseNodeData(BaseModel):
+    alias: Optional[str]
+    label: str
+class DiseaseNode(BaseModel):
+    type: Literal["DISEASE_STATE_NODE"]
+    data: DiseaseNodeData
+    id: str
 class MpoxDiseaseConfig(BaseModel):
     disease_type: Literal["MONKEYPOX"]
-    compartment_list: List[str]
     transmission_edges: List[TransmissionEdge]
+
+    disease_nodes: Optional[List[DiseaseNode]] = None
+    compartment_list: Optional[List[str]] = None
+
+    @model_validator(mode='after')
+    def check_compartment_source(self):
+        """
+        Ensures that either disease_nodes or compartment_list is provided.
+        If disease_nodes is not provided, compartment_list must be provided.
+        """
+        if self.disease_nodes is None and (self.compartment_list is None or len(self.compartment_list) == 0):
+            raise ValueError(
+                "Either 'disease_nodes' or 'compartment_list' must be provided. "
+                "If 'disease_nodes' is not provided, 'compartment_list' is required."
+            )
+        return self
