@@ -558,7 +558,7 @@ def create_initial_population_matrix(case_file, compartment_list):
         initial_population[i, column_mapping['S']] = susceptible
         initial_population[i, column_mapping['I']] = infected
 
-    return initial_population
+    return initial_population.copy()
 
 def create_dengue_compartment_list(disease_type):
     if disease_type == "VECTOR_BORNE":
@@ -812,7 +812,7 @@ def create_travel_matrix(input_df, sigma):
 
     travel_matrix = travel_matrix * sigma
     np.fill_diagonal(travel_matrix.values, 1 - sigma)
-    return travel_matrix.to_numpy()
+    return travel_matrix.to_numpy().copy()
 
 def get_gravity_model_travel_matrix(case_file, travel_rates):
     """
@@ -822,20 +822,20 @@ def get_gravity_model_travel_matrix(case_file, travel_rates):
     if travel_rates is None:
         # No travel - return identity matrix
         n_regions = len(case_file)
-        return np.eye(n_regions).copy()  # Ensure writable array for Pydantic serialization
-
+        return np.eye(n_regions)
+    
     if len(case_file) == 1:
         # Single region - no travel needed
         return np.array([[1.0]])
-
+    
     df = get_admin_zone_df(case_file)
     sigma = travel_rates.get("leaving", 0.0)
-
+    
     if sigma == 0.0:
         # No travel rate specified - return identity
         n_regions = len(case_file)
-        return np.eye(n_regions).copy()  # Ensure writable array for Pydantic serialization
-
+        return np.eye(n_regions)
+    
     return create_travel_matrix(df, sigma)
 
 # --------------------------------------------------
