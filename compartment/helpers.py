@@ -822,20 +822,20 @@ def get_gravity_model_travel_matrix(case_file, travel_rates):
     if travel_rates is None:
         # No travel - return identity matrix
         n_regions = len(case_file)
-        return np.eye(n_regions)
-    
+        return np.eye(n_regions).copy()  # Ensure writable array for Pydantic serialization
+
     if len(case_file) == 1:
         # Single region - no travel needed
         return np.array([[1.0]])
-    
+
     df = get_admin_zone_df(case_file)
     sigma = travel_rates.get("leaving", 0.0)
-    
+
     if sigma == 0.0:
         # No travel rate specified - return identity
         n_regions = len(case_file)
-        return np.eye(n_regions)
-    
+        return np.eye(n_regions).copy()  # Ensure writable array for Pydantic serialization
+
     return create_travel_matrix(df, sigma)
 
 # --------------------------------------------------
