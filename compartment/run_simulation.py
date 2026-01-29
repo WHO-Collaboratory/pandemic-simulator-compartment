@@ -113,7 +113,8 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     logger.info(f"disease_type: {disease_type}")
     if getattr(cleaned_config, "transmission_dict", None) is not None:
         logger.info(f"transmission_dict: {cleaned_config.transmission_dict}")
-    logger.info(f"intervention_dict: {cleaned_config.intervention_dict}")
+    if getattr(cleaned_config, "intervention_dict", None) is not None: 
+        logger.info(f"intervention_dict: {cleaned_config.intervention_dict}")
 
     # Validate that model_class is a subclass of Model
     if not issubclass(model_class, Model):
@@ -146,12 +147,12 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         n_sims = 30
         ci = 0.95
 
-        if disease_type == "VECTOR_BORNE":
-          transmission_edges_dicts = None
+        if getattr(cleaned_config, "transmission_dict", None) is not None:
+            transmission_edges_dicts = [
+                edge.model_dump() for edge in cleaned_config.Disease.transmission_edges
+            ]
         else:
-          transmission_edges_dicts = [
-              edge.model_dump() for edge in cleaned_config.Disease.transmission_edges
-          ]
+            transmission_edges_dicts = None
 
         interventions_dicts = [intervention.model_dump() for intervention in cleaned_config.interventions]
 
