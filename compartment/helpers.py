@@ -558,7 +558,7 @@ def create_initial_population_matrix(case_file, compartment_list):
         initial_population[i, column_mapping['S']] = susceptible
         initial_population[i, column_mapping['I']] = infected
 
-    return initial_population.copy()
+    return initial_population
 
 def create_dengue_compartment_list(disease_type):
     if disease_type == "VECTOR_BORNE":
@@ -812,7 +812,7 @@ def create_travel_matrix(input_df, sigma):
 
     travel_matrix = travel_matrix * sigma
     np.fill_diagonal(travel_matrix.values, 1 - sigma)
-    return travel_matrix.to_numpy().copy()
+    return travel_matrix.to_numpy()
 
 def get_gravity_model_travel_matrix(case_file, travel_rates):
     """

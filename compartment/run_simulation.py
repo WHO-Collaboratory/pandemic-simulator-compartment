@@ -146,7 +146,6 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     else:
         n_sims = 30
         ci = 0.95
-        print(cleaned_config.transmission_dict)
 
         if getattr(cleaned_config, "transmission_dict", None) is not None:
             transmission_edges_dicts = [
