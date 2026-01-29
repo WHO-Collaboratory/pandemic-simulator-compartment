@@ -64,7 +64,7 @@ class CovidSimulationConfig(BaseSimulationShared):
         else:
             raise ValueError("Either disease_nodes or compartment_list must be provided in Disease config")
 
-        self.initial_population = create_initial_population_matrix(admin_zones_dicts, self.compartment_list)
+        self.initial_population = create_initial_population_matrix(admin_zones_dicts, self.compartment_list).copy()
         self.transmission_dict = create_transmission_dict(disease_dict['transmission_edges'])
         self.admin_units = extract_admin_units(admin_zones_dicts)
         self.intervention_dict = create_intervention_dict(interventions_list, self.start_date)
@@ -73,6 +73,6 @@ class CovidSimulationConfig(BaseSimulationShared):
         self.travel_matrix = get_gravity_model_travel_matrix(
             admin_zones_dicts, 
             travel_volume_dict if self.travel_volume else None
-        )
+        ).copy()
         self.hemisphere = get_hemisphere(admin2_dict, admin1_dict, admin0_dict)
         self.temperature = get_temperature(admin_zones_dicts)
