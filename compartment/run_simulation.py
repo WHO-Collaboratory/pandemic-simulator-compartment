@@ -5,16 +5,17 @@ import multiprocessing
 import numpy as np # should we use jax.numpy?
 from copy import deepcopy
 import boto3
-from compartment.helpers import get_executor_class
 from compartment.model import Model
 from compartment.simulation_manager import SimulationManager
 from compartment.simulation_postprocessor import SimulationPostProcessor
 from compartment.batch_simulation_manager import BatchSimulationManager
 from compartment.helpers import (
-  generate_LHS_samples, 
-  build_uncertainty_params,
-  load_config_from_json,
-  write_results_to_local
+    get_executor_class,
+    generate_LHS_samples, 
+    build_uncertainty_params,
+    load_config_from_json,
+    write_results_to_local,
+    as_dict_list
 )
 from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.cloud_helpers.gql import get_simulation_job
@@ -33,7 +34,6 @@ logging.getLogger("jax._src").setLevel(logging.WARNING)
 logging.getLogger("jax._src.xla_bridge").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 np.set_printoptions(suppress=True, formatter={'float_kind':'{:0.2f}'.format})
-
 
 def simulate_and_postprocess(model): 
     all_output = SimulationManager(model).run_simulation()
@@ -148,13 +148,18 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         ci = 0.95
 
         if getattr(cleaned_config, "transmission_dict", None) is not None:
-            transmission_edges_dicts = [
-                edge.model_dump() for edge in cleaned_config.Disease.transmission_edges
-            ]
+            # Handle Disease as either dict or Pydantic model
+            disease_section = cleaned_config.Disease
+            if isinstance(disease_section, dict):
+                transmission_edges_dicts = as_dict_list(disease_section.get('transmission_edges'))
+            else:
+                transmission_edges_dicts = as_dict_list(disease_section.transmission_edges)
         else:
             transmission_edges_dicts = None
 
-        interventions_dicts = [intervention.model_dump() for intervention in cleaned_config.interventions]
+        # Handle interventions as either list of dicts or Pydantic models
+        interventions = getattr(cleaned_config, 'interventions', [])
+        interventions_dicts = as_dict_list(interventions)
 
         uncertainty_params = build_uncertainty_params(
             transmission_edges_dicts,

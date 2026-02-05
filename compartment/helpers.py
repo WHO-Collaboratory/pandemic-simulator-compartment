@@ -1006,3 +1006,40 @@ def get_executor_class():
         return ThreadPoolExecutor
     except (OSError, RuntimeError, ValueError):
         return ThreadPoolExecutor
+    
+# --------------------------------------------------
+# Helper Functions: Dengue Misc
+# --------------------------------------------------
+    
+def as_dict_list(obj):
+    """Normalize a Pydantic model or list of models/dicts to list of dicts.
+    
+    Handles cases where obj might be:
+    - List of Pydantic models (call model_dump() on each)
+    - List of dicts (return as-is)
+    - Single Pydantic model (call model_dump() and wrap in list)
+    - Single dict (wrap in list)
+    - None (return empty list)
+    """
+    if obj is None:
+        return []
+    
+    # Handle list/sequence
+    if isinstance(obj, (list, tuple)):
+        result = []
+        for item in obj:
+            if hasattr(item, 'model_dump'):
+                result.append(item.model_dump())
+            elif isinstance(item, dict):
+                result.append(item)
+            else:
+                result.append(item)
+        return result
+    
+    # Handle single item
+    if hasattr(obj, 'model_dump'):
+        return [obj.model_dump()]
+    elif isinstance(obj, dict):
+        return [obj]
+    
+    return []
