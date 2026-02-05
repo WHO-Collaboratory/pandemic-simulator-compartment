@@ -125,7 +125,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     logger.info(f"run_mode: {run_mode}")
 
     # Create business as usual model
-    model_with = model_class(cleaned_config.model_dump())
+    model_with = model_class(cleaned_config)
     # Create a deepcopy for the interventionless model
     model_without = deepcopy(model_with)
     model_without.intervention_dict = {}
