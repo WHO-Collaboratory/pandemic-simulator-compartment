@@ -1,49 +1,40 @@
-from .base_simulation import BaseSimulationShared, TravelVolume
-from .covid_disease import (
+# New simplified validation structure (default)
+from .disease_config import BaseDiseaseConfig
+from .simulation_config import SimulationConfig
+from .post_processor import ValidationPostProcessor, ProcessedSimulation
+from .diseases import (
     CovidDiseaseConfig,
-    CovidDiseaseNode,
-    CovidDiseaseNodeData,
-    CovidTransmissionEdge,
-    CovidTransmissionEdgeData,
-    CovidVarianceParams,
-)
-from .dengue_disease import DengueDiseaseConfig
-from .mpox_disease import (
+    DengueDiseaseConfig,
     MpoxDiseaseConfig,
-    TransmissionEdge,
-    TransmissionEdgeData,
 )
 
+# Shared models still used
+from .base_simulation import BaseSimulationShared, TravelVolume
 from .interventions import (
     Intervention,
     InterventionVarianceParams,
 )
-from .covid_simulation_config import CovidSimulationConfig
-from .dengue_simulation_config import DengueSimulationConfig
-from .mpox_simulation_config import MpoxSimulationConfig
 
 import logging
 import sys
 from pydantic import ValidationError
 
 __all__ = [
+    # Core validation classes
+    "BaseDiseaseConfig",
+    "SimulationConfig",
+    "ValidationPostProcessor",
+    "ProcessedSimulation",
+    # Disease configs
+    "CovidDiseaseConfig",
+    "DengueDiseaseConfig",
+    "MpoxDiseaseConfig",
+    # Shared models
     "BaseSimulationShared",
     "TravelVolume",
-    "CovidDiseaseConfig",
-    "CovidDiseaseNode",
-    "CovidDiseaseNodeData",
-    "CovidTransmissionEdge",
-    "CovidTransmissionEdgeData",
-    "CovidVarianceParams",
     "Intervention",
     "InterventionVarianceParams",
-    "CovidSimulationConfig",
-    "DengueDiseaseConfig",
-    "DengueSimulationConfig",
-    "MpoxDiseaseConfig",
-    "TransmissionEdge",
-    "TransmissionEdgeData",
-    "MpoxSimulationConfig",
+    # Utility functions
     "log_pydantic_errors",
     "load_simulation_config",
 ]
@@ -71,26 +62,38 @@ def log_pydantic_errors(err: ValidationError, context: str | None = None) -> Non
 
 def load_simulation_config(config: dict, disease_type: str):
     """
-    Centralized validation entrypoint.
+    Centralized validation entrypoint using the new structure.
 
-    - Picks the right SimulationConfig model
-    - Validates config["data"]["getSimulationJob"]
-    - Logs nice error messages on ValidationError
+    Args:
+        config: Configuration dict (usually from GraphQL/JSON)
+        disease_type: Type of disease ("RESPIRATORY", "VECTOR_BORNE", "MONKEYPOX")
+
+    Returns:
+        ProcessedSimulation with all computed fields ready for use by Model classes.
+        
+    Example:
+        config = load_simulation_config(data, "RESPIRATORY")
+        model = CovidJaxModel(config)
     """
+    # Map disease type to disease config class
     if disease_type == "VECTOR_BORNE":
-        model_cls = DengueSimulationConfig
+        disease_cls = DengueDiseaseConfig
     elif disease_type == "RESPIRATORY":
-        model_cls = CovidSimulationConfig
+        disease_cls = CovidDiseaseConfig
     elif disease_type == "MONKEYPOX":
-        model_cls = MpoxSimulationConfig
+        disease_cls = MpoxDiseaseConfig
     else:
         raise ValueError(f"Invalid disease type: {disease_type}")
-    context = model_cls.__name__
-
+    
+    context = f"SimulationConfig[{disease_cls.__name__}]"
+    
     try:
-        return model_cls(**config["data"]["getSimulationJob"])
+        # Step 1: Validate
+        validated_config = SimulationConfig[disease_cls](**config["data"]["getSimulationJob"])
+        # Step 2: Post-process
+        processed = ValidationPostProcessor.process(validated_config)
+        return processed
     except ValidationError as e:
         log_pydantic_errors(e, context=context)
         logger.error("Simulation config validation failed; aborting.")
-        # exit with non-zero code, NO traceback
         sys.exit(2)
