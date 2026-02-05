@@ -1,8 +1,14 @@
+from __future__ import annotations
 from typing import List, Literal, Optional
-from pydantic import BaseModel, Field
-from pydantic import model_validator
+from pydantic import BaseModel, Field, model_validator
+
+from compartment.validation.disease_config import BaseDiseaseConfig
+
+
 class TransmissionEdgeData(BaseModel):
     transmission_rate: float = Field(gt=0)
+
+
 class TransmissionEdge(BaseModel):
     source: str
     target: str
@@ -18,15 +24,20 @@ class TransmissionEdge(BaseModel):
             values["id"] = f"{source}->{target}"
         return values
 
+
 class DiseaseNodeData(BaseModel):
     alias: Optional[str]
     label: str
+
+
 class DiseaseNode(BaseModel):
     type: Literal["DISEASE_STATE_NODE"]
     data: DiseaseNodeData
     id: str
-class MpoxDiseaseConfig(BaseModel):
-    disease_type: Literal["MONKEYPOX"]
+
+
+class MpoxDiseaseConfig(BaseDiseaseConfig):
+    disease_type: Literal["MONKEYPOX"] = "MONKEYPOX"
     transmission_edges: List[TransmissionEdge]
 
     disease_nodes: Optional[List[DiseaseNode]] = None
@@ -36,7 +47,6 @@ class MpoxDiseaseConfig(BaseModel):
     def check_compartment_source(self):
         """
         Ensures that either disease_nodes or compartment_list is provided.
-        If disease_nodes is not provided, compartment_list must be provided.
         """
         if self.disease_nodes is None and (self.compartment_list is None or len(self.compartment_list) == 0):
             raise ValueError(

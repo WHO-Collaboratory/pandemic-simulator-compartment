@@ -1,6 +1,9 @@
 from __future__ import annotations
 from typing import Literal, List, Optional
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import BaseModel, Field, model_validator
+
+from compartment.validation.disease_config import BaseDiseaseConfig
+
 
 class CovidVarianceParams(BaseModel):
     has_variance: bool
@@ -13,6 +16,7 @@ class CovidVarianceParams(BaseModel):
 class CovidTransmissionEdgeData(BaseModel):
     transmission_rate: float = Field(gt=0)
     variance_params: Optional[CovidVarianceParams] = None
+
 
 class CovidTransmissionEdge(BaseModel):
     source: str
@@ -40,18 +44,10 @@ class CovidDiseaseNode(BaseModel):
     type: Literal["DISEASE_STATE_NODE"]
     data: CovidDiseaseNodeData
     id: str
-class CovidCompartmentList(BaseModel):
-    compartment_list: List[str]
 
-class CovidDiseaseConfig(BaseModel):
-    """
-    Disease-specific config for COVID.
-    """
-    model_config = ConfigDict(extra="ignore") # "forbid" would raise an error for unknown fields
 
-    id: Optional[str] = None
-    disease_name: Optional[str] = None
-    disease_type: Literal["RESPIRATORY"]
+class CovidDiseaseConfig(BaseDiseaseConfig):
+    disease_type: Literal["RESPIRATORY"] = "RESPIRATORY"
     transmission_edges: List[CovidTransmissionEdge]
     
     disease_nodes: Optional[List[CovidDiseaseNode]] = None
@@ -61,7 +57,6 @@ class CovidDiseaseConfig(BaseModel):
     def check_compartment_source(self):
         """
         Ensures that either disease_nodes or compartment_list is provided.
-        If disease_nodes is not provided, compartment_list must be provided.
         """
         if self.disease_nodes is None and (self.compartment_list is None or len(self.compartment_list) == 0):
             raise ValueError(
