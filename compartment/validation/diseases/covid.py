@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Literal, List, Optional
+from typing import Literal, List, Optional, ClassVar
 from pydantic import BaseModel, Field, model_validator
 
 from compartment.validation.disease_config import BaseDiseaseConfig, DiseaseCapabilities
@@ -50,7 +50,7 @@ class CovidDiseaseConfig(BaseDiseaseConfig):
     disease_type: Literal["RESPIRATORY"] = "RESPIRATORY"
     
     # COVID capabilities
-    capabilities: DiseaseCapabilities = DiseaseCapabilities(
+    capabilities: ClassVar[DiseaseCapabilities] = DiseaseCapabilities(
         supports_travel=True,
         supported_interventions={"social_isolation", "vaccination", "mask_wearing", "lock_down"},
         supports_demographics=True,

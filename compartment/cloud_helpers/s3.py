@@ -15,11 +15,11 @@ def s3_write_helper(s3_client, bucket_name, key, payload):
 
 def write_to_s3(s3_client, bucket_name, payload, simulation_job_id):
     statuses = []
-    base_path = f'{simulation_job_id}/{payload.get('id')}'
+    base_path = f"{simulation_job_id}/{payload.get('id')}"
     
     # Write parent_admin_total
     parent_admin_total = payload.pop('parent_admin_total')
-    s3_key = f'{base_path}/{parent_admin_total.get('admin_unit_id')}.json'
+    s3_key = f"{base_path}/{parent_admin_total.get('admin_unit_id')}.json"
     try:
         s3_write_helper(s3_client, bucket_name, s3_key, parent_admin_total)
         statuses.append({'key': s3_key, 'status': 'success'})
@@ -28,7 +28,7 @@ def write_to_s3(s3_client, bucket_name, payload, simulation_job_id):
 
     admin_zones = payload.pop('admin_zones')
     # Write metadata (excluded children and parent time series)
-    s3_key = f'{base_path}/metadata.json'
+    s3_key = f"{base_path}/metadata.json"
     try:
         s3_write_helper(s3_client, bucket_name, s3_key, payload)
         statuses.append({'key': s3_key, 'status': 'success'})
@@ -67,6 +67,7 @@ def record_and_upload_validation(
 ):
     validation_result = None
     validation_success = False
+    cleaned_config = None
     try:
         cleaned_config = load_simulation_config(config, disease_type)
         validation_result = {

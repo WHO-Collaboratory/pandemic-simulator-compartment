@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC
-from typing import Optional, List, Set
+from typing import Optional, List, Set, ClassVar
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -43,7 +43,8 @@ class BaseDiseaseConfig(BaseModel, ABC):
     disease_type: str  # e.g., "RESPIRATORY", "VECTOR_BORNE", "MONKEYPOX"
     
     # Class attribute defining capabilities - override in subclasses
-    capabilities: DiseaseCapabilities = DiseaseCapabilities()
+    # Use ClassVar so Pydantic does not treat this as a model field
+    capabilities: ClassVar[DiseaseCapabilities] = DiseaseCapabilities()
     
     def get_compartments(self) -> List[str]:
         """

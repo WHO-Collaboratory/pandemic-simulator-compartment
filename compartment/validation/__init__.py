@@ -94,6 +94,7 @@ def load_simulation_config(config: dict, disease_type: str):
         processed = ValidationPostProcessor.process(validated_config)
         return processed
     except ValidationError as e:
+        # Log in a compact, readable way, then propagate the error to the caller
         log_pydantic_errors(e, context=context)
-        logger.error("Simulation config validation failed; aborting.")
-        sys.exit(2)
+        logger.error("Simulation config validation failed; raising ValidationError to caller.")
+        raise

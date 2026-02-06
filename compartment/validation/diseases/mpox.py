@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, ClassVar
 from pydantic import BaseModel, Field, model_validator
 
 from compartment.validation.disease_config import BaseDiseaseConfig, DiseaseCapabilities
@@ -41,7 +41,7 @@ class MpoxDiseaseConfig(BaseDiseaseConfig):
     transmission_edges: List[TransmissionEdge]
     
     # Mpox capabilities
-    capabilities: DiseaseCapabilities = DiseaseCapabilities(
+    capabilities: ClassVar[DiseaseCapabilities] = DiseaseCapabilities(
         supports_travel=False,
         supported_interventions=set(),
         supports_demographics=False,
