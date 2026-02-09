@@ -1,0 +1,71 @@
+{
+    "admin_unit_0_id": "MDG",
+    "end_date": "2025-12-21",
+    "simulation_type": "COMPARTMENTAL",
+    "run_mode": "DETERMINISTIC",
+    "start_date": "2025-11-21",
+    "time_steps": 720,
+    "travel_volume": {
+        "leaving": 10.0
+    },
+    "AdminUnit0": {
+        "id": "MDG",
+        "center_lat": -19.37564815173127
+    },
+    "Disease": {
+        "disease_type": "VECTOR_BORNE_2STRAIN",
+        "immunity_period": 240
+    },
+    "case_file": {
+        "admin_zones": [
+            {
+                "center_lat": -18.93585290187204,
+                "center_lon": 46.80467692606311,
+                "name": "Antananarivo",
+                "population": 7982937,
+                "infected_population": 3.0,
+                "seroprevalence": 30.0
+            },
+            {
+                "center_lat": -13.869271297424163,
+                "center_lon": 49.413514128028105,
+                "name": "Antsiranana",
+                "population": 2127141,
+                "infected_population": 3.0,
+                "seroprevalence": 30.0
+            },
+            {
+                "center_lat": -21.856236442723883,
+                "center_lon": 46.86230787719887,
+                "name": "Fianarantsoa",
+                "population": 5785134,
+                "infected_population": 3.0,
+                "seroprevalence": 30.0
+            },
+            {
+                "center_lat": -16.536991119784563,
+                "center_lon": 46.68467040064395,
+                "name": "Mahajanga",
+                "population": 3783162,
+                "infected_population": 3.0,
+                "seroprevalence": 30.0
+            },
+            {
+                "center_lat": -17.82287275056714,
+                "center_lon": 48.7510838190036,
+                "name": "Toamasina",
+                "population": 3693480,
+                "infected_population": 3.0,
+                "seroprevalence": 30.0
+            },
+            {
+                "center_lat": -22.60126035484297,
+                "center_lon": 45.01750093141163,
+                "name": "Toliary",
+                "population": 4621930,
+                "infected_population": 3.0,
+                "seroprevalence": 30.0
+            }
+        ]
+    }
+}
