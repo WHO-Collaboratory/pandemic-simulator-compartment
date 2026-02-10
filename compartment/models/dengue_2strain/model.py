@@ -10,29 +10,23 @@ logger = logging.getLogger(__name__)
 
 class Dengue2StrainModel(Model):
     def __init__(self, config):
-        # same as covid jax model
         self.population_matrix = np.array(config["initial_population"])
         self.compartment_list = config["compartment_list"]
         self.start_date = config["start_date"]
-        self.start_date_ordinal = self.start_date.toordinal()
+        #self.start_date_ordinal = self.start_date.toordinal()
         self.n_timesteps = config["time_steps"]
-        # for Jax replace travel matrix diag with 1.0
-        self.travel_matrix = np.fill_diagonal(np.array(config["travel_matrix"]), 1.0, inplace=False)
         self.admin_units = config["admin_units"]
-        self.sigma = config['travel_volume']['leaving'] 
-
-        # Extra
         self.payload = config
 
         # Dengue 2-strain parameters
-        self.beta_0 = .03
-        self.eta = .2
-        self.omega=0.5*np.pi/365
-        self.rho= 1./pow(10,5)
+        self.beta_0 = 0.03
+        self.eta = 0.2
+        self.omega = 0.5 * np.pi / 365
+        self.rho = 1.0 / pow(10, 5)
         self.epsilon = 1.5
-        self.phi= 0.
-        self.gamma= 0.02
-        self.mu= 1/(65*365)
+        self.phi = 0.0
+        self.gamma = 0.02
+        self.mu = 1 / (65 * 365)
         self.b = self.mu
         self.alpha = 1/(2*365)
 
@@ -52,6 +46,9 @@ class Dengue2StrainModel(Model):
         self._add_cumulative_compartments()
         
         return self.population_matrix , self.compartment_list
+    
+    def get_params(self):
+        return np.array([self.beta_0, self.eta, self.omega, self.rho, self.phi, self.epsilon, self.gamma, self.mu, self.b, self.alpha])
 
     def derivative(self, y, t, p):
 
@@ -60,10 +57,12 @@ class Dengue2StrainModel(Model):
         y = np.clip(y, 0.0, 1e9) # clip to avoid infs
 
         # Unpack state variables
-        S, I1, I2, R1, R2, S1, S2, I12, I21, R = y
+        error_val = 1e-6
+        S, I1, I2, R1, R2, S1, S2, I12, I21, R, I_total, R1_total, S2_total, I2_total, R2_total = y
+        N = error_val + sum([S, I1, I2, R1, R2, S1, S2, I12, I21, R])
         
         # Unpack parameters
-        beta_0,eta,omega,rho,phi,epsilon,gamma,mu,b,alpha,N = p
+        beta_0,eta,omega,rho,phi,epsilon,gamma,mu,b,alpha = p
         
         # Seasonality
         beta = beta_0 * (1 + eta * np.cos(omega * (t + phi)))

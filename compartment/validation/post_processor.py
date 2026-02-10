@@ -13,6 +13,7 @@ from compartment.helpers import (
     get_hemisphere,
     get_temperature,
     get_dengue_initial_population,
+    get_dengue_2strain_initial_population,
     create_dengue_compartment_list,
 )
 
@@ -109,8 +110,8 @@ class ValidationPostProcessor:
         travel_volume_dict = config.travel_volume.model_dump() if config.travel_volume else None
         
         # === COMPARTMENT LIST (automatically detect source) ===
-        if disease_type == "VECTOR_BORNE":
-            # Vector-borne diseases like dengue use special compartment list
+        if disease_type in ["VECTOR_BORNE", "VECTOR_BORNE_2STRAIN"]:
+            # Vector-borne diseases use special compartment list
             compartment_list = create_dengue_compartment_list(disease_type)
         elif disease_dict.get('compartment_list'):
             # Explicit compartment list provided
@@ -126,11 +127,17 @@ class ValidationPostProcessor:
         
         # === INITIAL POPULATION (automatically use appropriate function) ===
         if disease_type == "VECTOR_BORNE":
-            # Vector-borne diseases like dengue use special initialization
+            # Dengue 4-serotype model uses special initialization
             initial_population = get_dengue_initial_population(
                 admin_zones_dicts, 
                 compartment_list, 
                 config.run_mode
+            )
+        elif disease_type == "VECTOR_BORNE_2STRAIN":
+            # Dengue 2-strain model uses simplified initialization
+            initial_population = get_dengue_2strain_initial_population(
+                admin_zones_dicts, 
+                compartment_list
             )
         else:
             # Standard initialization for all other diseases

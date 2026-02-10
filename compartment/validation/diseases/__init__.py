@@ -17,10 +17,12 @@ Example:
 """
 from .covid import CovidDiseaseConfig
 from .dengue import DengueDiseaseConfig
+from .dengue_2strain import Dengue2StrainDiseaseConfig
 from .mpox import MpoxDiseaseConfig
 
 __all__ = [
     "CovidDiseaseConfig",
     "DengueDiseaseConfig",
+    "Dengue2StrainDiseaseConfig",
     "MpoxDiseaseConfig",
 ]

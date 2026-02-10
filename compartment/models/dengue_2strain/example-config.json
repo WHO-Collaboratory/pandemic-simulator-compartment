@@ -1,20 +1,16 @@
 {
     "admin_unit_0_id": "MDG",
-    "end_date": "2025-12-21",
+    "start_date": "2026-01-01",
+    "end_date": "2026-01-31",
     "simulation_type": "COMPARTMENTAL",
     "run_mode": "DETERMINISTIC",
-    "start_date": "2025-11-21",
-    "time_steps": 720,
-    "travel_volume": {
-        "leaving": 10.0
-    },
+    "time_steps": 30,
     "AdminUnit0": {
         "id": "MDG",
         "center_lat": -19.37564815173127
     },
     "Disease": {
-        "disease_type": "VECTOR_BORNE_2STRAIN",
-        "immunity_period": 240
+        "disease_type": "VECTOR_BORNE_2STRAIN"
     },
     "case_file": {
         "admin_zones": [

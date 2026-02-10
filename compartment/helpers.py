@@ -102,6 +102,19 @@ dengue_compartment_grouping = {
     "R": ["R1", "R2", "R3", "R4"]
 }
 
+dengue_2strain_compartment_grouping = {
+    "S": ["S"],
+    "S1": ["S1"],
+    "S2": ["S2"],
+    "I1": ["I1"],
+    "I2": ["I2"],
+    "I12": ["I12"],
+    "I21": ["I21"],
+    "R1": ["R1"],
+    "R2": ["R2"],
+    "R": ["R"]
+}
+
 covid_compartment_grouping = {
     "S": ["S"],
     "E": ["E"],
@@ -199,6 +212,14 @@ def compute_jax_compartment_deltas(population_matrix, disease_type, n_regions, c
             compartment_deltas["I2"] += float(df["I2_total"].iloc[-1])
             compartment_deltas["H"] += float(df["H_total"].iloc[-1])
             compartment_deltas["R"] += float(df["R_total"].iloc[-1])
+    elif disease_type == "VECTOR_BORNE_2STRAIN":
+        keys = ["S", "S1", "S2", "I1", "I2", "I12", "I21", "R1", "R2", "R"]
+        compartment_deltas = {k: 0.0 for k in keys}
+        for i in range(n_regions):
+            df = pd.DataFrame(population_matrix[:,:,i], columns=compartment_list)
+            for key in keys:
+                if key in df.columns:
+                    compartment_deltas[key] += float(df[key].iloc[-1])
     else:
         # Only report on compartments that actually exist
         # models may range anywhere between SIR and full SEIHDR
@@ -269,6 +290,9 @@ def create_jax_intervention_results(population_matrix: np.ndarray, intervention_
         ]
         compartment_list = compartment_list[9:-8] # remove vectors and cumulative compartments
         infective_idx = [compartment_list.index(c) for c in infective_comps if c in compartment_list]
+    elif disease_type == "VECTOR_BORNE_2STRAIN":
+        infective_comps = ["I1", "I2", "I12", "I21"]
+        infective_idx = [compartment_list.index(c) for c in infective_comps if c in compartment_list]
     else:
         # collapse 4d age strat matrix
         if population_matrix.ndim == 4:
@@ -286,6 +310,8 @@ def create_jax_intervention_results(population_matrix: np.ndarray, intervention_
 
         if disease_type == "VECTOR_BORNE":
             humans_only = population_matrix[idx][9:-8, :] # remove vectors and cumulative compartments
+        elif disease_type == "VECTOR_BORNE_2STRAIN":
+            humans_only = population_matrix[idx] # no vectors in 2-strain model
         else:
             humans_only = population_matrix[idx] # already humans only
 
@@ -376,6 +402,9 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
         if disease_type == "VECTOR_BORNE":
             # create dictoinary mapping of compartments to generalized compartments for df groupby
             col2grp = {c:grp for grp, cols in dengue_compartment_grouping.items() for c in cols}
+        #elif disease_type == "VECTOR_BORNE_2STRAIN":
+            # create dictionary mapping of compartments to generalized compartments for df groupby
+        #    col2grp = {c:grp for grp, cols in dengue_2strain_compartment_grouping.items() for c in cols}
         else:
             col2grp = {c:c for c in compartment_list}
 
@@ -568,6 +597,8 @@ def create_dengue_compartment_list(disease_type):
                             'E12', 'E13', 'E14', 'E21', 'E23', 'E24', 'E31', 'E32', 'E34', 'E41', 'E42', 'E43', 
                             'I12', 'I13', 'I14', 'I21', 'I23', 'I24', 'I31', 'I32', 'I34', 'I41', 'I42', 'I43', 
                             'H1', 'H2', 'H3', 'H4', 'R1', 'R2', 'R3', 'R4']
+    elif disease_type == "VECTOR_BORNE_2STRAIN":
+        return ['S', 'I1', 'I2', 'R1', 'R2', 'S1', 'S2', 'I12', 'I21', 'R']
 
 def create_compartment_list(disease_nodes):
     """ Map disease nodes to compartment abbreviations """
@@ -995,6 +1026,38 @@ def get_dengue_initial_population(case_file, compartment_list, run_mode, vector_
         initial_population[i, column_mapping['I2']] = I2
         initial_population[i, column_mapping['I3']] = I3
         initial_population[i, column_mapping['I4']] = I4
+    
+    return initial_population
+
+def get_dengue_2strain_initial_population(case_file, compartment_list):
+    column_mapping = {value: index for index, value in enumerate(compartment_list)}
+    initial_population = np.zeros((len(case_file), len(compartment_list)))
+
+    for i, case in enumerate(case_file):
+        population = case['population']
+        seroprevalence = case.get('seroprevalence', 0) or 0
+        infected_population = case.get('infected_population', 0) or 0
+
+        # Split infected_population 50/50 between I1 and I2
+        I1 = round(infected_population / 200 * population, 2)  # infected_population is a percentage
+        I2 = round(infected_population / 200 * population, 2)
+        
+        # Split seroprevalence 50/50 between S1 and S2
+        S1 = round(seroprevalence / 200 * population, 2)  # seroprevalence is a percentage
+        S2 = round(seroprevalence / 200 * population, 2)
+        
+        # Rest goes to S (susceptible)
+        S = population - I1 - I2 - S1 - S2
+        
+        # Assign to compartments
+        initial_population[i, column_mapping['S']] = S
+        initial_population[i, column_mapping['I1']] = I1
+        initial_population[i, column_mapping['I2']] = I2
+        initial_population[i, column_mapping['S1']] = S1
+        initial_population[i, column_mapping['S2']] = S2
+        
+        # All other compartments (R1, R2, I12, I21, R) start at 0
+        # Cumulative compartments also start at 0
     
     return initial_population
 

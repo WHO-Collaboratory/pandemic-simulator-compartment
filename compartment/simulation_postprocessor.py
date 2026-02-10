@@ -10,6 +10,7 @@ from compartment.helpers import (
     get_simulation_step_size,
     compute_multi_run_compartment_deltas,
     dengue_compartment_grouping,
+    dengue_2strain_compartment_grouping,
     covid_compartment_grouping
 
 )
@@ -117,8 +118,14 @@ class SimulationPostProcessor:
         if self.disease_type == "VECTOR_BORNE":
             grouping = dengue_compartment_grouping
             grouped_compartment_list = list(grouping.keys())
+        #elif self.disease_type == "VECTOR_BORNE_2STRAIN":
+        #    grouping = dengue_2strain_compartment_grouping
+        #    grouped_compartment_list = list(grouping.keys())
         else:
-            grouping = covid_compartment_grouping
+            if self.disease_type == "RESPIRATORY":
+                grouping = covid_compartment_grouping
+            else:
+                grouping = dengue_2strain_compartment_grouping
             grouped_compartment_list = [comp for comp in self.compartment_list if comp in grouping.keys()]
 
         # Use helper to group each simulation's compartments
