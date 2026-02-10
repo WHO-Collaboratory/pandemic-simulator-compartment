@@ -11,6 +11,15 @@ logger = logging.getLogger(__name__)
 
 class CovidJaxModel(Model):
     """ A class representing a compartmental model with dynamic travel and intervention mechanisms """
+    
+    @classmethod
+    def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
+        """
+        Standard SEIHDR initial population for respiratory diseases.
+        Uses base class implementation (S-I split).
+        """
+        return super().get_initial_population(admin_zones, compartment_list, **kwargs)
+    
     def __init__(self, config):
         """ Initialize the CompartmentalModel with a configuration dictionary """
         # Load population and travel data

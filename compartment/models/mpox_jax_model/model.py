@@ -10,6 +10,15 @@ logger = logging.getLogger(__name__)
 
 class MpoxJaxModel(Model):
     """ A simple SIR compartmental model for MPOX """
+    
+    @classmethod
+    def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
+        """
+        Simple SIR initial population for MPOX.
+        Uses base class implementation (S-I split).
+        """
+        return super().get_initial_population(admin_zones, compartment_list, **kwargs)
+    
     def __init__(self, config):
         """ Initialize the MPOX SIR model with a configuration dictionary """
         # Load population data

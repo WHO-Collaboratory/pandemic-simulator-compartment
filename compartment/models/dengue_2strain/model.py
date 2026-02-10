@@ -9,6 +9,50 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 class Dengue2StrainModel(Model):
+    
+    @classmethod
+    def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
+        """
+        2-strain dengue model with 50/50 strain distribution.
+        
+        Compartments: S, I1, I2, R1, R2, S1, S2, I12, I21, R
+        
+        Initial conditions:
+        - infected_population (%) splits 50/50 between I1 and I2
+        - seroprevalence (%) splits 50/50 between S1 and S2
+        - Rest goes to S (susceptible)
+        - All other compartments start at 0
+        """
+        import numpy as onp
+        column_mapping = {value: index for index, value in enumerate(compartment_list)}
+        initial_population = onp.zeros((len(admin_zones), len(compartment_list)))
+
+        for i, zone in enumerate(admin_zones):
+            population = zone['population']
+            seroprevalence = zone.get('seroprevalence', 0) or 0
+            infected_population = zone.get('infected_population', 0) or 0
+
+            # Split infected_population 50/50 between I1 and I2
+            I1 = round(infected_population / 200 * population, 2)
+            I2 = round(infected_population / 200 * population, 2)
+            
+            # Split seroprevalence 50/50 between S1 and S2
+            S1 = round(seroprevalence / 200 * population, 2)
+            S2 = round(seroprevalence / 200 * population, 2)
+            
+            # Rest goes to S (susceptible)
+            S = population - I1 - I2 - S1 - S2
+            
+            # Assign to compartments
+            initial_population[i, column_mapping['S']] = S
+            initial_population[i, column_mapping['I1']] = I1
+            initial_population[i, column_mapping['I2']] = I2
+            initial_population[i, column_mapping['S1']] = S1
+            initial_population[i, column_mapping['S2']] = S2
+            # All other compartments (R1, R2, I12, I21, R) start at 0
+
+        return initial_population
+    
     def __init__(self, config):
         self.population_matrix = np.array(config["initial_population"])
         self.compartment_list = config["compartment_list"]

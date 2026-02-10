@@ -12,6 +12,57 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 class DengueJaxModel(Model):
+    
+    @classmethod
+    def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
+        """
+        4-serotype dengue initial population.
+        
+        Compartments include: SV (mosquitoes), S0, Snot1-4, I1-4, and others.
+        
+        Initial conditions:
+        - All mosquitoes start in SV (susceptible vector)
+        - seroprevalence (%) distributed equally across Snot1-4 (25% each)
+        - infected_population (%) distributed equally across I1-4 (25% each)
+        - Remaining population goes to S0 (fully susceptible humans)
+        """
+        import numpy as onp
+        column_mapping = {value: index for index, value in enumerate(compartment_list)}
+        initial_population = onp.zeros((len(admin_zones), len(compartment_list)))
+
+        for i, zone in enumerate(admin_zones):
+            # Mosquito population - all start as susceptible vectors
+            # Note: SV population is initialized to 0, actual vector dynamics handled in model
+            initial_population[i, column_mapping['SV']] = 0
+
+            # Human population
+            population = zone['population']
+            seroprevalence = zone.get('seroprevalence', 0) or 0
+            infected_population = zone.get('infected_population', 0) or 0
+
+            # Equal distribution across 4 serotypes (25% each)
+            serotype_weights = [0.25] * 4
+
+            # Distribute seroprevalence across Snot1-4
+            total_snot = 0
+            for idx, weight in enumerate(serotype_weights, 1):
+                snot_pop = round(weight * seroprevalence / 100 * population, 2)
+                initial_population[i, column_mapping[f'Snot{idx}']] = snot_pop
+                total_snot += snot_pop
+
+            # Distribute infected across I1-4
+            infected_assigned = 0
+            for idx, weight in enumerate(serotype_weights, 1):
+                i_pop = round(weight * infected_population / 100 * population, 2)
+                initial_population[i, column_mapping[f'I{idx}']] = i_pop
+                infected_assigned += i_pop
+
+            # Remaining population goes to S0 (fully susceptible)
+            S0 = population - total_snot - infected_assigned
+            initial_population[i, column_mapping['S0']] = S0
+
+        return initial_population
+    
     def __init__(self, config):
         # same as covid jax model
         self.population_matrix = np.array(config["initial_population"])
