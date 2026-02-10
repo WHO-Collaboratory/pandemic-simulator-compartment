@@ -5,6 +5,7 @@ from .post_processor import ValidationPostProcessor, ProcessedSimulation
 from .diseases import (
     CovidDiseaseConfig,
     DengueDiseaseConfig,
+    Dengue2StrainDiseaseConfig,
     MpoxDiseaseConfig,
 )
 
@@ -28,6 +29,7 @@ __all__ = [
     # Disease configs
     "CovidDiseaseConfig",
     "DengueDiseaseConfig",
+    "Dengue2StrainDiseaseConfig",
     "MpoxDiseaseConfig",
     # Shared models
     "BaseSimulationShared",
@@ -78,6 +80,8 @@ def load_simulation_config(config: dict, disease_type: str):
     # Map disease type to disease config class
     if disease_type == "VECTOR_BORNE":
         disease_cls = DengueDiseaseConfig
+    elif disease_type == "VECTOR_BORNE_2STRAIN":
+        disease_cls = Dengue2StrainDiseaseConfig
     elif disease_type == "RESPIRATORY":
         disease_cls = CovidDiseaseConfig
     elif disease_type == "MONKEYPOX":
