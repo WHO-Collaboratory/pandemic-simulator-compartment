@@ -13,60 +13,20 @@ logger = logging.getLogger(__name__)
 
 class DengueJaxModel(Model):
     
-    @classmethod
-    def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
-        """
-        4-serotype dengue initial population.
-        
-        Compartments include: SV (mosquitoes), S0, Snot1-4, I1-4, and others.
-        
-        Initial conditions:
-        - All mosquitoes start in SV (susceptible vector)
-        - seroprevalence (%) distributed equally across Snot1-4 (25% each)
-        - infected_population (%) distributed equally across I1-4 (25% each)
-        - Remaining population goes to S0 (fully susceptible humans)
-        """
-        import numpy as onp
-        column_mapping = {value: index for index, value in enumerate(compartment_list)}
-        initial_population = onp.zeros((len(admin_zones), len(compartment_list)))
+    # Fixed compartment structure for 4-serotype dengue model
+    COMPARTMENT_LIST = [
+        'SV', 'EV1', 'EV2', 'EV3', 'EV4', 'IV1', 'IV2', 'IV3', 'IV4',
+        'S0', 'E1', 'E2', 'E3', 'E4', 'I1', 'I2', 'I3', 'I4',
+        'C1', 'C2', 'C3', 'C4', 'Snot1', 'Snot2', 'Snot3', 'Snot4',
+        'E12', 'E13', 'E14', 'E21', 'E23', 'E24', 'E31', 'E32', 'E34', 'E41', 'E42', 'E43',
+        'I12', 'I13', 'I14', 'I21', 'I23', 'I24', 'I31', 'I32', 'I34', 'I41', 'I42', 'I43',
+        'H1', 'H2', 'H3', 'H4', 'R1', 'R2', 'R3', 'R4'
+    ]
 
-        for i, zone in enumerate(admin_zones):
-            # Mosquito population - all start as susceptible vectors
-            # Note: SV population is initialized to 0, actual vector dynamics handled in model
-            initial_population[i, column_mapping['SV']] = 0
-
-            # Human population
-            population = zone['population']
-            seroprevalence = zone.get('seroprevalence', 0) or 0
-            infected_population = zone.get('infected_population', 0) or 0
-
-            # Equal distribution across 4 serotypes (25% each)
-            serotype_weights = [0.25] * 4
-
-            # Distribute seroprevalence across Snot1-4
-            total_snot = 0
-            for idx, weight in enumerate(serotype_weights, 1):
-                snot_pop = round(weight * seroprevalence / 100 * population, 2)
-                initial_population[i, column_mapping[f'Snot{idx}']] = snot_pop
-                total_snot += snot_pop
-
-            # Distribute infected across I1-4
-            infected_assigned = 0
-            for idx, weight in enumerate(serotype_weights, 1):
-                i_pop = round(weight * infected_population / 100 * population, 2)
-                initial_population[i, column_mapping[f'I{idx}']] = i_pop
-                infected_assigned += i_pop
-
-            # Remaining population goes to S0 (fully susceptible)
-            S0 = population - total_snot - infected_assigned
-            initial_population[i, column_mapping['S0']] = S0
-
-        return initial_population
-    
     def __init__(self, config):
         # same as covid jax model
         self.population_matrix = np.array(config["initial_population"])
-        self.compartment_list = config["compartment_list"]
+        self.compartment_list = self.COMPARTMENT_LIST  # Use class attribute
         self.start_date = config["start_date"]
         self.start_date_ordinal = self.start_date.toordinal()
         self.n_timesteps = config["time_steps"]
@@ -113,6 +73,45 @@ class DengueJaxModel(Model):
         self.kappa = 1e-5      # Helper population for mosquitos 
         self.theta = 0.01       # hospitalized --> infected. This value is from pg. 4 of Paz-Bailey et al.
         self.omega = 1/4.9      # hospitalized --> recovered
+    
+    @classmethod
+    def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
+        import numpy as onp
+        column_mapping = {value: index for index, value in enumerate(compartment_list)}
+        initial_population = onp.zeros((len(admin_zones), len(compartment_list)))
+
+        for i, zone in enumerate(admin_zones):
+            # Mosquito population - all start as susceptible vectors
+            # Note: SV population is initialized to 0, actual vector dynamics handled in model
+            initial_population[i, column_mapping['SV']] = 0
+
+            # Human population
+            population = zone['population']
+            seroprevalence = zone.get('seroprevalence', 0) or 0
+            infected_population = zone.get('infected_population', 0) or 0
+
+            # Equal distribution across 4 serotypes (25% each)
+            serotype_weights = [0.25] * 4
+
+            # Distribute seroprevalence across Snot1-4
+            total_snot = 0
+            for idx, weight in enumerate(serotype_weights, 1):
+                snot_pop = round(weight * seroprevalence / 100 * population, 2)
+                initial_population[i, column_mapping[f'Snot{idx}']] = snot_pop
+                total_snot += snot_pop
+
+            # Distribute infected across I1-4
+            infected_assigned = 0
+            for idx, weight in enumerate(serotype_weights, 1):
+                i_pop = round(weight * infected_population / 100 * population, 2)
+                initial_population[i, column_mapping[f'I{idx}']] = i_pop
+                infected_assigned += i_pop
+
+            # Remaining population goes to S0 (fully susceptible)
+            S0 = population - total_snot - infected_assigned
+            initial_population[i, column_mapping['S0']] = S0
+
+        return initial_population
 
     @property
     def disease_type(self):

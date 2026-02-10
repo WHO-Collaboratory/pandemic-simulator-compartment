@@ -10,19 +10,31 @@ logger = logging.getLogger(__name__)
 
 class Dengue2StrainModel(Model):
     
+    # Fixed compartment structure for 2-strain dengue model
+    COMPARTMENT_LIST = ['S', 'I1', 'I2', 'R1', 'R2', 'S1', 'S2', 'I12', 'I21', 'R']
+    
+    def __init__(self, config):
+        self.population_matrix = np.array(config["initial_population"])
+        self.compartment_list = self.COMPARTMENT_LIST  # Use class attribute
+        self.start_date = config["start_date"]
+        self.n_timesteps = config["time_steps"]
+        self.admin_units = config["admin_units"]
+        self.payload = config
+
+        # Dengue 2-strain parameters
+        self.beta_0 = 0.03
+        self.eta = 0.2
+        self.omega = 0.5 * np.pi / 365
+        self.rho = 1.0 / pow(10, 5)
+        self.epsilon = 1.5
+        self.phi = 0.0
+        self.gamma = 0.02
+        self.mu = 1 / (65 * 365)
+        self.b = self.mu
+        self.alpha = 1/(2*365)
+    
     @classmethod
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
-        """
-        2-strain dengue model with 50/50 strain distribution.
-        
-        Compartments: S, I1, I2, R1, R2, S1, S2, I12, I21, R
-        
-        Initial conditions:
-        - infected_population (%) splits 50/50 between I1 and I2
-        - seroprevalence (%) splits 50/50 between S1 and S2
-        - Rest goes to S (susceptible)
-        - All other compartments start at 0
-        """
         import numpy as onp
         column_mapping = {value: index for index, value in enumerate(compartment_list)}
         initial_population = onp.zeros((len(admin_zones), len(compartment_list)))
@@ -52,27 +64,6 @@ class Dengue2StrainModel(Model):
             # All other compartments (R1, R2, I12, I21, R) start at 0
 
         return initial_population
-    
-    def __init__(self, config):
-        self.population_matrix = np.array(config["initial_population"])
-        self.compartment_list = config["compartment_list"]
-        self.start_date = config["start_date"]
-        #self.start_date_ordinal = self.start_date.toordinal()
-        self.n_timesteps = config["time_steps"]
-        self.admin_units = config["admin_units"]
-        self.payload = config
-
-        # Dengue 2-strain parameters
-        self.beta_0 = 0.03
-        self.eta = 0.2
-        self.omega = 0.5 * np.pi / 365
-        self.rho = 1.0 / pow(10, 5)
-        self.epsilon = 1.5
-        self.phi = 0.0
-        self.gamma = 0.02
-        self.mu = 1 / (65 * 365)
-        self.b = self.mu
-        self.alpha = 1/(2*365)
 
     @property
     def disease_type(self):
@@ -95,9 +86,6 @@ class Dengue2StrainModel(Model):
         return np.array([self.beta_0, self.eta, self.omega, self.rho, self.phi, self.epsilon, self.gamma, self.mu, self.b, self.alpha])
 
     def derivative(self, y, t, p):
-
-        # Unpack parameters
-        # Clip to avoid infs
         y = np.clip(y, 0.0, 1e9) # clip to avoid infs
 
         # Unpack state variables
