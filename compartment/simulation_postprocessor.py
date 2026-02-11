@@ -9,10 +9,7 @@ from compartment.helpers import (
     format_uncertainty_output,
     get_simulation_step_size,
     compute_multi_run_compartment_deltas,
-    dengue_compartment_grouping,
-    dengue_2strain_compartment_grouping,
-    covid_compartment_grouping
-
+    get_compartment_delta_grouping
 )
 
 # Initialize logging
@@ -111,22 +108,13 @@ class SimulationPostProcessor:
                 self.n_timesteps,
                 self.demographics,
                 self.disease_type,
-                self.step
+                self.step,
+                self.model.__class__
             )
         
-        # Choose grouping and group compartments before confidence intervals
-        if self.disease_type == "VECTOR_BORNE":
-            grouping = dengue_compartment_grouping
-            grouped_compartment_list = list(grouping.keys())
-        #elif self.disease_type == "VECTOR_BORNE_2STRAIN":
-        #    grouping = dengue_2strain_compartment_grouping
-        #    grouped_compartment_list = list(grouping.keys())
-        else:
-            if self.disease_type == "RESPIRATORY":
-                grouping = covid_compartment_grouping
-            else:
-                grouping = dengue_2strain_compartment_grouping
-            grouped_compartment_list = [comp for comp in self.compartment_list if comp in grouping.keys()]
+        # Get compartment grouping from model class or generate default
+        grouping = get_compartment_delta_grouping(self.model.__class__, self.compartment_list)
+        grouped_compartment_list = list(grouping.keys())
 
         # Use helper to group each simulation's compartments
         logger.info("Grouping compartments before confidence intervals via _group_compartments")
@@ -148,7 +136,8 @@ class SimulationPostProcessor:
             self.population_matrix, 
             self.disease_type, 
             len(self.admin_units), 
-            self.compartment_list
+            self.compartment_list,
+            self.model.__class__
         )
         
         # Format output

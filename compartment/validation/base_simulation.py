@@ -82,8 +82,6 @@ class BaseSimulationShared(BaseModel):
     time_steps: int = Field(gt=0)
 
     # Population / mobility
-    #selected_infected_population: float = Field(ge=0)
-    #selected_population: int = Field(ge=0)
     # Make travel_volume optional - models can declare if they need it
     travel_volume: Optional[TravelVolume] = TravelVolume()
 

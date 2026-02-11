@@ -13,30 +13,6 @@ import os
 import sys
 
 # --------------------------------------------------
-# Helper Functions: temporary memory tracking for jax
-# --------------------------------------------------
-
-def rss_mb() -> float:
-    # Linux (Lambda) fast path
-    try:
-        with open("/proc/self/status") as f:
-            for line in f:
-                if line.startswith("VmRSS:"):
-                    return int(line.split()[1]) / 1024  # kB -> MB
-    except FileNotFoundError:
-        pass  # not Linux /proc
-
-    # Cross-platform fallback
-    try:
-        import psutil
-        return psutil.Process(os.getpid()).memory_info().rss / (1024**2)
-    except Exception:
-        return float("nan")
-
-def log_mem(tag: str) -> None:
-    print(f"[mem] pid={os.getpid()} {tag}: RSS={rss_mb():.1f} MB")
-
-# --------------------------------------------------
 # Helper Functions: Config Loading
 # --------------------------------------------------
 
@@ -86,43 +62,19 @@ def setup_logging():
 # --------------------------------------------------
 # Helper Functions: Model Output
 # --------------------------------------------------
-# Compartment Groupings are used to condense the output of the model for compartment deltas
-dengue_compartment_grouping = {
-    "SV": ["SV"],
-    "EV": ["EV1", "EV2", "EV3", "EV4"],
-    "IV": ["IV1", "IV2", "IV3", "IV4"],
-    "S": ["S0"],
-    "E": ["E1", "E2", "E3", "E4"],
-    "I": ["I1", "I2", "I3", "I4"],
-    "C": ["C1", "C2", "C3", "C4"],
-    "Snot": ["Snot1", "Snot2", "Snot3", "Snot4"],
-    "E2": ["E12", "E13", "E14", "E21", "E23", "E24", "E31", "E32", "E34", "E41", "E42", "E43"],
-    "I2": ["I12", "I13", "I14", "I21", "I23", "I24", "I31", "I32", "I34", "I41", "I42", "I43"],
-    "H": ["H1", "H2", "H3", "H4"],
-    "R": ["R1", "R2", "R3", "R4"]
-}
 
-dengue_2strain_compartment_grouping = {
-    "S": ["S"],
-    "S1": ["S1"],
-    "S2": ["S2"],
-    "I1": ["I1"],
-    "I2": ["I2"],
-    "I12": ["I12"],
-    "I21": ["I21"],
-    "R1": ["R1"],
-    "R2": ["R2"],
-    "R": ["R"]
-}
-
-covid_compartment_grouping = {
-    "S": ["S"],
-    "E": ["E"],
-    "I": ["I"],
-    "H": ["H"],
-    "D": ["D"],
-    "R": ["R"]
-}
+def get_compartment_delta_grouping(model_class, compartment_list):
+    """
+    Get compartment grouping for delta calculations.
+    
+    If model has COMPARTMENT_DELTA_GROUPING, use it.
+    Otherwise, generate default 1:1 mapping from compartment_list.
+    """
+    if model_class and hasattr(model_class, 'COMPARTMENT_DELTA_GROUPING'):
+        return model_class.COMPARTMENT_DELTA_GROUPING
+    
+    # Default: 1:1 mapping (each compartment groups to itself)
+    return {comp: [comp] for comp in compartment_list}
 
 edge_to_variable = {
     "susceptible->infected": "beta",
@@ -195,61 +147,39 @@ def compute_parent_admin_total(data, payload, unique_id, parent_unique_id, num_t
 
     return results
 
-def compute_jax_compartment_deltas(population_matrix, disease_type, n_regions, compartment_list):
+def compute_jax_compartment_deltas(population_matrix, disease_type, n_regions, compartment_list, model_class=None):
+    """
+    Compute compartment deltas using model's COMPARTMENT_DELTA_GROUPING if available,
+    otherwise defaults to 1:1 mapping.
+    """
     compartment_deltas = {}
-
-    if disease_type == "VECTOR_BORNE":
-        keys = ["S", "E", "I", "C", "Snot", "E2", "I2", "H", "R"]
-        compartment_deltas = {k: 0.0 for k in keys}
-        for i in range(n_regions):
-            df = pd.DataFrame(population_matrix[:,:,i], columns=compartment_list)
-            compartment_deltas["S"] += float(df["S0"].iloc[-1])
-            compartment_deltas["E"] += float(df["E_total"].iloc[-1])
-            compartment_deltas["I"] += float(df["I_total"].iloc[-1])
-            compartment_deltas["C"] += float(df["C_total"].iloc[-1])
-            compartment_deltas["Snot"] += float(df["Snot_total"].iloc[-1])
-            compartment_deltas["E2"] += float(df["E2_total"].iloc[-1])
-            compartment_deltas["I2"] += float(df["I2_total"].iloc[-1])
-            compartment_deltas["H"] += float(df["H_total"].iloc[-1])
-            compartment_deltas["R"] += float(df["R_total"].iloc[-1])
-    elif disease_type == "VECTOR_BORNE_2STRAIN":
-        keys = ["S", "S1", "S2", "I1", "I2", "I12", "I21", "R1", "R2", "R"]
-        compartment_deltas = {k: 0.0 for k in keys}
-        for i in range(n_regions):
-            df = pd.DataFrame(population_matrix[:,:,i], columns=compartment_list)
-            for key in keys:
-                if key in df.columns:
-                    compartment_deltas[key] += float(df[key].iloc[-1])
-    else:
-        # Only report on compartments that actually exist
-        # models may range anywhere between SIR and full SEIHDR
-        if population_matrix.ndim == 4:
-            # Sum across the age axis (axis=2) so we get back to (T, C, R)
-            population_matrix = population_matrix.sum(axis=2)
-
-        desired_keys = ["S", "E", "I", "H", "D", "R"]
-        alt_cols = {"E": "E_total", "I": "I_total", "H": "H_total"}
-
-        present = [k for k in desired_keys if (k in compartment_list) or (alt_cols.get(k) in compartment_list)]
-
-        # snapshot = last day, shape (compartments, regions)
-        final_step = population_matrix[-1]  # still (comp, regions)
-
-        # Build quick lookup from comp name -> row index in final_step
-        comp_idx = {c: idx for idx, c in enumerate(compartment_list)}
-
-        compartment_deltas = {}
-        for key in present:
-            # Prefer cumulative *_total columns when they exist (E, I, H)
-            if key in alt_cols and alt_cols[key] in comp_idx:
-                col_name = alt_cols[key]
-            else:
-                col_name = key
-            idx = comp_idx[col_name]
-            compartment_deltas[key] = float(final_step[idx, :].sum())
+    
+    # Get compartment grouping from model or generate default
+    grouping = get_compartment_delta_grouping(model_class, compartment_list)
+    
+    # Handle age-stratified models (4D arrays)
+    if population_matrix.ndim == 4:
+        # Sum across the age axis (axis=2) so we get back to (T, C, R)
+        population_matrix = population_matrix.sum(axis=2)
+    
+    # snapshot = last day, shape (compartments, regions)
+    final_step = population_matrix[-1]  # (comp, regions)
+    
+    # Build quick lookup from comp name -> row index in final_step
+    comp_idx = {c: idx for idx, c in enumerate(compartment_list)}
+    
+    # Compute delta for each grouped compartment
+    for group_name, comp_names in grouping.items():
+        group_total = 0.0
+        for comp_name in comp_names:
+            if comp_name in comp_idx:
+                idx = comp_idx[comp_name]
+                group_total += float(final_step[idx, :].sum())
+        compartment_deltas[group_name] = group_total
+    
     return compartment_deltas
 
-def compute_multi_run_compartment_deltas(population_matrix, disease_type, n_regions, compartment_list):
+def compute_multi_run_compartment_deltas(population_matrix, disease_type, n_regions, compartment_list, model_class=None):
     """
     Calculate the average compartment deltas over all simulations
     """
@@ -259,7 +189,8 @@ def compute_multi_run_compartment_deltas(population_matrix, disease_type, n_regi
             sim,
             disease_type,
             n_regions,
-            compartment_list
+            compartment_list,
+            model_class
         )
         all_deltas.append(deltas)
     # Get unique compartments
@@ -369,7 +300,7 @@ def create_jax_intervention_results(population_matrix: np.ndarray, intervention_
     return events
 
 def format_jax_output(intervention_dict, payload, population_matrix, compartment_list, 
-                      n_regions, start_date, n_timesteps, demographics, disease_type, step):
+                      n_regions, start_date, n_timesteps, demographics, disease_type, step, model_class=None):
     """ Im hoping this replaces the mess we have above """
     unique_id = str(uuid.uuid4()) # Generate unique id for gql
     parent_unique_id = str(uuid.uuid4()) 
@@ -399,14 +330,10 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
     ]
 
     if population_matrix.ndim == 3:
-        if disease_type == "VECTOR_BORNE":
-            # create dictoinary mapping of compartments to generalized compartments for df groupby
-            col2grp = {c:grp for grp, cols in dengue_compartment_grouping.items() for c in cols}
-        #elif disease_type == "VECTOR_BORNE_2STRAIN":
-            # create dictionary mapping of compartments to generalized compartments for df groupby
-        #    col2grp = {c:grp for grp, cols in dengue_2strain_compartment_grouping.items() for c in cols}
-        else:
-            col2grp = {c:c for c in compartment_list}
+        # Get compartment grouping from model or generate default
+        grouping = get_compartment_delta_grouping(model_class, compartment_list)
+        # Create dictionary mapping of compartments to generalized compartments for df groupby
+        col2grp = {c: grp for grp, cols in grouping.items() for c in cols}
 
         zero_ages = dict.fromkeys(list(demographics.keys()), 0)
         
@@ -436,7 +363,7 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
     else:
         raise ValueError(f"Unsupported population matrix dimension: {population_matrix.ndim}")
 
-    formatted_data["compartment_deltas"] = compute_jax_compartment_deltas(population_matrix, disease_type,  n_regions, compartment_list)
+    formatted_data["compartment_deltas"] = compute_jax_compartment_deltas(population_matrix, disease_type, n_regions, compartment_list, model_class)
     formatted_data["parent_admin_total"] = compute_parent_admin_total(formatted_data['admin_zones'], payload, unique_id, parent_unique_id, population_matrix.shape[0], step)
     return formatted_data
 
@@ -588,17 +515,6 @@ def create_initial_population_matrix(case_file, compartment_list):
         initial_population[i, column_mapping['I']] = infected
 
     return initial_population
-
-def create_dengue_compartment_list(disease_type):
-    if disease_type == "VECTOR_BORNE":
-        return ['SV', 'EV1', 'EV2', 'EV3', 'EV4', 'IV1', 'IV2', 'IV3', 'IV4', 
-                            'S0', 'E1', 'E2', 'E3', 'E4', 'I1', 'I2', 'I3', 'I4', 
-                            'C1', 'C2', 'C3', 'C4', 'Snot1', 'Snot2', 'Snot3', 'Snot4', 
-                            'E12', 'E13', 'E14', 'E21', 'E23', 'E24', 'E31', 'E32', 'E34', 'E41', 'E42', 'E43', 
-                            'I12', 'I13', 'I14', 'I21', 'I23', 'I24', 'I31', 'I32', 'I34', 'I41', 'I42', 'I43', 
-                            'H1', 'H2', 'H3', 'H4', 'R1', 'R2', 'R3', 'R4']
-    elif disease_type == "VECTOR_BORNE_2STRAIN":
-        return ['S', 'I1', 'I2', 'R1', 'R2', 'S1', 'S2', 'I12', 'I21', 'R']
 
 def create_compartment_list(disease_nodes):
     """ Map disease nodes to compartment abbreviations """
@@ -752,25 +668,6 @@ def get_temperature(case_file, default_min=0, default_max=38, default_mean=30):
         "temp_min": case_file.get("temp_min", default_min) if case_file.get("temp_min") is not None else default_min,
         "temp_max": case_file.get("temp_max", default_max) if case_file.get("temp_max") is not None else default_max,
         "temp_mean": case_file.get("temp_mean", default_mean) if case_file.get("temp_mean") is not None else default_mean,
-    }
-
-def get_travel_volume(travel_volume, case_file, default_leaving=0.2, default_returning=0.1):
-    if len(case_file) == 1:
-        # if 1 sub-admin zone, default no travel
-        leaving = float(0)
-        returning = float(0)
-    else:
-        if travel_volume:
-            # Assigns defaults and checks for None values
-            leaving =  travel_volume.get("leaving", default_leaving) / 100 if travel_volume.get("leaving") is not None else default_leaving
-            returning = travel_volume.get("returning", default_returning) / 100 if travel_volume.get("returning") is not None else default_returning
-        else:
-            # Handle travel_volume: None case
-            leaving = default_leaving,
-            returning = default_returning
-    return {
-        "leaving": leaving,
-        "returning": returning
     }
 
 def get_simulation_step_size(n_timesteps):
@@ -969,97 +866,8 @@ def generate_LHS_samples(num_runs, param_configs):
     return param_list
 
 # --------------------------------------------------
-# Helper Functions: Dengue Misc
+# Helper Functions: Misc
 # --------------------------------------------------
-
-def get_dengue_initial_population(case_file, compartment_list, run_mode, vector_population=0):
-    """
-    Creates inital population matrix off of REQUIRED frontend entries:
-      - MOSQUITO: [SV]
-      - HUMAN: [S0, Snot1, Snot2, Snot3, Snot4]
-    run_mode: STOCHASTIC or DETERMINISTIC
-    """
-    column_mapping = {value: index for index, value in enumerate(compartment_list)}
-    initial_population = np.zeros((len(case_file), len(compartment_list)))
-
-    for i, case in enumerate(case_file):
-        # Assign all vectors to SV
-        initial_population[i, column_mapping['SV']] = vector_population
-
-        # Human population
-        population = case['population']
-        seroprevalence = case['seroprevalence'] if case['seroprevalence'] is not None else 0
-        infected_population = case['infected_population'] if case['infected_population'] is not None else 0
-
-        if run_mode == "STOCHASTIC":
-            # Generate 4 random numbers for 4 serotypes
-            weights = [random.random()  for _ in range(4)]
-            weight_sum = sum(weights)
-            Snot1_pct, Snot2_pct, Snot3_pct, Snot4_pct = tuple(w / weight_sum * seroprevalence for w in weights)
-            I1_pct, I2_pct, I3_pct, I4_pct = tuple(w / weight_sum * infected_population for w in weights)
-        else:
-            # DETERMINISTIC - equally distribute
-            Snot1_pct, Snot2_pct, Snot3_pct, Snot4_pct = (seroprevalence / 4,) * 4
-            I1_pct, I2_pct, I3_pct, I4_pct = (infected_population / 4,) * 4
-
-        # Snot1-4
-        Snot1 = round(Snot1_pct / 100 * population, 2)
-        Snot2 = round(Snot2_pct / 100 * population, 2)
-        Snot3 = round(Snot3_pct / 100 * population, 2)
-        Snot4 = round(Snot4_pct / 100 * population, 2)
-        susceptible = population - Snot1 - Snot2 - Snot3 - Snot4
-
-        initial_population[i, column_mapping['Snot1']] = Snot1
-        initial_population[i, column_mapping['Snot2']] = Snot2
-        initial_population[i, column_mapping['Snot3']] = Snot3
-        initial_population[i, column_mapping['Snot4']] = Snot4
-
-        # I1-4
-        I1 = round(I1_pct / 100 * population, 2)
-        I2 = round(I2_pct / 100 * population, 2)
-        I3 = round(I3_pct / 100 * population, 2)
-        I4 = round(I4_pct / 100 * population, 2)
-        susceptible = susceptible - I1 - I2 - I3 - I4
-
-        initial_population[i, column_mapping['S0']] = susceptible
-        initial_population[i, column_mapping['I1']] = I1
-        initial_population[i, column_mapping['I2']] = I2
-        initial_population[i, column_mapping['I3']] = I3
-        initial_population[i, column_mapping['I4']] = I4
-    
-    return initial_population
-
-def get_dengue_2strain_initial_population(case_file, compartment_list):
-    column_mapping = {value: index for index, value in enumerate(compartment_list)}
-    initial_population = np.zeros((len(case_file), len(compartment_list)))
-
-    for i, case in enumerate(case_file):
-        population = case['population']
-        seroprevalence = case.get('seroprevalence', 0) or 0
-        infected_population = case.get('infected_population', 0) or 0
-
-        # Split infected_population 50/50 between I1 and I2
-        I1 = round(infected_population / 200 * population, 2)  # infected_population is a percentage
-        I2 = round(infected_population / 200 * population, 2)
-        
-        # Split seroprevalence 50/50 between S1 and S2
-        S1 = round(seroprevalence / 200 * population, 2)  # seroprevalence is a percentage
-        S2 = round(seroprevalence / 200 * population, 2)
-        
-        # Rest goes to S (susceptible)
-        S = population - I1 - I2 - S1 - S2
-        
-        # Assign to compartments
-        initial_population[i, column_mapping['S']] = S
-        initial_population[i, column_mapping['I1']] = I1
-        initial_population[i, column_mapping['I2']] = I2
-        initial_population[i, column_mapping['S1']] = S1
-        initial_population[i, column_mapping['S2']] = S2
-        
-        # All other compartments (R1, R2, I12, I21, R) start at 0
-        # Cumulative compartments also start at 0
-    
-    return initial_population
 
 def get_executor_class():
     """Get the appropriate executor class, falling back to ThreadPoolExecutor if multiprocessing fails."""
@@ -1069,10 +877,6 @@ def get_executor_class():
         return ThreadPoolExecutor
     except (OSError, RuntimeError, ValueError):
         return ThreadPoolExecutor
-    
-# --------------------------------------------------
-# Helper Functions: Dengue Misc
-# --------------------------------------------------
     
 def as_dict_list(obj):
     """Normalize a Pydantic model or list of models/dicts to list of dicts.
