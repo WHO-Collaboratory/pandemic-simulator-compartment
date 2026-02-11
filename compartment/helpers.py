@@ -68,13 +68,14 @@ def get_compartment_delta_grouping(model_class, compartment_list):
     Get compartment grouping for delta calculations.
     
     If model has COMPARTMENT_DELTA_GROUPING, use it.
-    Otherwise, generate default 1:1 mapping from compartment_list.
+    Otherwise, generate default 1:1 mapping from compartment_list (excluding cumulative _total columns).
     """
     if model_class and hasattr(model_class, 'COMPARTMENT_DELTA_GROUPING'):
         return model_class.COMPARTMENT_DELTA_GROUPING
     
     # Default: 1:1 mapping (each compartment groups to itself)
-    return {comp: [comp] for comp in compartment_list}
+    # Exclude cumulative (_total) columns as they're only used internally
+    return {comp: [comp] for comp in compartment_list if not comp.endswith('_total')}
 
 edge_to_variable = {
     "susceptible->infected": "beta",
@@ -137,6 +138,9 @@ def compute_parent_admin_total(data, payload, unique_id, parent_unique_id, num_t
             for compartment, age_groups in zone_timestep.items():
                 if compartment == "date":
                     continue  # ignore date
+                # Skip cumulative columns (defensive check)
+                if compartment.endswith("_total"):
+                    continue
                 if compartment not in timestep_total:
                     timestep_total[compartment] = {age_group: 0.0 for age_group in age_groups}
                 for age_group, value in age_groups.items():
@@ -151,6 +155,8 @@ def compute_jax_compartment_deltas(population_matrix, disease_type, n_regions, c
     """
     Compute compartment deltas using model's COMPARTMENT_DELTA_GROUPING if available,
     otherwise defaults to 1:1 mapping.
+    
+    Prefers cumulative (_total) columns when they exist, matching original behavior.
     """
     compartment_deltas = {}
     
@@ -170,12 +176,21 @@ def compute_jax_compartment_deltas(population_matrix, disease_type, n_regions, c
     
     # Compute delta for each grouped compartment
     for group_name, comp_names in grouping.items():
-        group_total = 0.0
-        for comp_name in comp_names:
-            if comp_name in comp_idx:
-                idx = comp_idx[comp_name]
-                group_total += float(final_step[idx, :].sum())
-        compartment_deltas[group_name] = group_total
+        # Prefer cumulative column if it exists (e.g., E_total instead of summing E1, E2, E3, E4)
+        cumulative_col = f"{group_name}_total"
+        
+        if cumulative_col in comp_idx:
+            # Use the cumulative column directly
+            idx = comp_idx[cumulative_col]
+            compartment_deltas[group_name] = float(final_step[idx, :].sum())
+        else:
+            # Sum individual compartments in the group
+            group_total = 0.0
+            for comp_name in comp_names:
+                if comp_name in comp_idx:
+                    idx = comp_idx[comp_name]
+                    group_total += float(final_step[idx, :].sum())
+            compartment_deltas[group_name] = group_total
     
     return compartment_deltas
 
@@ -349,6 +364,9 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
             # group by dengue compartment mapping
             # transpose avoids FutureWarning: DataFrame.groupby with axis=1 is deprecated. Do `frame.T.groupby(...)` without axis instead.
             df_grp = df.T.groupby(col2grp).sum().T
+            
+            # Remove cumulative columns (_total) from time_series output
+            df_grp = df_grp[[col for col in df_grp.columns if not col.endswith('_total')]]
 
             # nest each compartment with age groups
             df_nested = df_grp.map(lambda v: {**zero_ages, "age_all": float(v)})
@@ -375,10 +393,9 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
 def fast_format_jax_output_respiratory(
     population_matrix, compartment_list, demographics, admin_zones_payload, n_regions, n_timesteps, step, unique_id, payload
 ):
-    # Build index arrays
-    # Include both base compartments and their cumulative (_total) versions
+    # Build index arrays - only include base compartments (not cumulative _total columns)
     base_comps = ["S", "E", "I", "H", "D", "R"]
-    master_list = [c for c in compartment_list if c in base_comps or c.replace("_total", "") in base_comps]
+    master_list = [c for c in compartment_list if c in base_comps]
     age_labels = list(demographics.keys())
     dates = [
         (payload["start_date"] + timedelta(days=i * step)).strftime("%Y-%m-%d")
@@ -452,6 +469,9 @@ def format_uncertainty_output(means_child, lower_child, upper_child,
     
     base_date = datetime.strptime(start_date, "%Y-%m-%d").date()
     admin_zones_payload = payload['case_file']['admin_zones']
+    
+    # Filter out cumulative (_total) columns from time_series output
+    display_compartments = [(idx, comp) for idx, comp in enumerate(compartment_list) if not comp.endswith('_total')]
 
     # number of timesteps in the output
     n_outputs_child = means_child.shape[0]
@@ -471,8 +491,8 @@ def format_uncertainty_output(means_child, lower_child, upper_child,
             date = base_date + timedelta(days=step * t)
             record = {"date": date.isoformat()}
 
-            # embed each compartment name as its own key
-            for c_idx, comp_name in enumerate(compartment_list):
+            # embed each compartment name as its own key (exclude cumulative columns)
+            for c_idx, comp_name in display_compartments:
                 record[comp_name] = {
                     "mean":  float(means_child[t, c_idx, zone_idx]),
                     "lower": float(lower_child[t, c_idx, zone_idx]),
@@ -488,7 +508,7 @@ def format_uncertainty_output(means_child, lower_child, upper_child,
     for t in range(n_outputs_parent):
         date = base_date + timedelta(days=step * t)
         record = {"date": date.isoformat()}
-        for c_idx, comp_name in enumerate(compartment_list):
+        for c_idx, comp_name in display_compartments:
             record[comp_name] = {
                 "mean":  float(means_parent[t, c_idx]),
                 "lower": float(lower_parent[t, c_idx]),

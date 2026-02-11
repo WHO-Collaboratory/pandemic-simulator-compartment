@@ -4,7 +4,7 @@
     "simulation_type": "COMPARTMENTAL",
     "run_mode": "DETERMINISTIC",
     "start_date": "2025-11-21",
-    "time_steps": 720,
+    "time_steps": 30,
     "travel_volume": {
         "leaving": 10.0
     },
@@ -26,6 +26,9 @@
         }
     ],
     "case_file": {
+        "temp_min": 15.0,
+        "temp_max": 30.0,
+        "temp_mean": 25.0,
         "admin_zones": [
             {
                 "center_lat": -18.93585290187204,
