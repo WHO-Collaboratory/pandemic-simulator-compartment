@@ -11,11 +11,6 @@
     },
     "Disease": {
         "disease_type": "MONKEYPOX",
-        "compartment_list": [
-            "S",
-            "I",
-            "R"
-        ],
         "transmission_edges": [
             {
                 "data": {

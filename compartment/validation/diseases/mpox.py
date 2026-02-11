@@ -39,18 +39,6 @@ class DiseaseNode(BaseModel):
 class MpoxDiseaseConfig(BaseDiseaseConfig):
     disease_type: Literal["MONKEYPOX"] = "MONKEYPOX"
     transmission_edges: List[TransmissionEdge]
-
-    disease_nodes: Optional[List[DiseaseNode]] = None
-    compartment_list: Optional[List[str]] = None
-
-    @model_validator(mode='after')
-    def check_compartment_source(self):
-        """
-        Ensures that either disease_nodes or compartment_list is provided.
-        """
-        if self.disease_nodes is None and (self.compartment_list is None or len(self.compartment_list) == 0):
-            raise ValueError(
-                "Either 'disease_nodes' or 'compartment_list' must be provided. "
-                "If 'disease_nodes' is not provided, 'compartment_list' is required."
-            )
-        return self
+    
+    # MPOX has a hardcoded compartment list in MpoxJaxModel.COMPARTMENT_LIST
+    # No need to require it in config

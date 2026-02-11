@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Dict, List, Callable, Optional
+from typing import Any, Dict, List, Callable
 from pydantic import BaseModel, Field, ConfigDict
 
 from compartment.validation.simulation_config import SimulationConfig
@@ -11,12 +11,8 @@ from compartment.helpers import (
     create_intervention_dict,
     get_gravity_model_travel_matrix,
     get_hemisphere,
-    get_temperature,
-    get_dengue_initial_population,
-    get_dengue_2strain_initial_population,
-    create_dengue_compartment_list,
+    get_temperature
 )
-
 
 class ProcessedSimulation(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
@@ -109,38 +105,45 @@ class ValidationPostProcessor:
         admin2_dict = config.AdminUnit2.model_dump() if config.AdminUnit2 else None
         travel_volume_dict = config.travel_volume.model_dump() if config.travel_volume else None
         
-        # === COMPARTMENT LIST (automatically detect source) ===
-        if disease_type in ["VECTOR_BORNE", "VECTOR_BORNE_2STRAIN"]:
-            # Vector-borne diseases use special compartment list
-            compartment_list = create_dengue_compartment_list(disease_type)
+        # === MODEL REGISTRY (import model classes) ===
+        from compartment.models.covid_jax_model.model import CovidJaxModel
+        from compartment.models.dengue_jax_model.model import DengueJaxModel
+        from compartment.models.dengue_2strain.model import Dengue2StrainModel
+        from compartment.models.mpox_jax_model.model import MpoxJaxModel
+        
+        MODEL_REGISTRY = {
+            "RESPIRATORY": CovidJaxModel,
+            "VECTOR_BORNE": DengueJaxModel,
+            "VECTOR_BORNE_2STRAIN": Dengue2StrainModel,
+            "MONKEYPOX": MpoxJaxModel,
+        }
+        
+        model_class = MODEL_REGISTRY.get(disease_type)
+        
+        # === COMPARTMENT LIST (check model class attribute first) ===
+        if model_class and hasattr(model_class, 'COMPARTMENT_LIST'):
+            # Use model's hardcoded compartment list
+            compartment_list = model_class.COMPARTMENT_LIST
         elif disease_dict.get('compartment_list'):
-            # Explicit compartment list provided
+            # Explicit compartment list provided in config
             compartment_list = disease_dict['compartment_list']
         elif disease_dict.get('disease_nodes'):
-            # Extract from disease graph structure
+            # Extract from disease graph structure (flexible models like COVID)
             compartment_list = create_compartment_list(disease_dict['disease_nodes'])
         else:
             raise ValueError(
                 "Either 'disease_nodes' or 'compartment_list' must be provided in Disease config. "
-                "If your disease doesn't have compartments, register a custom processor."
             )
         
-        # === INITIAL POPULATION (automatically use appropriate function) ===
-        if disease_type == "VECTOR_BORNE":
-            # Dengue 4-serotype model uses special initialization
-            initial_population = get_dengue_initial_population(
-                admin_zones_dicts, 
-                compartment_list, 
-                config.run_mode
-            )
-        elif disease_type == "VECTOR_BORNE_2STRAIN":
-            # Dengue 2-strain model uses simplified initialization
-            initial_population = get_dengue_2strain_initial_population(
-                admin_zones_dicts, 
-                compartment_list
+        # === INITIAL POPULATION (use Model class methods) ===
+        if model_class:
+            # Let the Model compute its own initial population
+            initial_population = model_class.get_initial_population(
+                admin_zones=admin_zones_dicts,
+                compartment_list=compartment_list
             )
         else:
-            # Standard initialization for all other diseases
+            # Fallback to default implementation for unregistered disease types
             initial_population = create_initial_population_matrix(admin_zones_dicts, compartment_list)
         
         # === TRANSMISSION DICT (only if transmission_edges exist) ===

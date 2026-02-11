@@ -10,11 +10,15 @@ logger = logging.getLogger(__name__)
 
 class MpoxJaxModel(Model):
     """ A simple SIR compartmental model for MPOX """
+    
+    # Fixed compartment structure for MPOX
+    COMPARTMENT_LIST = ['S', 'I', 'R']
+
     def __init__(self, config):
         """ Initialize the MPOX SIR model with a configuration dictionary """
         # Load population data
         self.population_matrix = np.array(config["initial_population"]).T
-        self.compartment_list = config["compartment_list"]
+        self.compartment_list = self.COMPARTMENT_LIST  # Use class attribute
         
         # Load disease transmission parameters
         transmission_dict = config.get("transmission_dict", {})
@@ -23,13 +27,20 @@ class MpoxJaxModel(Model):
         
         # Simulation parameters
         self.start_date = config["start_date"]
-        self.start_date_ordinal = self.start_date.toordinal()
         self.n_timesteps = config["time_steps"]
         
         # Administrative units
         self.admin_units = config["admin_units"]
         
         self.payload = config
+    
+    @classmethod
+    def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
+        """
+        Simple SIR initial population for MPOX.
+        Uses base class implementation (S-I split).
+        """
+        return super().get_initial_population(admin_zones, compartment_list, **kwargs)
 
     @property
     def disease_type(self):
@@ -44,10 +55,6 @@ class MpoxJaxModel(Model):
         return self.population_matrix, self.compartment_list
 
     def derivative(self, y, t, p):
-        """
-        Calculates the SIR derivative for MPOX
-        S -> I -> R
-        """
         # Unpack parameters
         beta, gamma = p
         
