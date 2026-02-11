@@ -22,6 +22,22 @@ class DengueJaxModel(Model):
         'I12', 'I13', 'I14', 'I21', 'I23', 'I24', 'I31', 'I32', 'I34', 'I41', 'I42', 'I43',
         'H1', 'H2', 'H3', 'H4', 'R1', 'R2', 'R3', 'R4'
     ]
+    
+    # Custom compartment grouping for delta calculations
+    COMPARTMENT_DELTA_GROUPING = {
+        "SV": ["SV"],
+        "EV": ["EV1", "EV2", "EV3", "EV4"],
+        "IV": ["IV1", "IV2", "IV3", "IV4"],
+        "S": ["S0"],
+        "E": ["E1", "E2", "E3", "E4"],
+        "I": ["I1", "I2", "I3", "I4"],
+        "C": ["C1", "C2", "C3", "C4"],
+        "Snot": ["Snot1", "Snot2", "Snot3", "Snot4"],
+        "E2": ["E12", "E13", "E14", "E21", "E23", "E24", "E31", "E32", "E34", "E41", "E42", "E43"],
+        "I2": ["I12", "I13", "I14", "I21", "I23", "I24", "I31", "I32", "I34", "I41", "I42", "I43"],
+        "H": ["H1", "H2", "H3", "H4"],
+        "R": ["R1", "R2", "R3", "R4"]
+    }
 
     def __init__(self, config):
         # same as covid jax model
