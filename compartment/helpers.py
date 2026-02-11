@@ -334,6 +334,11 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
         grouping = get_compartment_delta_grouping(model_class, compartment_list)
         # Create dictionary mapping of compartments to generalized compartments for df groupby
         col2grp = {c: grp for grp, cols in grouping.items() for c in cols}
+        
+        # Ensure all compartments (including cumulative columns) are mapped
+        for comp in compartment_list:
+            if comp not in col2grp:
+                col2grp[comp] = comp
 
         zero_ages = dict.fromkeys(list(demographics.keys()), 0)
         
@@ -371,7 +376,9 @@ def fast_format_jax_output_respiratory(
     population_matrix, compartment_list, demographics, admin_zones_payload, n_regions, n_timesteps, step, unique_id, payload
 ):
     # Build index arrays
-    master_list = ["S", "E", "I", "H", "D", "R"]
+    # Include both base compartments and their cumulative (_total) versions
+    base_comps = ["S", "E", "I", "H", "D", "R"]
+    master_list = [c for c in compartment_list if c in base_comps or c.replace("_total", "") in base_comps]
     age_labels = list(demographics.keys())
     dates = [
         (payload["start_date"] + timedelta(days=i * step)).strftime("%Y-%m-%d")
@@ -385,6 +392,7 @@ def fast_format_jax_output_respiratory(
 
     # Flatten the population_matrix for DataFrame
     df = pd.DataFrame({"value": population_matrix.ravel()}, index=index).reset_index()
+    # Filter to only include compartments in master_list (base + cumulative)
     df = df[df["compartment"].isin(master_list)]
 
     # Pivot ALL data at once: grouped by region, then by date
