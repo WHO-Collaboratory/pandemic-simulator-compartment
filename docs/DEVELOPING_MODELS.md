@@ -1,13 +1,13 @@
-Developing a new disease model
+# Developing a new disease model
 
 This guide walks you through adding a new compartmental model to the simulator. It is based on the current architecture and working examples in this repo.
 
-Prerequisites
+## Prerequisites
 - Python 3.10+
 - jax and numpy familiarity (models use jax.numpy in the ODE `derivative()`)
 - Basic Pydantic understanding (configs are validated before reaching your model)
 
-Key concepts and files
+## Key concepts and files
 - Base model: [compartment/model.py](compartment/model.py)
 - Simulation loop: [compartment/simulation_manager.py](compartment/simulation_manager.py)
 - Output formatting: [compartment/simulation_postprocessor.py](compartment/simulation_postprocessor.py) and [compartment/helpers.py](compartment/helpers.py)
@@ -16,7 +16,7 @@ Key concepts and files
   - Respiratory with travel and age stratification (COVID): [compartment/models/covid_jax_model/model.py](compartment/models/covid_jax_model/model.py)
   - Vector-borne dengue (4 serotypes): [compartment/models/dengue_jax_model/model.py](compartment/models/dengue_jax_model/model.py)
 
-Developing your model
+## Developing your model
 - Create a directory under compartment/models/{my_disease_model}
 - Within compartment/models/{my_disease_model} create the following:
   - `__init__.py`
@@ -24,7 +24,7 @@ Developing your model
   - `model.py`
   - `example-config.json`
 
-What your Model class must provide
+### What your Model class must provide
 - `disease_type` property
   - A short string the platform uses to route configs to your class. It must match `Disease.disease_type` in the validated config (e.g. `VECTOR_BORNE`, `RESPIRATORY`).
 - Optional class attributes
@@ -54,16 +54,16 @@ What your Model class must provide
   - `y` has the same shape you returned in `prepare_initial_state()`; return a `np.stack([...])` with derivatives in the same order as `self.compartment_list`.
   - If you maintain cumulative `_total` compartments, also return their derivatives (e.g., flows into E, I, etc.).
 
-Shapes and conventions
+### Shapes and conventions
 - Regions-first vs compartments-first: JAX ODEs allow any array shape. The project convention is returning `(C, R)` or `(C, A, R)` from `prepare_initial_state()` so `derivative()` can index with the compartment order.
 - Age stratification: Respiratory models often use `(C, A, R)`. See `prepare_covid_initial_state()` in [compartment/helpers.py](compartment/helpers.py).
 - Cumulative columns: If you track cumulative counts, always suffix the compartment name with `_total`. These are used internally for accuracy and are automatically excluded from GraphQL outputs and parent totals.
 
-Register your model
+### Register your model
 - Map your new `disease_type` to your class in [compartment/validation/post_processor.py](compartment/validation/post_processor.py) within `MODEL_REGISTRY`.
 - If your model has a fixed structure, set `COMPARTMENT_LIST` on the class; otherwise ensure your config provides enough information to derive it (e.g., `disease_nodes`).
 
-Compartment deltas and reporting
+### Compartment deltas and reporting
 - The system computes “compartment deltas” at the end of a run using [get_compartment_delta_grouping() and compute_jax_compartment_deltas()](compartment/helpers.py#L1-L500).
 - Provide `COMPARTMENT_DELTA_GROUPING` on your class if you want grouped outputs (see dengue). If omitted, the default uses each base compartment as its own group and ignores any `_total` columns.
 - If a cumulative column like `E_total` exists, it will be used internally to compute the delta for group `E`, but the output key remains `E` (no `_total` suffix appears in API results).
@@ -77,7 +77,7 @@ Configuration tips (example-config.json)
 - After validation, the engine provides these computed fields to your `__init__` via `config`:
   - `compartment_list`, `initial_population`, `transmission_dict`, `admin_units`, `intervention_dict`, `travel_matrix`, `hemisphere`, `temperature`
 
-How to run locally
+## How to run locally
 - Testing can be done by running a command like this from the repo root:
 
 ```
@@ -87,11 +87,11 @@ python3 -m compartment.models.dengue_jax_model.main \
   --output_file results/test_dengue.json
 ```
 
-Interventions and travel
+### Interventions and travel
 - Interventions: Set and use `self.intervention_dict` in your model; built-in helper hooks handle date- and threshold-based activations during the run.
 - Travel: Use the provided `travel_matrix` (already gravity-modeled). If you expect an identity (no travel) for 1 region or missing rates, the validator will supply it.
 
-Quality checklist before opening a PR
+## Quality checklist before opening a PR
 - `prepare_initial_state()` returns the correct shape and appends any `_total` columns you need.
 - `derivative()` stacks outputs in the exact order of `self.compartment_list` (including any `_total`).
 - `disease_type` string matches your example config and is registered in `MODEL_REGISTRY`.
@@ -99,10 +99,10 @@ Quality checklist before opening a PR
 - If you need aggregated reporting, define `COMPARTMENT_DELTA_GROUPING`. Otherwise rely on the default 1:1 mapping.
 - Add a small `example-config.json` in your model folder and verify a local run completes without errors.
 
-Where to look when in doubt
+## Where to look when in doubt
 - Minimal: MPOX model for the simplest SIR example.
 - Age-stratified respiratory: COVID model.
 - Complex vector-borne with groups and cumulative tracking: Dengue models.
 
-Support
+## Support
 - If you hit issues with validation or output formats, check the formatters and helpers referenced above, or mirror how existing models supply shapes and `_total` columns.
