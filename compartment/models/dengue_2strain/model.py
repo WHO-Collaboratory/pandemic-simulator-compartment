@@ -106,28 +106,51 @@ class Dengue2StrainModel(Model):
         
         dI2_dt = beta/N * S * (I2 + rho*N + epsilon*I12) - (gamma + mu) * I2
         
-        I_total = beta/N * S * (I1 + I2 + 2*(rho*N) + epsilon*(I21 + I12))
+        # Cumulative totals (derivatives)
+        I_total_dt = beta/N * S * (I1 + I2 + 2*(rho*N) + epsilon*(I21 + I12))
 
         dR1_dt = gamma * I1 - (alpha + mu) * R1
         
         dR2_dt = gamma * I2 - (alpha + mu) * R2
         
-        R1_total = gamma * (I1 + I2)
+        R1_total_dt = gamma * (I1 + I2)
 
         dS1_dt = -beta/N * S1 * (I2 + rho*N + epsilon*I12) + alpha*R1 - mu*S1
         
         dS2_dt = -beta/N * S2 * (I1 + rho*N + epsilon*I21) + alpha*R2 - mu*S2
         
-        S2_total = -beta/N * S1 * (I2 + rho*N + epsilon*I12) + alpha*R1 + -beta/N * S2 * (I1 + rho*N + epsilon*I21) + alpha*R2
+        S2_total_dt = (
+            -beta/N * S1 * (I2 + rho*N + epsilon*I12) + alpha*R1
+            + -beta/N * S2 * (I1 + rho*N + epsilon*I21) + alpha*R2
+        )
         
         dI12_dt = beta/N * S1 * (I2 + rho*N + epsilon*I12) - (gamma + mu) * I12
         
         dI21_dt = beta/N * S2 * (I1 + rho*N + epsilon*I21) - (gamma + mu) * I21
         
-        I2_total = beta/N * (S1 * (I2 + rho*N + epsilon*I12) + S2 * (I1 + rho*N + epsilon*I21))
+        I2_total_dt = beta/N * (S1 * (I2 + rho*N + epsilon*I12) + S2 * (I1 + rho*N + epsilon*I21))
 
         dR_dt = gamma * (I12 + I21) - mu * R
 
-        R2_total = gamma * (I12 + I21)
+        R2_total_dt = gamma * (I12 + I21)
         
-        return np.stack([dS_dt, dI1_dt, dI2_dt, I_total, dR1_dt, dR2_dt, R1_total, dS1_dt, dS2_dt, S2_total, dI12_dt, dI21_dt, I2_total, dR_dt, R2_total])
+        # IMPORTANT: Return order must exactly match self.compartment_list
+        # Order after _add_cumulative_compartments():
+        # ['S','I1','I2','R1','R2','S1','S2','I12','I21','R','I_total','R1_total','S2_total','I2_total','R2_total']
+        return np.stack([
+            dS_dt,      # S
+            dI1_dt,     # I1
+            dI2_dt,     # I2
+            dR1_dt,     # R1
+            dR2_dt,     # R2
+            dS1_dt,     # S1
+            dS2_dt,     # S2
+            dI12_dt,    # I12
+            dI21_dt,    # I21
+            dR_dt,      # R
+            I_total_dt,     # I_total
+            R1_total_dt,    # R1_total
+            S2_total_dt,    # S2_total
+            I2_total_dt,    # I2_total
+            R2_total_dt     # R2_total
+        ])
