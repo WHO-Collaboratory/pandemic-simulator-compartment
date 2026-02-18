@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal, Optional, List
 from uuid import uuid4
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
 
 class TravelVolume(BaseModel):
@@ -79,7 +79,8 @@ class BaseSimulationShared(BaseModel):
     # Time
     start_date: date
     end_date: date
-    time_steps: int = Field(gt=0)
+    # time_steps is now optional and will be derived from start/end dates if not provided
+    time_steps: Optional[int] = Field(default=None, gt=0)
 
     # Population / mobility
     # Make travel_volume optional - models can declare if they need it
@@ -94,3 +95,11 @@ class BaseSimulationShared(BaseModel):
         if start and v < start:
             raise ValueError("end_date must be on or after start_date")
         return v
+
+    @model_validator(mode="after")
+    def derive_time_steps(self):
+        if self.time_steps is None:
+            delta_days = (self.end_date - self.start_date).days
+            # Maintain positive steps for same-day ranges
+            self.time_steps = max(delta_days, 1)
+        return self

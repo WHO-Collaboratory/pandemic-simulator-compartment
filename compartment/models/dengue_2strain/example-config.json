@@ -1,10 +1,9 @@
 {
     "admin_unit_0_id": "MDG",
     "start_date": "2026-01-01",
-    "end_date": "2028-01-01",
+    "end_date": "2027-01-01",
     "simulation_type": "COMPARTMENTAL",
     "run_mode": "DETERMINISTIC",
-    "time_steps": 730,
     "AdminUnit0": {
         "id": "MDG",
         "center_lat": -19.37564815173127
