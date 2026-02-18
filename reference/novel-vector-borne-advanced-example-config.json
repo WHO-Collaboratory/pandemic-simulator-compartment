@@ -1,10 +1,8 @@
 {
     "admin_unit_0_id": "MDG",
-    "end_date": "2026-11-21",
-    "simulation_type": "COMPARTMENTAL",
-    "run_mode": "UNCERTAINTY",
     "start_date": "2025-11-21",
-    "time_steps": 365,
+    "end_date": "2026-11-21",
+    "run_mode": "UNCERTAINTY",
     "travel_volume": {
         "leaving": 10.0
     },
