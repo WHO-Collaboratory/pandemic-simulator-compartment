@@ -162,3 +162,48 @@ GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
     }
   }
 }"""
+
+ADMIN_UNITS_BY_SIM_JOB_QUERY = """query SimulationJobAdminUnitsBySimulationJobId(
+  $simulation_job_id: ID!
+  $limit: Int
+  $nextToken: String
+) {
+  simulationJobAdminUnitsBySimulationJobId(
+    simulation_job_id: $simulation_job_id
+    limit: $limit
+    nextToken: $nextToken
+  ) {
+    items {
+      id
+      admin_unit_id
+      name
+      population
+      infected_population
+      seroprevalence
+      vector_population
+      temp_min
+      temp_max
+      temp_mean
+    }
+    nextToken
+  }
+}"""
+
+SEARCH_ADMIN_UNITS_QUERY = """query SearchAdminUnits(
+  $filter: SearchableAdminUnitFilterInput
+  $limit: Int
+) {
+  searchAdminUnits(filter: $filter, limit: $limit) {
+    items {
+      id
+      admin_code
+      admin_iso_code
+      admin_level
+      center_lat
+      center_lon
+      viz_name
+      name
+      osm_id
+    }
+  }
+}"""

@@ -18,10 +18,10 @@ from compartment.helpers import (
     as_dict_list
 )
 from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
-from compartment.cloud_helpers.gql import get_simulation_job
+from compartment.cloud_helpers.gql import get_admin_unit_references, get_simulation_job, get_simulation_job_admin_units
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
 from compartment.cloud_helpers.gql import write_to_gql
-from compartment.cloud_helpers.simulation_helpers import transform_normalized_interventions
+from compartment.cloud_helpers.simulation_helpers import transform_normalized_interventions, transform_simulation_job_admin_units
 from compartment.model import Model
 
 # Makes sure unix implementations don't deadlock
@@ -67,7 +67,28 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         # Grab simulation job and clean validated config for model
         config = get_simulation_job(simulation_params, GRAPHQL_QUERY)
 
-        ########### START NORMALIZATION OF INTERVENTIONS ###########
+        sim_job = config["data"]["getSimulationJob"]
+
+        ########### START NORMALIZATION ###########
+        sim_job_admin_units = get_simulation_job_admin_units(
+            simulation_params, simulation_job_id
+        )
+
+        if sim_job_admin_units:
+            logger.info(
+                f"Using {len(sim_job_admin_units)} admin units from SimulationJobAdminUnit table"
+            )
+            admin_unit_ids = [u["admin_unit_id"] for u in sim_job_admin_units]
+            admin_unit_refs = get_admin_unit_references(simulation_params, admin_unit_ids)
+            sim_job["case_file"]["admin_zones"] = transform_simulation_job_admin_units(
+                sim_job_admin_units, admin_unit_refs
+            )
+        else:
+            logger.info(
+                "No SimulationJobAdminUnits found, using embedded case_file.admin_zones"
+            )
+
+
         # Transform normalized interventions from join tables to legacy format
         # Priority: Use new Interventions join table if available, fall back to embedded interventions
         normalized_interventions = config['data']['getSimulationJob'].get('Interventions', {})
@@ -80,12 +101,12 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
             config['data']['getSimulationJob']['interventions'] = transform_normalized_interventions(normalized_items)
         else:
             logger.info("No normalized interventions found, using embedded interventions field")
-        ########### END NORMALIZATION OF INTERVENTIONS ###########
+        ########### END NORMALIZATION ###########
 
         owner = config['data']['getSimulationJob'].get('owner')
     else:
         raise ValueError(f"Invalid mode: {mode}")
-
+    
     # Validate and create config object
     disease_type = config['data']['getSimulationJob']['Disease']['disease_type']
     validation_success, cleaned_config = record_and_upload_validation(
