@@ -5,6 +5,7 @@ from compartment.cloud_helpers.graphql_queries import (
     ADMIN_UNITS_BY_SIM_JOB_QUERY,
     SEARCH_ADMIN_UNITS_QUERY,
 )
+from compartment.helpers import convert_dates
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +81,12 @@ def write_to_gql(job_params, results):
 def gql_write_helper(job_params, results, query):
     """Write resutls of model to GraphQL"""
 
+    # Ensure JSON-serializable payload (dates, datetimes, ndarrays → strings/lists)
+    safe_results = convert_dates(results)
+
     payload = {
         "query": query,
-        "variables": {"input": results},
+        "variables": {"input": safe_results},
     }
 
     headers = {"Content-Type": "application/json"}
@@ -217,12 +221,7 @@ def get_admin_unit_references(job_params: dict, admin_unit_ids: list) -> dict:
         "limit": len(admin_unit_ids),
     }
 
-    print(f"job_params: {job_params}")
-    print(f"SEARCH_ADMIN_UNITS_QUERY: {SEARCH_ADMIN_UNITS_QUERY}")
-    print(f"variables: {variables}")
-
     data = _gql_query(job_params, SEARCH_ADMIN_UNITS_QUERY, variables)
-    print(f"data: {data}")
     items = data.get("data", {}).get("searchAdminUnits", {}).get("items", [])
 
     # Key by ID for O(1) lookup during transformation

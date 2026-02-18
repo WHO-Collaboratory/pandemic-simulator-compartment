@@ -196,8 +196,6 @@ SEARCH_ADMIN_UNITS_QUERY = """query SearchAdminUnits(
   searchAdminUnits(filter: $filter, limit: $limit) {
     items {
       id
-      admin_code
-      admin_iso_code
       admin_level
       center_lat
       center_lon

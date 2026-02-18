@@ -32,8 +32,8 @@ class CaseFileDemographics(BaseModel):
 
 class CaseFileAdminZone(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
-    admin_code: Optional[str] = None
-    admin_iso_code: Optional[str] = None
+    #admin_code: Optional[str] = None
+    #admin_iso_code: Optional[str] = None
     admin_level: Optional[int] = None
     center_lat: float = Field(ge=-90, le=90)
     center_lon: float = Field(ge=-180, le=180)
@@ -42,7 +42,7 @@ class CaseFileAdminZone(BaseModel):
     name: str
 
     population: int = Field(ge=0)
-    osm_id: Optional[str] = None
+    #osm_id: Optional[List[str]] = None
 
     infected_population: float = Field(default=0.05, ge=0, le=100) # Covid: infected population, Dengue: first infection
     seroprevalence: Optional[float] = Field(default=10.0, ge=0, le=100) # Dengue: susceptible to second infection

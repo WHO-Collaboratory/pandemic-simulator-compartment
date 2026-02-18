@@ -67,7 +67,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         # Grab simulation job and clean validated config for model
         config = get_simulation_job(simulation_params, GRAPHQL_QUERY)
 
-        sim_job = config["data"]["getSimulationJob"]
+        #sim_job = config["data"]["getSimulationJob"]
 
         ########### START NORMALIZATION ###########
         sim_job_admin_units = get_simulation_job_admin_units(
@@ -80,7 +80,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
             )
             admin_unit_ids = [u["admin_unit_id"] for u in sim_job_admin_units]
             admin_unit_refs = get_admin_unit_references(simulation_params, admin_unit_ids)
-            sim_job["case_file"]["admin_zones"] = transform_simulation_job_admin_units(
+            config["data"]["getSimulationJob"]["case_file"]["admin_zones"] = transform_simulation_job_admin_units(
                 sim_job_admin_units, admin_unit_refs
             )
         else:
@@ -106,7 +106,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         owner = config['data']['getSimulationJob'].get('owner')
     else:
         raise ValueError(f"Invalid mode: {mode}")
-    
+        
     # Validate and create config object
     disease_type = config['data']['getSimulationJob']['Disease']['disease_type']
     validation_success, cleaned_config = record_and_upload_validation(
