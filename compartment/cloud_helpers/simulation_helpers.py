@@ -1,16 +1,5 @@
 """Helpers which reduce duplication between Batch programs."""
-import logging
 from os import environ
-
-
-def setup_logging():
-    """Sets up logging for AWS Batch (Console Only)"""
-    logging.basicConfig(
-        format="[%(levelname)s] %(name)s: %(message)s",
-        level=logging.INFO,
-        handlers=[logging.StreamHandler()],
-    )
-
 
 def get_simulation_params() -> dict:
     simulation_params = {
