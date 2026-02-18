@@ -1,10 +1,15 @@
 import requests
+import logging
+from compartment.helpers import setup_logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from compartment.cloud_helpers.graphql_queries import (
     ADMIN_UNITS_BY_SIM_JOB_QUERY,
     SEARCH_ADMIN_UNITS_QUERY,
 )
 from compartment.helpers import convert_dates
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 # --------------------------------------------------
 # Helper Functions: GQL query
