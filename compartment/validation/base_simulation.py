@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal, Optional, List
 from uuid import uuid4
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
 
 class TravelVolume(BaseModel):
@@ -32,8 +32,8 @@ class CaseFileDemographics(BaseModel):
 
 class CaseFileAdminZone(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
-    admin_code: Optional[str] = None
-    admin_iso_code: Optional[str] = None
+    #admin_code: Optional[str] = None
+    #admin_iso_code: Optional[str] = None
     admin_level: Optional[int] = None
     center_lat: float = Field(ge=-90, le=90)
     center_lon: float = Field(ge=-180, le=180)
@@ -42,7 +42,7 @@ class CaseFileAdminZone(BaseModel):
     name: str
 
     population: int = Field(ge=0)
-    osm_id: Optional[str] = None
+    #osm_id: Optional[List[str]] = None
 
     infected_population: float = Field(default=0.05, ge=0, le=100) # Covid: infected population, Dengue: first infection
     seroprevalence: Optional[float] = Field(default=10.0, ge=0, le=100) # Dengue: susceptible to second infection
@@ -73,13 +73,14 @@ class BaseSimulationShared(BaseModel):
 
     # Owner & meta
     owner: Optional[str] = None
-    simulation_type: Literal["COMPARTMENTAL", "AGENT_BASED"]
-    run_mode: Literal["UNCERTAINTY", "DETERMINISTIC"]
+    simulation_type: Literal["COMPARTMENTAL", "AGENT_BASED"] = "COMPARTMENTAL"
+    run_mode: Literal["UNCERTAINTY", "DETERMINISTIC"] = "DETERMINISTIC"
 
     # Time
     start_date: date
     end_date: date
-    time_steps: int = Field(gt=0)
+    # time_steps is now optional and will be derived from start/end dates if not provided
+    time_steps: Optional[int] = Field(default=None, gt=0)
 
     # Population / mobility
     # Make travel_volume optional - models can declare if they need it
@@ -94,3 +95,11 @@ class BaseSimulationShared(BaseModel):
         if start and v < start:
             raise ValueError("end_date must be on or after start_date")
         return v
+
+    @model_validator(mode="after")
+    def derive_time_steps(self):
+        if self.time_steps is None:
+            delta_days = (self.end_date - self.start_date).days
+            # Maintain positive steps for same-day ranges
+            self.time_steps = max(delta_days, 1)
+        return self
