@@ -1,7 +1,9 @@
 """Helpers which reduce duplication between Batch programs."""
+
 from os import environ
 
-def get_simulation_params(simulation_job_id:str) -> dict:
+
+def get_simulation_params(simulation_job_id: str) -> dict:
     simulation_params = {
         "SIMULATION_JOB_ID": simulation_job_id,
         "GRAPHQL_APIKEY": environ[("GRAPHQL_APIKEY")],
@@ -75,6 +77,72 @@ def transform_normalized_interventions(normalized_interventions: list) -> list:
         legacy_interventions.append(legacy_intervention)
 
     return legacy_interventions
+
+
+def transform_normalized_transmission_edges(normalized_edges: list) -> list:
+    """
+    Transforms SimulationJobTransmissionEdge records to the legacy
+    Disease.transmission_edges format.
+
+    Mapping:
+    - transmittion_edge.source + transmittion_edge.target → id ("source->target")
+    - transmittion_edge.source → source
+    - transmittion_edge.target → target
+    - value → data.transmission_rate
+    - FieldConfigs.items[0] → data.variance_params (field_key → field_name)
+
+    Args:
+        normalized_edges: List of SimulationJobTransmissionEdge records
+            from the new join table (TransmissionEdges.items on SimulationJob)
+
+    Returns:
+        List of transmission edges in the legacy format expected by the
+        validation models and downstream helpers (create_transmission_dict,
+        build_uncertainty_params, etc.)
+    """
+    legacy_edges = []
+
+    for edge in normalized_edges:
+        # The lookup record linked via @hasOne (note the typo in the schema)
+        lookup = edge.get("transmittion_edge")
+        if not lookup:
+            continue
+
+        source = lookup.get("source", "")
+        target = lookup.get("target", "")
+
+        # Build variance_params from the first FieldConfig (each edge has at most one)
+        variance_params = None
+        field_configs = edge.get("FieldConfigs", {})
+        field_config_items = field_configs.get("items", []) if field_configs else []
+
+        if field_config_items:
+            fc = field_config_items[0]
+            if fc.get("has_variance"):
+                variance_params = {
+                    "has_variance": fc.get("has_variance", False),
+                    "distribution_type": fc.get("distribution_type", "UNIFORM"),
+                    "field_name": fc.get("field_key"),  # field_key → field_name
+                    "min": fc.get("min"),
+                    "max": fc.get("max"),
+                }
+
+        # Build the data payload
+        data = {"transmission_rate": edge.get("value", lookup.get("default_value", 0))}
+        if variance_params:
+            data["variance_params"] = variance_params
+
+        legacy_edges.append(
+            {
+                "id": f"{source}->{target}",
+                "source": source,
+                "target": target,
+                "type": lookup.get("value_type"),
+                "data": data,
+            }
+        )
+
+    return legacy_edges
 
 
 def transform_simulation_job_admin_units(

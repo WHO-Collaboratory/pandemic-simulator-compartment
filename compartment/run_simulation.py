@@ -2,7 +2,7 @@ import logging
 import json
 import os
 import multiprocessing
-import numpy as np # should we use jax.numpy?
+import numpy as np  # should we use jax.numpy?
 from copy import deepcopy
 import boto3
 from compartment.model import Model
@@ -11,21 +11,29 @@ from compartment.simulation_postprocessor import SimulationPostProcessor
 from compartment.batch_simulation_manager import BatchSimulationManager
 from compartment.helpers import (
     get_executor_class,
-    generate_LHS_samples, 
+    generate_LHS_samples,
     build_uncertainty_params,
     load_config_from_json,
     write_results_to_local,
-    as_dict_list
+    as_dict_list,
 )
 from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
-from compartment.cloud_helpers.gql import get_admin_unit_references, get_simulation_job, get_simulation_job_admin_units
+from compartment.cloud_helpers.gql import (
+    get_admin_unit_references,
+    get_simulation_job,
+    get_simulation_job_admin_units,
+)
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
 from compartment.cloud_helpers.gql import write_to_gql
-from compartment.cloud_helpers.simulation_helpers import transform_normalized_interventions, transform_simulation_job_admin_units
+from compartment.cloud_helpers.simulation_helpers import (
+    transform_normalized_interventions,
+    transform_normalized_transmission_edges,
+    transform_simulation_job_admin_units,
+)
 from compartment.model import Model
 
 # Makes sure unix implementations don't deadlock
-multiprocessing.set_start_method('spawn', force=True)
+multiprocessing.set_start_method("spawn", force=True)
 ExecutorClass = get_executor_class()
 
 # Remove unnecessary jax INFO logging
@@ -33,12 +41,14 @@ logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)
 logging.getLogger("jax._src.xla_bridge").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
-np.set_printoptions(suppress=True, formatter={'float_kind':'{:0.2f}'.format})
+np.set_printoptions(suppress=True, formatter={"float_kind": "{:0.2f}".format})
 
-def simulate_and_postprocess(model): 
+
+def simulate_and_postprocess(model):
     all_output = SimulationManager(model).run_simulation()
     processor = SimulationPostProcessor(model, all_output)
     return processor.process()
+
 
 def batch_simulate_and_postprocess(model, n_sims, param_list, ci, num_workers):
     batcher = BatchSimulationManager(max_workers=num_workers)
@@ -48,26 +58,35 @@ def batch_simulate_and_postprocess(model, n_sims, param_list, ci, num_workers):
     processor = SimulationPostProcessor(model, all_output)
     return processor.process(ci=ci)
 
-def run_simulation(model_class, simulation_params=None, mode:str='local', config_path: str = None, output_path: str = None):
+
+def run_simulation(
+    model_class,
+    simulation_params=None,
+    mode: str = "local",
+    config_path: str = None,
+    output_path: str = None,
+):
     logger.info("Starting the simulation...")
 
-    if mode == 'local':
+    if mode == "local":
         logger.info("Running in LOCAL mode")
         # Load config from local JSON file
         config = load_config_from_json(config_path)
-        simulation_job_id = config['data']['getSimulationJob'].get('id', 'local-simulation')
+        simulation_job_id = config["data"]["getSimulationJob"].get(
+            "id", "local-simulation"
+        )
         owner = "local-user"
-    elif mode == 'cloud':
+    elif mode == "cloud":
         logger.info("Running in CLOUD mode")
         if simulation_params is None:
             raise ValueError("simulation_params is required for cloud mode")
-        simulation_job_id = simulation_params.get('SIMULATION_JOB_ID')
+        simulation_job_id = simulation_params.get("SIMULATION_JOB_ID")
         logger.info(f"simulation_job_id: {simulation_job_id}")
         logger.info(f"graphql_endpoint: {simulation_params.get('GRAPHQL_ENDPOINT')}")
         # Grab simulation job and clean validated config for model
         config = get_simulation_job(simulation_params, GRAPHQL_QUERY)
 
-        #sim_job = config["data"]["getSimulationJob"]
+        # sim_job = config["data"]["getSimulationJob"]
 
         ########### START NORMALIZATION ###########
         sim_job_admin_units = get_simulation_job_admin_units(
@@ -79,42 +98,82 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
                 f"Using {len(sim_job_admin_units)} admin units from SimulationJobAdminUnit table"
             )
             admin_unit_ids = [u["admin_unit_id"] for u in sim_job_admin_units]
-            admin_unit_refs = get_admin_unit_references(simulation_params, admin_unit_ids)
-            config["data"]["getSimulationJob"]["case_file"]["admin_zones"] = transform_simulation_job_admin_units(
-                sim_job_admin_units, admin_unit_refs
+            admin_unit_refs = get_admin_unit_references(
+                simulation_params, admin_unit_ids
+            )
+            config["data"]["getSimulationJob"]["case_file"]["admin_zones"] = (
+                transform_simulation_job_admin_units(
+                    sim_job_admin_units, admin_unit_refs
+                )
             )
         else:
             logger.info(
                 "No SimulationJobAdminUnits found, using embedded case_file.admin_zones"
             )
 
-
         # Transform normalized interventions from join tables to legacy format
         # Priority: Use new Interventions join table if available, fall back to embedded interventions
-        normalized_interventions = config['data']['getSimulationJob'].get('Interventions', {})
-        normalized_items = normalized_interventions.get('items', []) if normalized_interventions else []
+        normalized_interventions = config["data"]["getSimulationJob"].get(
+            "Interventions", {}
+        )
+        normalized_items = (
+            normalized_interventions.get("items", [])
+            if normalized_interventions
+            else []
+        )
 
         logger.info(f"normalized_items: {normalized_items}")
-        
+
         if normalized_items:
-            logger.info(f"Using {len(normalized_items)} interventions from normalized join tables")
-            config['data']['getSimulationJob']['interventions'] = transform_normalized_interventions(normalized_items)
+            logger.info(
+                f"Using {len(normalized_items)} interventions from normalized join tables"
+            )
+            config["data"]["getSimulationJob"]["interventions"] = (
+                transform_normalized_interventions(normalized_items)
+            )
         else:
-            logger.info("No normalized interventions found, using embedded interventions field")
+            logger.info(
+                "No normalized interventions found, using embedded interventions field"
+            )
+
+        # Transform normalized transmission edges from join tables to legacy format
+        # Priority: Use new TransmissionEdges join table if available, fall back to embedded Disease.transmission_edges
+        normalized_transmission_edges = config["data"]["getSimulationJob"].get(
+            "TransmissionEdges", {}
+        )
+        normalized_edge_items = (
+            normalized_transmission_edges.get("items", [])
+            if normalized_transmission_edges
+            else []
+        )
+
+        if normalized_edge_items:
+            logger.info(
+                f"Using {len(normalized_edge_items)} transmission edges from normalized join tables"
+            )
+            config["data"]["getSimulationJob"]["Disease"]["transmission_edges"] = (
+                transform_normalized_transmission_edges(normalized_edge_items)
+            )
+        else:
+            logger.info(
+                "No normalized transmission edges found, using embedded Disease.transmission_edges"
+            )
         ########### END NORMALIZATION ###########
 
-        owner = config['data']['getSimulationJob'].get('owner')
+        owner = config["data"]["getSimulationJob"].get("owner")
     else:
         raise ValueError(f"Invalid mode: {mode}")
-        
+
     # Validate and create config object
-    disease_type = config['data']['getSimulationJob']['Disease']['disease_type']
+    disease_type = config["data"]["getSimulationJob"]["Disease"]["disease_type"]
     validation_success, cleaned_config = record_and_upload_validation(
         simulation_job_id,
         config,
         disease_type,
-        environment=simulation_params.get("ENVIRONMENT", "dev") if simulation_params else None,
-        mode=mode
+        environment=simulation_params.get("ENVIRONMENT", "dev")
+        if simulation_params
+        else None,
+        mode=mode,
     )
     if not validation_success:
         logger.error("Halting due to validation failure. See S3 logs for details.")
@@ -125,7 +184,7 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         "admin_zone_count": len(cleaned_config.admin_units),
         "simulation_time_steps": cleaned_config.time_steps,
         "owner": owner,
-        "disease_type": disease_type
+        "disease_type": disease_type,
     }
 
     logger.info(f"owner: {owner}")
@@ -134,14 +193,14 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     logger.info(f"disease_type: {disease_type}")
     if getattr(cleaned_config, "transmission_dict", None) is not None:
         logger.info(f"transmission_dict: {cleaned_config.transmission_dict}")
-    if getattr(cleaned_config, "intervention_dict", None) is not None: 
+    if getattr(cleaned_config, "intervention_dict", None) is not None:
         logger.info(f"intervention_dict: {cleaned_config.intervention_dict}")
 
     # Validate that model_class is a subclass of Model
     if not issubclass(model_class, Model):
         logger.error(f"model_class must be a subclass of Model, got {model_class}")
         raise ValueError(f"model_class must be a subclass of Model, got {model_class}")
-    
+
     run_mode = cleaned_config.run_mode
     logger.info(f"run_mode: {run_mode}")
 
@@ -154,10 +213,10 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     # Split cpu in half for top level workers
     # Then split the remaining cpu in half for low level workers
     top_level_workers = 2
-    low_level_workers = 2#ceil(os.cpu_count() / top_level_workers) - 1
+    low_level_workers = 2  # ceil(os.cpu_count() / top_level_workers) - 1
     logger.info(f"top_level_workers: {top_level_workers}")
     logger.info(f"low_level_workers: {low_level_workers}")
-    
+
     if run_mode == "DETERMINISTIC":
         with ExecutorClass(max_workers=top_level_workers) as executor:
             future_with = executor.submit(simulate_and_postprocess, model_with)
@@ -172,21 +231,24 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
             # Handle Disease as either dict or Pydantic model
             disease_section = cleaned_config.Disease
             if isinstance(disease_section, dict):
-                transmission_edges_dicts = as_dict_list(disease_section.get('transmission_edges'))
+                transmission_edges_dicts = as_dict_list(
+                    disease_section.get("transmission_edges")
+                )
             else:
-                transmission_edges_dicts = as_dict_list(disease_section.transmission_edges)
+                transmission_edges_dicts = as_dict_list(
+                    disease_section.transmission_edges
+                )
         else:
             transmission_edges_dicts = None
 
         # Handle interventions as either list of dicts or Pydantic models
-        interventions = getattr(cleaned_config, 'interventions', [])
+        interventions = getattr(cleaned_config, "interventions", [])
         interventions_dicts = as_dict_list(interventions)
 
         uncertainty_params = build_uncertainty_params(
-            transmission_edges_dicts,
-            interventions_dicts
-          )
-        
+            transmission_edges_dicts, interventions_dicts
+        )
+
         logger.info(f"Number of simulations: {n_sims}")
         logger.info(f"Confidence interval: {ci}")
         logger.info(f"Uncertainty parameters: {uncertainty_params}")
@@ -200,16 +262,30 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
 
         # Run both batches in parallel
         with ExecutorClass(max_workers=top_level_workers) as executor:
-            future_with = executor.submit(batch_simulate_and_postprocess, model_with, n_sims, param_list, ci, low_level_workers)
-            future_without = executor.submit(batch_simulate_and_postprocess, model_without, n_sims, interventionless_param_list, ci, low_level_workers)
+            future_with = executor.submit(
+                batch_simulate_and_postprocess,
+                model_with,
+                n_sims,
+                param_list,
+                ci,
+                low_level_workers,
+            )
+            future_without = executor.submit(
+                batch_simulate_and_postprocess,
+                model_without,
+                n_sims,
+                interventionless_param_list,
+                ci,
+                low_level_workers,
+            )
             results_with = future_with.result()
             results_without = future_without.result()
 
     results_with["control_run"] = False
     results_without["control_run"] = True
     results = [results_with, results_without]
-    
-    if mode == 'local':
+
+    if mode == "local":
         if output_path is None:
             print(results)
         elif output_path is not None:
@@ -218,10 +294,11 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
     else:
         # Cloud mode: write to GQL and S3, invoke lambda
         s3_results = deepcopy(results)
-        s3_client = boto3.client('s3', region_name='us-east-1')
-        bucket_name = f'compartmental-results-{simulation_params.get("ENVIRONMENT")}'
+        s3_client = boto3.client("s3", region_name="us-east-1")
+        bucket_name = f"compartmental-results-{simulation_params.get('ENVIRONMENT')}"
 
         from concurrent.futures import ThreadPoolExecutor, as_completed
+
         max_workers = min(32, max(4, len(results) * 2))  # tune as needed
         gql_statuses_by_i = [None] * len(results)
         s3_statuses_by_i = [None] * len(results)
@@ -230,9 +307,17 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             for i, result in enumerate(results):
-                future_to_meta[executor.submit(write_to_gql, simulation_params, result)] = (i, "gql")
                 future_to_meta[
-                    executor.submit(write_to_s3, s3_client, bucket_name, s3_results[i], simulation_job_id)
+                    executor.submit(write_to_gql, simulation_params, result)
+                ] = (i, "gql")
+                future_to_meta[
+                    executor.submit(
+                        write_to_s3,
+                        s3_client,
+                        bucket_name,
+                        s3_results[i],
+                        simulation_job_id,
+                    )
                 ] = (i, "s3")
 
             for fut in as_completed(future_to_meta):
@@ -251,15 +336,15 @@ def run_simulation(model_class, simulation_params=None, mode:str='local', config
         for i in range(len(results)):
             logger.info(f"gql_statuses_{i}: {gql_statuses_by_i[i]}")
             logger.info(f"s3_statuses_{i}: {s3_statuses_by_i[i]}")
-        
+
         # Invoke get-ai-summary lambda
-        lambda_client = boto3.client('lambda', region_name='us-east-1')
+        lambda_client = boto3.client("lambda", region_name="us-east-1")
         payload_data = {"simulation_job_id": simulation_job_id}
-        payload = json.dumps(payload_data).encode('utf-8')
+        payload = json.dumps(payload_data).encode("utf-8")
         lambda_client.invoke(
-            FunctionName=f'get-ai-summary-{simulation_params.get("ENVIRONMENT")}',
-            InvocationType='Event',
-            Payload=payload
+            FunctionName=f"get-ai-summary-{simulation_params.get('ENVIRONMENT')}",
+            InvocationType="Event",
+            Payload=payload,
         )
 
     return run_metadata
