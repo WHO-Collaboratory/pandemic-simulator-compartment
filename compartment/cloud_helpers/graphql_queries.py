@@ -136,6 +136,36 @@ GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
         }
       }
     }
+    TransmissionEdges {
+      items {
+        id
+        simulation_job_id
+        transmission_edge_id
+        transmittion_edge {
+          id
+          value_type
+          default_value
+          disease_type
+          description
+          source
+          target
+          order
+        }
+        value
+        FieldConfigs {
+          items {
+            id
+            field_key
+            has_variance
+            distribution_type
+            disease_param
+            min
+            max
+            parent_id
+          }
+        }
+      }
+    }
     case_file {
       admin_zones {
         id
