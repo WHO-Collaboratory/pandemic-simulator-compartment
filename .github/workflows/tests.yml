@@ -1,0 +1,139 @@
+name: tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
+  cancel-in-progress: true
+
+jobs:
+  # ------------------------------------------------------------------
+  # Detect which parts of the codebase changed so later jobs can run
+  # only the relevant tests.
+  # ------------------------------------------------------------------
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      helpers:       ${{ steps.filter.outputs.helpers }}
+      interventions: ${{ steps.filter.outputs.interventions }}
+      validation:    ${{ steps.filter.outputs.validation }}
+      mpox:          ${{ steps.filter.outputs.mpox }}
+      covid:         ${{ steps.filter.outputs.covid }}
+      dengue:        ${{ steps.filter.outputs.dengue }}
+      core:          ${{ steps.filter.outputs.core }}
+      integration:   ${{ steps.filter.outputs.integration }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            helpers:
+              - 'compartment/helpers.py'
+              - 'tests/test_helpers.py'
+            interventions:
+              - 'compartment/interventions.py'
+              - 'tests/test_interventions.py'
+            validation:
+              - 'compartment/validation/**'
+              - 'tests/test_validation.py'
+            mpox:
+              - 'compartment/models/mpox_jax_model/**'
+              - 'tests/models/test_mpox.py'
+            covid:
+              - 'compartment/models/covid_jax_model/**'
+              - 'tests/models/test_covid.py'
+            dengue:
+              - 'compartment/models/dengue_jax_model/**'
+              - 'compartment/models/dengue_2strain/**'
+              - 'tests/models/test_dengue.py'
+            core:
+              - 'compartment/model.py'
+              - 'compartment/simulation_manager.py'
+              - 'compartment/simulation_postprocessor.py'
+              - 'compartment/batch_simulation_manager.py'
+              - 'compartment/temperature.py'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'tests/conftest.py'
+            integration:
+              - 'compartment/models/**/model.py'
+              - 'compartment/models/**/example-config.json'
+              - 'compartment/simulation_manager.py'
+              - 'compartment/simulation_postprocessor.py'
+              - 'tests/integration/**'
+
+  # ------------------------------------------------------------------
+  # Run only the unit tests relevant to what changed.
+  # Falls back to the full unit suite when core infrastructure changes
+  # or when no specific target can be determined.
+  # ------------------------------------------------------------------
+  unit-tests:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - run: uv sync --group dev
+
+      - name: Determine test scope
+        id: scope
+        shell: bash
+        env:
+          CORE:          ${{ needs.detect-changes.outputs.core }}
+          HELPERS:       ${{ needs.detect-changes.outputs.helpers }}
+          INTERVENTIONS: ${{ needs.detect-changes.outputs.interventions }}
+          VALIDATION:    ${{ needs.detect-changes.outputs.validation }}
+          MPOX:          ${{ needs.detect-changes.outputs.mpox }}
+          COVID:         ${{ needs.detect-changes.outputs.covid }}
+          DENGUE:        ${{ needs.detect-changes.outputs.dengue }}
+        run: |
+          # Core infrastructure changed — run the full unit suite
+          if [[ "$CORE" == "true" ]]; then
+            echo "Core infrastructure changed — running full unit suite"
+            echo "paths=tests/" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          PATHS=""
+          [[ "$HELPERS"       == "true" ]] && PATHS="$PATHS tests/test_helpers.py"
+          [[ "$INTERVENTIONS" == "true" ]] && PATHS="$PATHS tests/test_interventions.py"
+          [[ "$VALIDATION"    == "true" ]] && PATHS="$PATHS tests/test_validation.py"
+          [[ "$MPOX"          == "true" ]] && PATHS="$PATHS tests/models/test_mpox.py"
+          [[ "$COVID"         == "true" ]] && PATHS="$PATHS tests/models/test_covid.py"
+          [[ "$DENGUE"        == "true" ]] && PATHS="$PATHS tests/models/test_dengue.py"
+
+          # Nothing matched (e.g. only docs changed) — fall back to full suite
+          if [[ -z "${PATHS// }" ]]; then
+            echo "No targeted changes detected — running full unit suite as fallback"
+            PATHS="tests/"
+          fi
+
+          echo "paths=$PATHS" >> "$GITHUB_OUTPUT"
+
+      - name: Run unit tests
+        run: uv run pytest ${{ steps.scope.outputs.paths }} -m "not integration" -v --tb=short
+
+  # ------------------------------------------------------------------
+  # Run the slow end-to-end integration tests only when model code,
+  # example configs, or the simulation pipeline changes.
+  # ------------------------------------------------------------------
+  integration-tests:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.integration == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - run: uv sync --group dev
+
+      - name: Run integration tests
+        run: uv run pytest tests/integration/ -m integration -v --tb=short

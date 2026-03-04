@@ -21,5 +21,13 @@ dependencies = [
     "scipy~=1.16.3",
 ]
 
+[dependency-groups]
+dev = ["pytest>=8.0", "pytest-cov>=6.0"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as full end-to-end simulation runs (deselect with -m 'not integration')",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["compartment"]
