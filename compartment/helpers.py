@@ -85,7 +85,10 @@ edge_to_variable = {
     "infected->hospitalized": "zeta",
     "infected->deceased": "delta",
     "hospitalized->recovered": "eta",
-    "hospitalized->deceased": "epsilon"
+    "hospitalized->deceased": "epsilon",
+    # ABC model edges
+    "a_compartment->b_compartment": "alpha",
+    "b_compartment->c_compartment": "beta"
 }
 
 def convert_dates(obj):
@@ -239,6 +242,12 @@ def create_jax_intervention_results(population_matrix: np.ndarray, intervention_
     elif disease_type == "VECTOR_BORNE_2STRAIN":
         infective_comps = ["I1", "I2", "I12", "I21"]
         infective_idx = [compartment_list.index(c) for c in infective_comps if c in compartment_list]
+    elif disease_type == "ABC":
+        # ABC model uses 'B' as the infective compartment
+        if population_matrix.ndim == 4:
+            population_matrix = population_matrix.sum(axis=2)
+        compartment_list = [s for s in compartment_list if "_total" not in s]
+        infective_idx = [compartment_list.index("B")]
     else:
         # collapse 4d age strat matrix
         if population_matrix.ndim == 4:
@@ -379,12 +388,12 @@ def format_jax_output(intervention_dict, payload, population_matrix, compartment
                     "admin_unit_id": admin_zones_payload[i].get('id', None),
                     "time_series": df_nested.to_dict("records")
                 })
-    elif population_matrix.ndim == 4 and disease_type == "RESPIRATORY":
+    elif population_matrix.ndim == 4 and disease_type in ["RESPIRATORY", "ABC"]:
         formatted_data["admin_zones"] = fast_format_jax_output_respiratory(
             population_matrix, compartment_list, demographics, admin_zones_payload, n_regions, n_timesteps, step, unique_id, payload
         )
     else:
-        raise ValueError(f"Unsupported population matrix dimension: {population_matrix.ndim}")
+        raise ValueError(f"Unsupported population matrix dimension: {population_matrix.ndim} for disease type: {disease_type}")
 
     formatted_data["compartment_deltas"] = compute_jax_compartment_deltas(population_matrix, disease_type, n_regions, compartment_list, model_class)
     formatted_data["parent_admin_total"] = compute_parent_admin_total(formatted_data['admin_zones'], payload, unique_id, parent_unique_id, population_matrix.shape[0], step)
@@ -394,7 +403,7 @@ def fast_format_jax_output_respiratory(
     population_matrix, compartment_list, demographics, admin_zones_payload, n_regions, n_timesteps, step, unique_id, payload
 ):
     # Build index arrays - only include base compartments (not cumulative _total columns)
-    base_comps = ["S", "E", "I", "H", "D", "R"]
+    base_comps = ["S", "E", "I", "H", "D", "R", "A", "B", "C"]
     master_list = [c for c in compartment_list if c in base_comps]
     age_labels = list(demographics.keys())
     dates = [

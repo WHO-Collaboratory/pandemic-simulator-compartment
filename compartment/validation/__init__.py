@@ -3,6 +3,7 @@ from .disease_config import BaseDiseaseConfig
 from .simulation_config import SimulationConfig
 from .post_processor import ValidationPostProcessor, ProcessedSimulation
 from .diseases import (
+    ABCDiseaseConfig,
     CovidDiseaseConfig,
     DengueDiseaseConfig,
     Dengue2StrainDiseaseConfig,
@@ -27,6 +28,7 @@ __all__ = [
     "ValidationPostProcessor",
     "ProcessedSimulation",
     # Disease configs
+    "ABCDiseaseConfig",
     "CovidDiseaseConfig",
     "DengueDiseaseConfig",
     "Dengue2StrainDiseaseConfig",
@@ -78,7 +80,9 @@ def load_simulation_config(config: dict, disease_type: str):
         model = CovidJaxModel(config)
     """
     # Map disease type to disease config class
-    if disease_type == "VECTOR_BORNE":
+    if disease_type == "ABC":
+        disease_cls = ABCDiseaseConfig
+    elif disease_type == "VECTOR_BORNE":
         disease_cls = DengueDiseaseConfig
     elif disease_type == "VECTOR_BORNE_2STRAIN":
         disease_cls = Dengue2StrainDiseaseConfig

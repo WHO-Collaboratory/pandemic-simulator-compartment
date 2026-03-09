@@ -80,6 +80,9 @@ def record_and_upload_validation(
         validation_success = True
     except Exception as e:
         from pydantic import ValidationError
+        import logging
+        logger = logging.getLogger(__name__)
+        
         err_obj = e if isinstance(e, ValidationError) else None
         validation_result = {
             "event": "validation_failure",
@@ -91,6 +94,15 @@ def record_and_upload_validation(
             "error_str": str(e),
         }
         validation_success = False
+        cleaned_config = None
+        
+        # Log validation errors for local mode debugging
+        if mode == 'local':
+            logger.error(f"Validation Error: {e}")
+            if err_obj:
+                for error in err_obj.errors():
+                    loc = " -> ".join(str(x) for x in error['loc'])
+                    logger.error(f"  {loc}: {error['msg']} (type={error['type']})")
     # Write to S3 if in cloud mode
     if mode == 'cloud' and environment and simulation_job_id:
         s3_path = upload_validation_result_to_s3(

@@ -106,12 +106,14 @@ class ValidationPostProcessor:
         travel_volume_dict = config.travel_volume.model_dump() if config.travel_volume else None
         
         # === MODEL REGISTRY (import model classes) ===
+        from compartment.models.abc_jax_model.model import ABCJaxModel
         from compartment.models.covid_jax_model.model import CovidJaxModel
         from compartment.models.dengue_jax_model.model import DengueJaxModel
         from compartment.models.dengue_2strain.model import Dengue2StrainModel
         from compartment.models.mpox_jax_model.model import MpoxJaxModel
         
         MODEL_REGISTRY = {
+            "ABC": ABCJaxModel,
             "RESPIRATORY": CovidJaxModel,
             "VECTOR_BORNE": DengueJaxModel,
             "VECTOR_BORNE_2STRAIN": Dengue2StrainModel,

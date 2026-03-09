@@ -15,12 +15,14 @@ Example:
     
     config = SimulationConfig[CovidDiseaseConfig].model_validate(data)
 """
+from .abc import ABCDiseaseConfig
 from .covid import CovidDiseaseConfig
 from .dengue import DengueDiseaseConfig
 from .dengue_2strain import Dengue2StrainDiseaseConfig
 from .mpox import MpoxDiseaseConfig
 
 __all__ = [
+    "ABCDiseaseConfig",
     "CovidDiseaseConfig",
     "DengueDiseaseConfig",
     "Dengue2StrainDiseaseConfig",
