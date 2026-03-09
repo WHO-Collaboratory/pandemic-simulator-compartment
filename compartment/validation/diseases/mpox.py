@@ -1,44 +1,31 @@
+"""
+Monkeypox disease validation config -- auto-generated from model parameters.
+
+This module no longer contains hand-written Pydantic models.  Instead it
+imports the ``MpoxJaxModel`` parameter schema and uses the schema generator
+to produce a ``MpoxDiseaseConfig`` class at import time.
+
+The generated class is fully compatible with ``SimulationConfig[T]`` and
+the ``ValidationPostProcessor`` pipeline.
+"""
+
 from __future__ import annotations
-from typing import List, Literal, Optional
-from pydantic import BaseModel, Field, model_validator
 
-from compartment.validation.disease_config import BaseDiseaseConfig
+from compartment.models.mpox_jax_model.model import MpoxJaxModel
+from compartment.schema_generator import generate_disease_config
 
+# Auto-generate MpoxDiseaseConfig from the model's parameter schema
+MpoxDiseaseConfig = generate_disease_config(
+    MpoxJaxModel._build_parameter_schema())
 
-class TransmissionEdgeData(BaseModel):
-    transmission_rate: float = Field(gt=0)
+# Re-export the supporting edge models so existing imports still work
+from compartment.schema_generator import (  # noqa: E402, F401
+    GeneratedTransmissionEdge as TransmissionEdge,
+    GeneratedTransmissionEdgeData as TransmissionEdgeData,
+)
 
-
-class TransmissionEdge(BaseModel):
-    source: str
-    target: str
-    data: TransmissionEdgeData
-    id: str = ""
-
-    @model_validator(mode="before")
-    @classmethod
-    def build_id(cls, values):
-        if "id" not in values or not values["id"]:
-            source = values.get("source", "")
-            target = values.get("target", "")
-            values["id"] = f"{source}->{target}"
-        return values
-
-
-class DiseaseNodeData(BaseModel):
-    alias: Optional[str]
-    label: str
-
-
-class DiseaseNode(BaseModel):
-    type: Literal["DISEASE_STATE_NODE"]
-    data: DiseaseNodeData
-    id: str
-
-
-class MpoxDiseaseConfig(BaseDiseaseConfig):
-    disease_type: Literal["MONKEYPOX"] = "MONKEYPOX"
-    transmission_edges: List[TransmissionEdge]
-    
-    # MPOX has a hardcoded compartment list in MpoxJaxModel.COMPARTMENT_LIST
-    # No need to require it in config
+__all__ = [
+    "MpoxDiseaseConfig",
+    "TransmissionEdge",
+    "TransmissionEdgeData",
+]

@@ -82,7 +82,8 @@ def run_simulation(
             raise ValueError("simulation_params is required for cloud mode")
         simulation_job_id = simulation_params.get("SIMULATION_JOB_ID")
         logger.info(f"simulation_job_id: {simulation_job_id}")
-        logger.info(f"graphql_endpoint: {simulation_params.get('GRAPHQL_ENDPOINT')}")
+        logger.info(f"graphql_endpoint: {
+                    simulation_params.get('GRAPHQL_ENDPOINT')}")
         # Grab simulation job and clean validated config for model
         config = get_simulation_job(simulation_params, GRAPHQL_QUERY)
 
@@ -95,7 +96,9 @@ def run_simulation(
 
         if sim_job_admin_units:
             logger.info(
-                f"Using {len(sim_job_admin_units)} admin units from SimulationJobAdminUnit table"
+                f"Using {
+                    len(sim_job_admin_units)
+                } admin units from SimulationJobAdminUnit table"
             )
             admin_unit_ids = [u["admin_unit_id"] for u in sim_job_admin_units]
             admin_unit_refs = get_admin_unit_references(
@@ -126,7 +129,9 @@ def run_simulation(
 
         if normalized_items:
             logger.info(
-                f"Using {len(normalized_items)} interventions from normalized join tables"
+                f"Using {
+                    len(normalized_items)
+                } interventions from normalized join tables"
             )
             config["data"]["getSimulationJob"]["interventions"] = (
                 transform_normalized_interventions(normalized_items)
@@ -149,7 +154,9 @@ def run_simulation(
 
         if normalized_edge_items:
             logger.info(
-                f"Using {len(normalized_edge_items)} transmission edges from normalized join tables"
+                f"Using {
+                    len(normalized_edge_items)
+                } transmission edges from normalized join tables"
             )
             config["data"]["getSimulationJob"]["Disease"]["transmission_edges"] = (
                 transform_normalized_transmission_edges(normalized_edge_items)
@@ -176,7 +183,8 @@ def run_simulation(
         mode=mode,
     )
     if not validation_success:
-        logger.error("Halting due to validation failure. See S3 logs for details.")
+        logger.error(
+            "Halting due to validation failure. See S3 logs for details.")
         return None
 
     run_metadata = {
@@ -198,8 +206,10 @@ def run_simulation(
 
     # Validate that model_class is a subclass of Model
     if not issubclass(model_class, Model):
-        logger.error(f"model_class must be a subclass of Model, got {model_class}")
-        raise ValueError(f"model_class must be a subclass of Model, got {model_class}")
+        logger.error(
+            f"model_class must be a subclass of Model, got {model_class}")
+        raise ValueError(
+            f"model_class must be a subclass of Model, got {model_class}")
 
     run_mode = cleaned_config.run_mode
     logger.info(f"run_mode: {run_mode}")
@@ -220,7 +230,8 @@ def run_simulation(
     if run_mode == "DETERMINISTIC":
         with ExecutorClass(max_workers=top_level_workers) as executor:
             future_with = executor.submit(simulate_and_postprocess, model_with)
-            future_without = executor.submit(simulate_and_postprocess, model_without)
+            future_without = executor.submit(
+                simulate_and_postprocess, model_without)
             results_with = future_with.result()
             results_without = future_without.result()
     else:
@@ -287,7 +298,8 @@ def run_simulation(
 
     if mode == "local":
         if output_path is None:
-            print(results)
+            print("yo")
+            # print(results)
         elif output_path is not None:
             write_results_to_local(results, output_path)
             logger.info(f"Results saved to: {output_path}")
@@ -295,7 +307,8 @@ def run_simulation(
         # Cloud mode: write to GQL and S3, invoke lambda
         s3_results = deepcopy(results)
         s3_client = boto3.client("s3", region_name="us-east-1")
-        bucket_name = f"compartmental-results-{simulation_params.get('ENVIRONMENT')}"
+        bucket_name = f"compartmental-results-{
+            simulation_params.get('ENVIRONMENT')}"
 
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -325,7 +338,8 @@ def run_simulation(
                 try:
                     out = fut.result()
                 except Exception as e:
-                    logger.exception("Write failed", extra={"i": i, "kind": kind})
+                    logger.exception("Write failed", extra={
+                                     "i": i, "kind": kind})
                     out = {"status": "error", "error": str(e)}
 
                 if kind == "gql":
@@ -342,7 +356,8 @@ def run_simulation(
         payload_data = {"simulation_job_id": simulation_job_id}
         payload = json.dumps(payload_data).encode("utf-8")
         lambda_client.invoke(
-            FunctionName=f"get-ai-summary-{simulation_params.get('ENVIRONMENT')}",
+            FunctionName=f"get-ai-summary-{
+                simulation_params.get('ENVIRONMENT')}",
             InvocationType="Event",
             Payload=payload,
         )

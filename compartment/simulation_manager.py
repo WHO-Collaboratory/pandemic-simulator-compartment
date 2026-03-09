@@ -8,6 +8,7 @@ from compartment.helpers import get_simulation_step_size, setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
+
 class SimulationManager:
     def __init__(self, model):
         self.model = model
@@ -24,7 +25,7 @@ class SimulationManager:
         params = self.model.get_params()
 
         pred = odeint(self.model.derivative, init_state, ts, params)
-        out = jax.device_get(pred)   # returns numpy arrays
+        out = jax.device_get(pred)  # returns numpy arrays
 
         logger.info("run_simulation function ENDING")
         return np.array(out)  # optional; out is already host-side
