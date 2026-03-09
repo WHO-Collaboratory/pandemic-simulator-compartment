@@ -1,54 +1,59 @@
 {
-    "admin_unit_0_id": "USA",
-    "start_date": "2025-01-01",
-    "end_date": "2025-04-01",
-    "AdminUnit0": {
-        "id": "USA",
-        "center_lat": 37.0902
+  "start_date": "2026-03-06",
+  "end_date": "2026-06-04",
+  "Disease": {
+    "disease_type": "MONKEYPOX",
+    "transmission_edges": [
+      {
+        "source": "susceptible",
+        "target": "infected",
+        "data": {
+          "transmission_rate": 0.3
+        }
+      },
+      {
+        "source": "infected",
+        "target": "recovered",
+        "data": {
+          "transmission_rate": 0.1
+        }
+      }
+    ]
+  },
+  "admin_unit_0_id": "USA",
+  "AdminUnit0": {
+    "id": "USA",
+    "center_lat": 37.0902
+  },
+  "interventions": [
+    {
+      "id": "mask_wearing",
+      "adherence_min": 30.0,
+      "transmission_percentage": 35.0,
+      "start_date": "2026-03-06",
+      "end_date": "2026-06-04",
+      "start_threshold": null,
+      "end_threshold": null
     },
-    "Disease": {
-        "disease_type": "MONKEYPOX",
-        "transmission_edges": [
-            {
-                "data": {
-                    "transmission_rate": 0.3
-                },
-                "source": "susceptible",
-                "target": "infected"
-            },
-            {
-                "data": {
-                    "transmission_rate": 0.1
-                },
-                "source": "infected",
-                "target": "recovered"
-            }
-        ]
-    },
-    "case_file": {
-        "admin_zones": [
-            {
-                "center_lat": 40.7128,
-                "center_lon": -74.0060,
-                "name": "New York",
-                "population": 8000000,
-                "infected_population": 1
-            },
-            {
-                "center_lat": 34.0522,
-                "center_lon": -118.2437,
-                "name": "Los Angeles",
-                "population": 4000000,
-                "infected_population": 5
-            },
-            {
-                "center_lat": 41.8781,
-                "center_lon": -87.6298,
-                "name": "Chicago",
-                "population": 2700000,
-                "infected_population": 8
-            }
-        ]
+    {
+      "id": "vaccination",
+      "adherence_min": 60.0,
+      "transmission_percentage": 80.0,
+      "start_date": "2026-03-06",
+      "end_date": "2026-06-04",
+      "start_threshold": null,
+      "end_threshold": null
     }
+  ],
+  "case_file": {
+    "admin_zones": [
+      {
+        "center_lat": 40.7128,
+        "center_lon": -74.006,
+        "name": "Example Zone",
+        "population": 1000000,
+        "infected_population": 1
+      }
+    ]
+  }
 }
-
