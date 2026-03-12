@@ -1,7 +1,10 @@
 name: disease-images
 
 on:
-  workflow_dispatch
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -56,4 +59,3 @@ jobs:
           ${{secrets.DOCKER_REGISTRY}}/pandemic-simulator-compartment/${{matrix.disease_path}}:${{ github.ref_name }}
         build-args: |
           MODEL_DIR=compartment/models/${{matrix.disease_path}}/
-        
