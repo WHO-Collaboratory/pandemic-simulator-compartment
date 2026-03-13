@@ -83,14 +83,29 @@ class ParameterDef:
 
 @dataclass
 class CompartmentDef:
-    """Describes a single compartment in the model (e.g. S, I, R)."""
+    """
+    Describes a single compartment in the model (e.g. S, I, R).
+
+    Set ``infective=True`` on compartments whose population contributes
+    to the force of infection (e.g. the *I* compartment in an SIR model).
+    When a transmission edge is marked ``frequency_dependent=True``,
+    :meth:`Model._compute_derivatives` uses the sum of all infective
+    compartments to compute the flow:
+    ``source * rate * sum(infective) / N_total``.
+    """
 
     id: str  # short key used in matrices: "S"
     label: str  # human-readable: "Susceptible"
     description: str  # explanation for UI
+    infective: bool = False  # contributes to force of infection
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return {
+            "id": self.id,
+            "label": self.label,
+            "description": self.description,
+            "infective": self.infective,
+        }
 
 
 class CompartmentRegistry:
@@ -123,8 +138,19 @@ class CompartmentRegistry:
     def __init__(self, compartment_defs: list[CompartmentDef]) -> None:
         self._defs = compartment_defs
         self._ids = [c.id for c in compartment_defs]
+        self._def_map: dict[str, CompartmentDef] = {c.id: c for c in compartment_defs}
+        self._infective_ids: list[str] = [c.id for c in compartment_defs if c.infective]
         for c in compartment_defs:
             setattr(self, c.id, c.id)
+
+    def get_def(self, compartment_id: str) -> CompartmentDef:
+        """Look up the full :class:`CompartmentDef` by its short ID."""
+        return self._def_map[compartment_id]
+
+    @property
+    def infective_ids(self) -> list[str]:
+        """Compartment IDs marked ``infective=True``."""
+        return self._infective_ids
 
     def __iter__(self):
         return iter(self._ids)
@@ -154,12 +180,20 @@ class TransmissionEdgeDef:
     Defines a directed edge in the compartment graph with parameter metadata.
 
     Example: susceptible -> infected  (variable_name="beta")
+
+    When ``frequency_dependent`` is ``True``, the framework computes the
+    flow as ``source * rate * sum(infective) / N_total`` instead of the
+    default ``rate * source``.  This is the standard frequency-dependent
+    force of infection used in most compartmental models.
     """
 
-    source: str  # "susceptible"
-    target: str  # "infected"
+    source: str  # human-readable label: "susceptible"
+    target: str  # human-readable label: "infected"
+    source_id: str  # resolved compartment ID: "S"
+    target_id: str  # resolved compartment ID: "I"
     variable_name: str  # model attribute name: "beta"
     parameter: ParameterDef  # metadata for the rate on this edge
+    frequency_dependent: bool = False  # use FOI formula instead of simple rate
 
     def to_dict(self) -> dict:
         return {
@@ -167,6 +201,7 @@ class TransmissionEdgeDef:
             "target": self.target,
             "variable_name": self.variable_name,
             "parameter": self.parameter.to_dict(),
+            "frequency_dependent": self.frequency_dependent,
         }
 
 
@@ -501,14 +536,27 @@ class ParameterSchemaBuilder:
         id: str,
         label: str,
         description: str,
+        infective: bool = False,
     ) -> None:
         """
         Add a compartment to the model (e.g. S, I, R).
+
+        Set ``infective=True`` for compartments whose population
+        contributes to the force of infection.  When a transmission
+        edge is marked ``frequency_dependent=True``, the framework
+        uses the sum of all infective compartments to compute the
+        flow: ``source * rate * sum(infective) / N_total``.
+
+        For most models only the *Infected* compartment (or its
+        equivalents) should be marked infective.
 
         Args:
             id: Short key used in matrices and edge definitions (e.g. ``"S"``).
             label: Human-readable name (e.g. ``"Susceptible"``).
             description: Explanation shown in the UI.
+            infective: Whether this compartment's population contributes
+                to the force of infection used by ``frequency_dependent``
+                transmission edges.  Defaults to ``False``.
 
         Raises:
             ValueError: If a compartment with the same *id* already exists.
@@ -520,10 +568,37 @@ class ParameterSchemaBuilder:
                 f"Already registered: {sorted(existing_ids)}"
             )
         self._compartments.append(
-            CompartmentDef(id=id, label=label, description=description)
+            CompartmentDef(
+                id=id,
+                label=label,
+                description=description,
+                infective=infective,
+            )
         )
 
     # ----- Transmission edges ----------------------------------------------
+
+    def _resolve_compartment_id(self, name: str) -> str:
+        """
+        Resolve a compartment label or ID to its canonical short ID.
+
+        Matches case-insensitively against both ``CompartmentDef.id``
+        and ``CompartmentDef.label``.
+
+        Args:
+            name: Label or ID to resolve (e.g. ``"susceptible"`` or ``"S"``).
+
+        Returns:
+            The canonical compartment ID (e.g. ``"S"``).
+
+        Raises:
+            ValueError: If no matching compartment is found.
+        """
+        for c in self._compartments:
+            if c.id.lower() == name.lower() or c.label.lower() == name.lower():
+                return c.id
+        display = [f"{c.id} ({c.label})" for c in self._compartments]
+        raise ValueError(f"Unknown compartment '{name}'. Available: {sorted(display)}")
 
     def add_transmission_edge(
         self,
@@ -538,12 +613,15 @@ class ParameterSchemaBuilder:
         default_min: float | None = None,
         default_max: float | None = None,
         unit: str = "per day",
+        frequency_dependent: bool = False,
     ) -> None:
         """
         Add a directed transmission edge between two compartments.
 
         The ``source`` and ``target`` are matched against previously added
-        compartment IDs (case-insensitive).
+        compartment IDs or labels (case-insensitive).  The resolved short
+        IDs are stored as ``source_id`` and ``target_id`` on the edge for
+        direct use in derivative computations.
 
         The rate parameter is created internally with
         ``value_type=ValueType.RATE`` and ``name="transmission_rate"`` --
@@ -561,35 +639,24 @@ class ParameterSchemaBuilder:
             default_min: Default lower bound for variance / uncertainty.
             default_max: Default upper bound for variance / uncertainty.
             unit: Display unit (defaults to ``"per day"``).
+            frequency_dependent: If ``True``, the framework computes flow
+                as ``source * rate * sum(infective) / N_total`` instead
+                of the default ``rate * source``.  Use this for edges
+                where transmission depends on the proportion of infective
+                individuals in the population (e.g. S→I in SIR).
 
         Raises:
             ValueError: If source or target doesn't match a known compartment.
         """
-        # Build lookup from id and label (case-insensitive) so edges can
-        # reference compartments by either short id ("S") or full name
-        # ("susceptible").
-        valid_names: set[str] = set()
-        display_names: list[str] = []
-        for c in self._compartments:
-            valid_names.add(c.id.lower())
-            valid_names.add(c.label.lower())
-            display_names.append(f"{c.id} ({c.label})")
-
-        if source.lower() not in valid_names:
-            raise ValueError(
-                f"Unknown compartment '{source}' for edge source. "
-                f"Available: {sorted(display_names)}"
-            )
-        if target.lower() not in valid_names:
-            raise ValueError(
-                f"Unknown compartment '{target}' for edge target. "
-                f"Available: {sorted(display_names)}"
-            )
+        source_id = self._resolve_compartment_id(source)
+        target_id = self._resolve_compartment_id(target)
 
         self._transmission_edges.append(
             TransmissionEdgeDef(
                 source=source,
                 target=target,
+                source_id=source_id,
+                target_id=target_id,
                 variable_name=variable_name,
                 parameter=ParameterDef(
                     name="transmission_rate",
@@ -603,6 +670,7 @@ class ParameterSchemaBuilder:
                     default_max=default_max,
                     unit=unit,
                 ),
+                frequency_dependent=frequency_dependent,
             )
         )
 
@@ -812,6 +880,12 @@ class ParameterSchemaBuilder:
     def build(self) -> ModelParameterSchema:
         """
         Finalize and return the ``ModelParameterSchema``.
+
+        The schema contains only the compartments and edges explicitly
+        declared by the model author.  Cumulative ``_total`` tracking
+        compartments are added later by the framework in
+        :meth:`Model.__init_subclass__` so that the schema itself stays
+        a clean representation of the model author's declarations.
 
         Raises:
             ValueError: If ``set_model_info()`` was not called or no
