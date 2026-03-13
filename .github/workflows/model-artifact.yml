@@ -74,5 +74,5 @@ jobs:
             --table-name "${{ secrets.IMAGE_HASH_TABLE }}" \
             --item '{
               "image": {"S": "${{ matrix.disease_type }}-${{ github.ref_name }}"},
-              "hash":  {"S": "${{ steps.hash.outputs.sha256 }}"}
+              "artifact_hash":  {"S": "${{ steps.hash.outputs.sha256 }}"}
             }'
