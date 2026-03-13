@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-image:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -65,6 +65,18 @@ jobs:
           build-args: |
             MODEL_DIR=compartment/models/${{ matrix.disease_path }}/
 
+  generate-artifact:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        disease_path: [covid_jax_model, dengue_jax_model, mpox_jax_model]
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -87,6 +99,13 @@ jobs:
         run: |
           HASH=$(sha256sum artifact.json | awk '{ print $1 }')
           echo "sha256=${HASH}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to AWS
+        if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment'
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
+          aws-region: us-east-1
 
       - name: Upload artifact to S3
         if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment'
