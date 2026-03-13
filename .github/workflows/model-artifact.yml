@@ -55,8 +55,8 @@ jobs:
         if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment'
         run: |
           KEY="${{ steps.hash.outputs.sha256 }}.json"
-          RESPONSE=$(aws s3api head-object --bucket "${{ secrets.ARTIFACT_BUCKET }}" --key "$KEY" 2>&1)
-          EXIT_CODE=$?
+          RESPONSE=$(aws s3api head-object --bucket "${{ secrets.ARTIFACT_BUCKET }}" --key "$KEY" 2>&1) \
+            && EXIT_CODE=0 || EXIT_CODE=$?
           if [ $EXIT_CODE -eq 0 ]; then
             echo "Artifact ${KEY} already exists in S3, skipping upload."
           elif echo "$RESPONSE" | grep -q "404\|NoSuchKey\|Not Found"; then
