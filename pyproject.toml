@@ -23,3 +23,15 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["compartment"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=6.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]

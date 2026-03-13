@@ -18,13 +18,49 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib
+import inspect
 import json
 import sys
+from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
 # Model registry (mirrors the one in validation but avoids circular imports)
 # ---------------------------------------------------------------------------
+
+
+def _discover_model_from_dir(model_dir: str):
+    """Dynamically load a Model subclass from a model directory path.
+
+    Accepts paths like:
+      compartment/models/mpox_jax_model
+      compartment/models/mpox_jax_model/
+
+    Returns the Model subclass found in that directory's model.py.
+    """
+    from compartment.model import Model
+
+    folder_name = Path(model_dir.rstrip("/")).name
+    module_name = f"compartment.models.{folder_name}.model"
+
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError as e:
+        print(f"Error: Could not import '{module_name}': {e}", file=sys.stderr)
+        sys.exit(1)
+
+    candidates = [
+        obj
+        for _, obj in inspect.getmembers(module, inspect.isclass)
+        if issubclass(obj, Model) and obj is not Model and obj.__module__ == module_name
+    ]
+
+    if not candidates:
+        print(f"Error: No Model subclass found in '{module_name}'", file=sys.stderr)
+        sys.exit(1)
+
+    return candidates[0]
 
 
 def _get_model_class(disease_type: str):
@@ -105,6 +141,14 @@ def main():
         help="Write example config to this file (only with --example-config).",
     )
     parser.add_argument(
+        "--model-dir",
+        help=(
+            "Model folder path (e.g. compartment/models/mpox_jax_model). "
+            "Discovers the model class and disease_type dynamically via importlib, "
+            "eliminating the need for a hardcoded mapping table."
+        ),
+    )
+    parser.add_argument(
         "--list",
         action="store_true",
         dest="list_types",
@@ -114,7 +158,7 @@ def main():
     args = parser.parse_args()
 
     # --list mode
-    if args.list_types or args.disease_type is None:
+    if args.list_types or (args.disease_type is None and args.model_dir is None):
         available = _list_available()
         if available:
             print("Disease types with declarative parameter definitions:")
@@ -124,8 +168,11 @@ def main():
             print("No disease types have implemented define_parameters() yet.")
         return
 
-    # Resolve model class
-    model_class = _get_model_class(args.disease_type)
+    # Resolve model class — prefer --model-dir over positional disease_type
+    if args.model_dir:
+        model_class = _discover_model_from_dir(args.model_dir)
+    else:
+        model_class = _get_model_class(args.disease_type)
 
     try:
         schema = model_class._build_parameter_schema()

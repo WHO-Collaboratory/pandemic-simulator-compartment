@@ -1,0 +1,115 @@
+name: disease-pipeline
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        disease_path: [covid_jax_model, dengue_jax_model, mpox_jax_model]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify image builds when not a tag
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: docker build . -t pansim-compartment-${{ matrix.disease_path }}
+
+      - name: Log in to AWS
+        if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment' && startsWith(github.ref, 'refs/tags/')
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
+          aws-region: us-east-1
+
+      - name: Log in to ECR
+        if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment' && startsWith(github.ref, 'refs/tags/')
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image for lambda
+        if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment' && startsWith(github.ref, 'refs/tags/')
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ secrets.DOCKER_REGISTRY }}/pandemic-simulator-compartment/${{ matrix.disease_path }}:${{ github.ref_name }}
+          build-args: |
+            MODEL_DIR=compartment/models/${{ matrix.disease_path }}/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Generate model artifact
+        run: |
+          uv run python -m compartment.generate_artifact \
+            --model-dir compartment/models/${{ matrix.disease_path }} \
+            --output artifact.json
+
+      - name: Compute SHA256 hash
+        id: hash
+        run: |
+          HASH=$(sha256sum artifact.json | awk '{ print $1 }')
+          echo "sha256=${HASH}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact to S3
+        if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment'
+        run: |
+          KEY="${{ steps.hash.outputs.sha256 }}.json"
+          RESPONSE=$(aws s3api head-object --bucket "${{ secrets.ARTIFACT_BUCKET }}" --key "$KEY" 2>&1) \
+            && EXIT_CODE=0 || EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "Artifact ${KEY} already exists in S3, skipping upload."
+          elif echo "$RESPONSE" | grep -q "404\|NoSuchKey\|Not Found"; then
+            aws s3 cp artifact.json "s3://${{ secrets.ARTIFACT_BUCKET }}/${KEY}" \
+              --content-type application/json
+          else
+            echo "Unexpected error checking S3: ${RESPONSE}"
+            exit 1
+          fi
+
+      - name: Record artifact hash in DynamoDB
+        if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment'
+        run: |
+          aws dynamodb put-item \
+            --table-name "${{ secrets.IMAGE_HASH_TABLE }}" \
+            --item '{
+              "image": {"S": "pandemic-simulator-compartment/${{ matrix.disease_path }}:${{ github.ref_name }}"},
+              "artifact_hash": {"S": "${{ steps.hash.outputs.sha256 }}"}
+            }'
