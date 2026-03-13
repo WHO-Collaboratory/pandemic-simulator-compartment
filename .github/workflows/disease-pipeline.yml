@@ -110,6 +110,6 @@ jobs:
           aws dynamodb put-item \
             --table-name "${{ secrets.IMAGE_HASH_TABLE }}" \
             --item '{
-              "image": {"S": "pandemic-simulator-compartment/${{ matrix.disease_path }}:${{ github.ref_name }}"},
+              "image": {"S": "${{ matrix.disease_path }}:${{ github.ref_name }}"},
               "artifact_hash": {"S": "${{ steps.hash.outputs.sha256 }}"}
             }'
