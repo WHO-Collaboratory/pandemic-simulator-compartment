@@ -31,23 +31,34 @@ class MpoxJaxModel(Model):
         )
 
         schema.add_compartment(
-            "S", "Susceptible", "Population susceptible to Monkeypox infection"
+            "S",
+            "Susceptible",
+            "Population susceptible to Monkeypox infection",
         )
-        schema.add_compartment("I", "Infected", "Currently infected population")
-        schema.add_compartment("R", "Recovered", "Recovered and immune population")
-        schema.add_compartment("I_total", "Infected Total", "Total infected population")
+        schema.add_compartment(
+            "I",
+            "Infected",
+            "Currently infected population",
+            infective=True,
+        )
+        schema.add_compartment(
+            "R",
+            "Recovered",
+            "Recovered and immune population",
+        )
 
         schema.add_transmission_edge(
             source="susceptible",
             target="infected",
             variable_name="beta",
+            frequency_dependent=True,
             label="Transmission Rate (S->I)",
             description="Rate at which susceptible individuals become infected through contact with infected individuals",
             default=0.3,
-            min_value=0.01,
-            max_value=2.0,
             default_min=0.1,
             default_max=0.5,
+            min_value=0.01,
+            max_value=2.0,
             unit="per day",
         )
 
@@ -58,10 +69,10 @@ class MpoxJaxModel(Model):
             label="Recovery Rate (I->R)",
             description="Rate at which infected individuals recover and gain immunity",
             default=0.1,
-            min_value=0.01,
-            max_value=1.0,
             default_min=0.05,
             default_max=0.2,
+            min_value=0.01,
+            max_value=1.0,
             unit="per day",
         )
 
@@ -85,32 +96,32 @@ class MpoxJaxModel(Model):
     # Model interface
     # ------------------------------------------------------------------
 
-    def __init__(self, config):
+    def __init__(self, input):
         """Initialize the MPOX SIR model with a configuration dictionary"""
         # Population data
-        self.population_matrix = np.array(config["initial_population"]).T
+        self.population_matrix = np.array(input["initial_population"]).T
         self.compartment_list = list(self.COMPARTMENTS)
 
         # Transmission params (self.beta, self.gamma) are set
         # automatically from the schema edge variable_names.
-        self._load_transmission_params(config.get("transmission_dict", {}))
+        self._load_transmission_params(input.get("transmission_dict", {}))
 
         # Simulation parameters
-        self.start_date = config["start_date"]
+        self.start_date = input["start_date"]
         self.start_date_ordinal = self.start_date.toordinal()
-        self.n_timesteps = config["time_steps"]
+        self.n_timesteps = input["time_steps"]
 
         # Administrative units
-        self.admin_units = config["admin_units"]
+        self.admin_units = input["admin_units"]
 
         # Interventions
-        self.intervention_dict = config.get("intervention_dict", {})
+        self.intervention_dict = input.get("intervention_dict", {})
         self.intervention_statuses = {
             "mask_wearing": False,
             "vaccination": False,
         }
 
-        self.payload = config
+        self.payload = input
 
     # disease_type  — derived from schema (set_model_info)
     # COMPARTMENTS   — derived from schema (add_compartment)
@@ -133,21 +144,19 @@ class MpoxJaxModel(Model):
 
     def derivative(self, y, t, p):
         C = self.COMPARTMENTS
-        # Unpack parameters (order matches add_transmission_edge order)
-        beta, gamma = p
+        params = self._unpack_params(p)
 
         # Extract compartments by name from state vector
         states = {c: y[i] for i, c in enumerate(C)}
-        S = states[C.S]
         I = states[C.I]  # noqa: E741
-        R = states[C.R]
 
-        # Compute total population
-        N_total = S + I + R
+        # N_total for intervention threshold (non-_total compartments)
+        non_total = [c for c in C if not c.endswith("_total")]
+        N_total = sum(states[c] for c in non_total)
 
         # --- Interventions ---
         current_ordinal_day = self.start_date_ordinal + t
-        rates = {"beta": beta}
+        rates = {"beta": params["beta"]}
         prop_infective_scalar = I.sum() / (N_total.sum() + 1e-10)
 
         rates, self.intervention_statuses, _ = jax_timestep_intervention(
@@ -165,18 +174,10 @@ class MpoxJaxModel(Model):
             self.travel_matrix,
         )
 
-        beta = rates["beta"]
+        # Add non-intervention rates
+        rates["gamma"] = params["gamma"]
 
-        # Force of infection (simple frequency-dependent transmission)
-        lambda_force = (
-            beta * I / (N_total + 1e-10)
-        )  # Add small epsilon to avoid division by zero
-
-        # SIR derivatives
-        derivs = {}
-        derivs[C.S] = -S * lambda_force
-        derivs[C.I] = S * lambda_force - gamma * I
-        derivs[C.R] = gamma * I
-        derivs[C.I_total] = S * lambda_force
+        # Compute derivatives via declared edge flags — no lambdas needed.
+        derivs = self._compute_derivatives(states, rates)
 
         return np.stack([derivs[c] for c in C])
