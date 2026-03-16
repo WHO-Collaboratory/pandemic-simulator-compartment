@@ -1,6 +1,6 @@
 {
   "start_date": "2026-03-06",
-  "end_date": "2026-06-04",
+  "end_date": "2032-03-06",
   "Disease": {
     "disease_type": "MONKEYPOX",
     "transmission_edges": [
@@ -8,14 +8,21 @@
         "source": "susceptible",
         "target": "infected",
         "data": {
-          "transmission_rate": 0.3
+          "transmission_rate": 0.12
         }
       },
       {
         "source": "infected",
         "target": "recovered",
         "data": {
-          "transmission_rate": 0.1
+          "transmission_rate": 0.05
+        }
+      },
+      {
+        "source": "recovered",
+        "target": "susceptible",
+        "data": {
+          "transmission_rate": 0.005
         }
       }
     ]
@@ -27,20 +34,11 @@
   },
   "interventions": [
     {
-      "id": "mask_wearing",
-      "adherence_min": 30.0,
-      "transmission_percentage": 35.0,
-      "start_date": "2026-03-06",
-      "end_date": "2026-06-04",
-      "start_threshold": null,
-      "end_threshold": null
-    },
-    {
-      "id": "vaccination",
-      "adherence_min": 60.0,
-      "transmission_percentage": 80.0,
-      "start_date": "2026-03-06",
-      "end_date": "2026-06-04",
+      "id": "ring_vaccination",
+      "adherence_min": 70.0,
+      "transmission_percentage": 75.0,
+      "start_date": null,
+      "end_date": null,
       "start_threshold": null,
       "end_threshold": null
     }
@@ -52,7 +50,21 @@
         "center_lon": -74.006,
         "name": "Example Zone",
         "population": 1000000,
-        "infected_population": 1
+        "infected_population": 0.01
+      },
+      {
+        "center_lat": 34.0522,
+        "center_lon": -118.2437,
+        "name": "Example Zone 2",
+        "population": 2000000,
+        "infected_population": 0.01
+      },
+      {
+        "center_lat": 41.8781,
+        "center_lon": -87.6298,
+        "name": "Example Zone 3",
+        "population": 1500000,
+        "infected_population": 0.01
       }
     ]
   }
