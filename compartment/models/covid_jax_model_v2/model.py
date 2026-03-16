@@ -2,7 +2,6 @@ import jax.numpy as np
 import logging
 import numpy as onp
 from compartment.helpers import setup_logging, prepare_covid_initial_state
-from compartment.interventions import jax_timestep_intervention, jax_prop_intervention
 from compartment.model import Model
 
 # Initialize logging
@@ -14,26 +13,31 @@ class CovidJaxModelV2(Model):
     """A class representing a compartmental model with dynamic travel and intervention mechanisms"""
 
     def __init__(self, config):
-        """Initialize the CompartmentalModel with a configuration dictionary"""
-        # Load population and travel data
+        """Initialize the COVID v2 compartmental model.
+
+        Common fields (start_date, transmission params, intervention_dict,
+        Intervention objects, etc.) are extracted by ``super().__init__()``.
+        Model-specific fields are set here.
+        """
+        super().__init__(config)
+
+        # COVID v2 population matrix is NOT transposed (prepare_covid_initial_state
+        # handles the reshaping internally).  Override the base class .T:
         self.population_matrix = np.array(config["initial_population"])
+
+        # COVID v2 uses runtime compartment list (may exclude optional compartments)
+        self.compartment_list = config["compartment_list"]
+
+        # Travel
         self.travel_matrix = np.fill_diagonal(
             np.array(config["travel_matrix"]), 1.0, inplace=False
         )
-        self.compartment_list = config["compartment_list"]
         self.sigma = config["travel_volume"]["leaving"]
 
-        # Load disease transmission parameters from schema edge declarations
-        self._load_transmission_params(config.get("transmission_dict", {}))
+        # Save original rates for reference
         self.original_rates = {"beta": self.beta}
 
-        # Simulation parameters
-        self.start_date = config["start_date"]
-        self.start_date_ordinal = self.start_date.toordinal()
-        self.n_timesteps = config["time_steps"]
-
-        # Administrative units & demographics
-        self.admin_units = config["admin_units"]
+        # Demographics & age stratification
         self.demographics = config["case_file"]["demographics"]
         self.age_stratification = list(self.demographics.values())
         self.age_groups = list(self.demographics.keys())
@@ -41,16 +45,11 @@ class CovidJaxModelV2(Model):
             [[5.46, 5.18, 0.93], [1.70, 9.18, 1.68], [0.83, 5.90, 3.80]]
         )
 
-        # Interventions
-        self.intervention_dict = config["intervention_dict"]
-        self.intervention_statuses = {
-            "lock_down": False,
-            "mask_wearing": False,
-            "social_isolation": False,
-            "vaccination": False,
-        }
-
-        self.payload = config
+        # Add lock_down and vaccination statuses (not in define_parameters
+        # but needed for backward compat with the old intervention system
+        # and post-processing).
+        self.intervention_statuses["lock_down"] = False
+        self.intervention_statuses["vaccination"] = False
 
     @classmethod
     def define_parameters(cls, schema):
@@ -178,6 +177,7 @@ class CovidJaxModelV2(Model):
             id="mask_wearing",
             label="Mask Wearing",
             description="Reduces transmission rate through mask usage in the population",
+            target_rates=["beta"],
             adherence=20.0,
             transmission_reduction=35.0,
         )
@@ -186,6 +186,7 @@ class CovidJaxModelV2(Model):
             id="social_isolation",
             label="Social Isolation",
             description="Reduces transmission rate through social distancing and isolation measures",
+            target_rates=["beta"],
             adherence=40.0,
             transmission_reduction=50.0,
         )
@@ -260,23 +261,11 @@ class CovidJaxModelV2(Model):
         N_total = sum(pop_terms).sum(axis=0)
         I_frac = I / N_total[None, :]
 
-        # --- Interventions (only beta is subject to interventions) ---
-        current_ordinal_day = self.start_date_ordinal + t
+        # --- Interventions (schema-driven via Intervention objects) ---
         rates = {"beta": params["beta"]}
         prop_infective_scalar = I.sum() / N_total.sum()
-        rates, self.intervention_statuses, contact_matrix = jax_timestep_intervention(
-            self.intervention_dict,
-            current_ordinal_day,
-            rates,
-            self.intervention_statuses,
-            self.travel_matrix,
-        )
-        rates, self.intervention_statuses, contact_matrix = jax_prop_intervention(
-            self.intervention_dict,
-            prop_infective_scalar,
-            rates,
-            self.intervention_statuses,
-            self.travel_matrix,
+        rates, contact_matrix = self._apply_interventions(
+            t, rates, prop_infective_scalar
         )
 
         # Non-intervention rates (all standard edges)

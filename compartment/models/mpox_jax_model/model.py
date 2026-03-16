@@ -1,9 +1,6 @@
 import jax.numpy as np
-import jax
-import numpy as onp
 import logging
 from compartment.helpers import setup_logging
-from compartment.interventions import jax_timestep_intervention, jax_prop_intervention
 from compartment.model import Model
 
 # Initialize logging
@@ -80,6 +77,7 @@ class MpoxJaxModel(Model):
             id="mask_wearing",
             label="Mask Wearing",
             description="Reduces transmission rate through mask usage in the population",
+            target_rates=["beta"],
             adherence=30.0,
             transmission_reduction=35.0,
         )
@@ -88,6 +86,7 @@ class MpoxJaxModel(Model):
             id="vaccination",
             label="Vaccination",
             description="Reduces transmission rate through immunization of susceptible population",
+            target_rates=["beta"],
             adherence=60.0,
             transmission_reduction=80.0,
         )
@@ -97,31 +96,13 @@ class MpoxJaxModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, input):
-        """Initialize the MPOX SIR model with a configuration dictionary"""
-        # Population data
-        self.population_matrix = np.array(input["initial_population"]).T
-        self.compartment_list = list(self.COMPARTMENTS)
+        """Initialize the MPOX SIR model with a configuration dictionary.
 
-        # Transmission params (self.beta, self.gamma) are set
-        # automatically from the schema edge variable_names.
-        self._load_transmission_params(input.get("transmission_dict", {}))
-
-        # Simulation parameters
-        self.start_date = input["start_date"]
-        self.start_date_ordinal = self.start_date.toordinal()
-        self.n_timesteps = input["time_steps"]
-
-        # Administrative units
-        self.admin_units = input["admin_units"]
-
-        # Interventions
-        self.intervention_dict = input.get("intervention_dict", {})
-        self.intervention_statuses = {
-            "mask_wearing": False,
-            "vaccination": False,
-        }
-
-        self.payload = input
+        Common fields (population_matrix, start_date, transmission params,
+        intervention_dict, intervention_statuses, Intervention objects,
+        etc.) are extracted by ``super().__init__()`` from the schema.
+        """
+        super().__init__(input)
 
     # disease_type  — derived from schema (set_model_info)
     # COMPARTMENTS   — derived from schema (add_compartment)
@@ -154,25 +135,10 @@ class MpoxJaxModel(Model):
         non_total = [c for c in C if not c.endswith("_total")]
         N_total = sum(states[c] for c in non_total)
 
-        # --- Interventions ---
-        current_ordinal_day = self.start_date_ordinal + t
+        # --- Interventions (schema-driven via Intervention objects) ---
         rates = {"beta": params["beta"]}
         prop_infective_scalar = I.sum() / (N_total.sum() + 1e-10)
-
-        rates, self.intervention_statuses, _ = jax_timestep_intervention(
-            self.intervention_dict,
-            current_ordinal_day,
-            rates,
-            self.intervention_statuses,
-            self.travel_matrix,
-        )
-        rates, self.intervention_statuses, _ = jax_prop_intervention(
-            self.intervention_dict,
-            prop_infective_scalar,
-            rates,
-            self.intervention_statuses,
-            self.travel_matrix,
-        )
+        rates, _ = self._apply_interventions(t, rates, prop_infective_scalar)
 
         # Add non-intervention rates
         rates["gamma"] = params["gamma"]
