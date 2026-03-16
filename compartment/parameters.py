@@ -281,11 +281,21 @@ class InterventionDef:
     Defines a supported intervention type and its configurable parameters.
 
     Example: social_isolation with adherence, transmission_percentage, etc.
+
+    ``target_rates`` declares which transmission-edge variable names this
+    intervention modifies (e.g. ``["beta"]``).  At runtime the
+    ``Intervention`` class reads this list and applies the reduction
+    formula only to those rates — no per-disease if/else branching.
+
+    If ``modifies_travel`` is ``True`` the intervention replaces the
+    travel matrix with an identity matrix when active (lockdown behavior).
     """
 
     id: str  # "social_isolation", "vaccination", ...
     label: str  # "Social Isolation"
     description: str
+    target_rates: list[str] = field(default_factory=list)  # e.g. ["beta"]
+    modifies_travel: bool = False  # lockdown: replace travel matrix with I
     parameters: list[ParameterDef] = field(
         default_factory=_intervention_shared_parameters
     )
@@ -295,6 +305,8 @@ class InterventionDef:
             "id": self.id,
             "label": self.label,
             "description": self.description,
+            "target_rates": self.target_rates,
+            "modifies_travel": self.modifies_travel,
             "parameters": [p.to_dict() for p in self.parameters],
         }
 
@@ -681,6 +693,8 @@ class ParameterSchemaBuilder:
         id: str,
         label: str,
         description: str,
+        target_rates: list[str] | None = None,
+        modifies_travel: bool = False,
         adherence: float | None = None,
         transmission_reduction: float | None = None,
     ) -> None:
@@ -692,10 +706,24 @@ class ParameterSchemaBuilder:
         ``transmission_reduction`` to override the generic defaults with
         disease-specific values.
 
+        ``target_rates`` declares which transmission-edge variable names
+        this intervention modifies at runtime (e.g. ``["beta"]``).  This
+        eliminates the hardcoded per-disease if/else chains in
+        ``interventions.py``.
+
+        Set ``modifies_travel=True`` for lockdown-style interventions that
+        replace the travel matrix with an identity matrix when active.
+
         Args:
             id: Machine key (e.g. ``"social_isolation"``, ``"vaccination"``).
             label: Human-readable name (e.g. ``"Social Isolation"``).
             description: Explanation shown in the UI.
+            target_rates: Variable names of transmission edges this
+                intervention modifies (e.g. ``["beta"]``).  Defaults to
+                an empty list (intervention has no rate effect, e.g.
+                lockdown only modifies travel).
+            modifies_travel: If ``True``, replaces the travel matrix with
+                identity when the intervention is active (lockdown).
             adherence: Default population adherence percentage (0-100).
                 Overrides the generic 50% default on ``adherence_min``.
             transmission_reduction: Default transmission reduction percentage
@@ -717,7 +745,12 @@ class ParameterSchemaBuilder:
 
         self._interventions.append(
             InterventionDef(
-                id=id, label=label, description=description, parameters=params
+                id=id,
+                label=label,
+                description=description,
+                target_rates=target_rates or [],
+                modifies_travel=modifies_travel,
+                parameters=params,
             )
         )
 

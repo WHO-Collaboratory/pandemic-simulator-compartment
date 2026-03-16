@@ -16,6 +16,7 @@ from compartment.parameters import (
     ParameterSchemaBuilder,
     ValueType,
 )
+from compartment.runtime import Intervention, TransmissionEdge
 
 # Re-export so model authors can write:
 #   from compartment.model import Model, ValueType
@@ -119,8 +120,65 @@ class Model(ABC):
                 )
                 seen_targets.add(tid)
 
-    def __init__(self, config: dict):
+    def __init__(self, config):
+        """
+        Initialize common model state from config.
+
+        For **migrated models** (those with a cached parameter schema),
+        calling ``super().__init__(config)`` extracts the common fields
+        every model needs:
+
+        - ``population_matrix``, ``compartment_list``
+        - ``start_date``, ``start_date_ordinal``, ``n_timesteps``
+        - ``admin_units``, ``payload``
+        - Transmission params (``self.beta``, ``self.gamma``, etc.)
+        - ``intervention_dict`` (kept for post-processing compat)
+        - ``interventions`` — list of :class:`Intervention` runtime objects
+        - ``intervention_statuses`` — auto-generated from schema
+
+        **Non-migrated models** that don't call ``super().__init__()``
+        are unaffected — they continue to extract fields manually.
+
+        Subclasses override ``__init__`` and call ``super().__init__(config)``
+        first, then add model-specific fields (travel matrix, demographics,
+        etc.).
+        """
         self.config = config
+
+        schema = type(self)._get_cached_schema()
+        if not schema:
+            # Non-migrated model — subclass handles everything.
+            return
+
+        # -- Common fields (identical across all migrated models) --
+        self.population_matrix = jnp.array(config["initial_population"]).T
+        self.compartment_list = list(self.COMPARTMENTS)
+        self.start_date = config["start_date"]
+        self.start_date_ordinal = self.start_date.toordinal()
+        self.n_timesteps = config["time_steps"]
+        self.admin_units = config["admin_units"]
+        self.payload = config
+
+        # Transmission params: self.beta, self.gamma, etc.
+        self._load_transmission_params(config.get("transmission_dict", {}))
+
+        # -- Interventions --
+        self.intervention_dict = config.get("intervention_dict", {})
+
+        # Build runtime Intervention objects from schema defs + config
+        self.interventions: list[Intervention] = []
+        for intv_def in schema.interventions:
+            if intv_def.id in self.intervention_dict:
+                self.interventions.append(
+                    Intervention.from_config(
+                        intv_def, self.intervention_dict[intv_def.id]
+                    )
+                )
+
+        # Auto-generate statuses from schema intervention declarations
+        self.intervention_statuses = {
+            intv_def.id: False for intv_def in schema.interventions
+        }
 
     # ------------------------------------------------------------------
     # Schema-derived properties
@@ -517,6 +575,83 @@ class Model(ABC):
         total_key = f"{target_id}_total"
         if total_key in derivs:
             derivs[total_key] = derivs[total_key] + flow
+
+    def _apply_interventions(
+        self,
+        t: Any,
+        rates: dict[str, Any],
+        prop_infective: Any,
+    ) -> tuple[dict[str, Any], Any]:
+        """
+        Apply all declared interventions to rates and travel matrix.
+
+        Replicates the original two-pass structure from
+        ``interventions.py``: first date-based activation + rate
+        reduction, then threshold-based activation + rate reduction.
+        A single intervention can reduce a rate **twice** — once via
+        date window and once via threshold — matching the original
+        behavior where ``jax_timestep_intervention`` modifies rates
+        and then ``jax_prop_intervention`` takes the already-modified
+        rates and potentially reduces them further.
+
+        Requires ``self.start_date_ordinal``, ``self.intervention_statuses``,
+        and ``self.travel_matrix`` to be set (the first two are set by
+        ``super().__init__()``; travel_matrix is set by the subclass or
+        ``prepare_initial_state()``).
+
+        Args:
+            t: Current time step (passed to derivative by the solver).
+            rates: Dict of rate variable names → current values.
+                Only rates targeted by interventions are modified.
+            prop_infective: Proportion of infective population (scalar).
+
+        Returns:
+            Tuple of (modified rates dict, modified travel_matrix).
+        """
+        current_ordinal_day = self.start_date_ordinal + t
+        travel_matrix = self.travel_matrix
+
+        # Only apply interventions that are present in intervention_dict.
+        # The runner creates a "model_without" by setting
+        # intervention_dict = {}, which disables all interventions.
+        active_interventions = [
+            intv for intv in self.interventions if intv.id in self.intervention_dict
+        ]
+
+        # Pass 1: Date-based activation + rate reduction
+        # (replicates jax_timestep_intervention)
+        # In the original code, _update_date applies rate reduction
+        # based on `in_window` (not the persisted status), so the
+        # reduction only applies during the date window.
+        for intv in active_interventions:
+            status = self.intervention_statuses.get(intv.id, False)
+            apply_flag, new_status = intv.check_date_activation(
+                current_ordinal_day, status
+            )
+            rates = intv.apply_to_rates(rates, apply_flag)
+            travel_matrix = intv.apply_to_travel(travel_matrix, apply_flag)
+            self.intervention_statuses = {
+                **self.intervention_statuses,
+                intv.id: new_status,
+            }
+
+        # Pass 2: Threshold-based activation + rate reduction
+        # (replicates jax_prop_intervention)
+        # In the original code, _update_one applies rate reduction
+        # based on `new_status` (the hysteresis-updated status), so
+        # the reduction persists as long as the status is active.
+        for intv in active_interventions:
+            status = self.intervention_statuses.get(intv.id, False)
+            new_status = intv.check_threshold_activation(prop_infective, status)
+            rates = intv.apply_to_rates(rates, new_status)
+            travel_matrix = intv.apply_to_travel(travel_matrix, new_status)
+            self.intervention_statuses = {
+                **self.intervention_statuses,
+                intv.id: new_status,
+            }
+
+        self.travel_matrix = travel_matrix
+        return rates, travel_matrix
 
     # ------------------------------------------------------------------
     # Model interface
