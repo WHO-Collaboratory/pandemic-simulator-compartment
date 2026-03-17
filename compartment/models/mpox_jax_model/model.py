@@ -117,6 +117,9 @@ class MpoxJaxModel(Model):
         # automatically from the schema edge variable_names.
         self._load_transmission_params(input.get("transmission_dict", {}))
 
+        if self.omega is None:
+            self.omega = 1 / 60
+
         # Simulation parameters
         self.start_date = input["start_date"]
         self.start_date_ordinal = self.start_date.toordinal()
