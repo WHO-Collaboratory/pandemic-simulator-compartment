@@ -37,8 +37,8 @@
       "id": "ring_vaccination",
       "adherence_min": 70.0,
       "transmission_percentage": 75.0,
-      "start_date": null,
-      "end_date": null,
+      "start_date": "2026-03-06",
+      "end_date": "2028-03-06",
       "start_threshold": null,
       "end_threshold": null
     }
