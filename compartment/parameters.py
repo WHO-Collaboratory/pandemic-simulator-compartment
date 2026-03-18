@@ -626,6 +626,7 @@ class ParameterSchemaBuilder:
         default_max: float | None = None,
         unit: str = "per day",
         frequency_dependent: bool = False,
+        value_type: ValueType = ValueType.RATE,
     ) -> None:
         """
         Add a directed transmission edge between two compartments.
@@ -635,9 +636,16 @@ class ParameterSchemaBuilder:
         IDs are stored as ``source_id`` and ``target_id`` on the edge for
         direct use in derivative computations.
 
-        The rate parameter is created internally with
-        ``value_type=ValueType.RATE`` and ``name="transmission_rate"`` --
-        these are part of the transmission edge contract.
+        All numeric arguments (``default``, ``min_value``, ``max_value``,
+        ``default_min``, ``default_max``) should be in the **native units**
+        of the chosen ``value_type``:
+
+        - ``ValueType.RATE``: per-day rate (e.g. ``0.3``).
+        - ``ValueType.DAYS``: duration in days (e.g. ``5``).  The framework
+          converts to a rate (``1 / days``) at model load time.
+        - ``ValueType.PERCENTAGE``: percentage 0-100 (e.g. ``4``).  The
+          framework converts to a fraction (``value / 100``) at model load
+          time.
 
         Args:
             source: Source compartment (e.g. ``"susceptible"``).
@@ -645,17 +653,19 @@ class ParameterSchemaBuilder:
             variable_name: Model attribute name (e.g. ``"beta"``).
             label: Human-readable edge label (e.g. ``"Transmission Rate (S->I)"``).
             description: Tooltip text for the UI.
-            default: Default rate value.
-            min_value: Hard minimum for validation.
-            max_value: Hard maximum for validation.
-            default_min: Default lower bound for variance / uncertainty.
-            default_max: Default upper bound for variance / uncertainty.
+            default: Default value in native units of ``value_type``.
+            min_value: Hard minimum for validation (native units).
+            max_value: Hard maximum for validation (native units).
+            default_min: Default lower bound for variance / uncertainty (native units).
+            default_max: Default upper bound for variance / uncertainty (native units).
             unit: Display unit (defaults to ``"per day"``).
             frequency_dependent: If ``True``, the framework computes flow
                 as ``source * rate * sum(infective) / N_total`` instead
                 of the default ``rate * source``.  Use this for edges
                 where transmission depends on the proportion of infective
                 individuals in the population (e.g. S→I in SIR).
+            value_type: The unit system for this edge's value.  Defaults
+                to ``ValueType.RATE``.
 
         Raises:
             ValueError: If source or target doesn't match a known compartment.
@@ -674,7 +684,7 @@ class ParameterSchemaBuilder:
                     name="transmission_rate",
                     label=label,
                     description=description,
-                    value_type=ValueType.RATE,
+                    value_type=value_type,
                     default=default,
                     min_value=min_value,
                     max_value=max_value,
