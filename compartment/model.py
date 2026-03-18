@@ -378,11 +378,26 @@ class Model(ABC):
     # Runtime helpers for schema-driven models
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _to_rate(value: float, value_type) -> float:
+        """Convert a native-unit value to a per-day rate for ODE computation."""
+        from compartment.parameters import ValueType
+
+        if value_type == ValueType.DAYS:
+            return 1.0 / value if value > 0 else 0.0
+        elif value_type == ValueType.PERCENTAGE:
+            return value / 100.0
+        return value
+
     def _load_transmission_params(self, transmission_dict: dict) -> None:
         """
         Set transmission-rate attributes (e.g. ``self.beta``, ``self.gamma``)
         from the config's ``transmission_dict``, using variable names
         declared in the parameter schema.
+
+        Values are stored in **native units** (days, percentages, or raw
+        rates) and converted to per-day rates here based on each edge's
+        ``value_type``.
 
         Call this from ``__init__`` instead of manually extracting each
         parameter by name.
@@ -400,11 +415,12 @@ class Model(ABC):
                 "Implement define_parameters() or load params manually."
             )
         for edge in schema.transmission_edges:
-            setattr(
-                self,
-                edge.variable_name,
-                transmission_dict.get(edge.variable_name),
-            )
+            raw = transmission_dict.get(edge.variable_name)
+            if raw is not None:
+                rate = self._to_rate(raw, edge.parameter.value_type)
+            else:
+                rate = None
+            setattr(self, edge.variable_name, rate)
 
     def get_params(self):
         """
