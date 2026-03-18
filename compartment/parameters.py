@@ -438,8 +438,8 @@ class ModelParameterSchema:
 
         # --- Admin unit stub ---
         admin0_id = "USA"
-        config["admin_unit_0_id"] = admin0_id
-        config["AdminUnit0"] = {"id": admin0_id, "center_lat": 37.0902}
+        config["admin_unit_id"] = admin0_id
+        config["AdminUnit"] = {"id": admin0_id, "center_lat": 37.0902}
 
         # --- Travel volume ---
         if self.travel_volume:

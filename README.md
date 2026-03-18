@@ -59,15 +59,17 @@ Configuration files define the parameters for running simulations. These JSON fi
 
 All configuration files must include the following shared fields:
 
-- **`admin_unit_0_id`** (string): Identifier for the primary administrative unit (e.g., country code like "DEU")
+- **`admin_unit_id`** (string): Identifier for the selected administrative unit (the deepest level selected, e.g., country code "DEU" or sub-region "DEU.1_1")
 - **`start_date`** (string): Simulation start date in ISO format (YYYY-MM-DD)
 - **`end_date`** (string): Simulation end date in ISO format (YYYY-MM-DD), must be on or after `start_date`
 - **`simulation_type`** (string): Must be `"COMPARTMENTAL"`
 - **`run_mode`** (string): Either `"DETERMINISTIC"` or `"UNCERTAINTY"` for uncertainty quantification
 - **`time_steps`** (integer): Number of time steps to run the simulation (must be > 0)
-- **`AdminUnit0`** (object): Primary administrative unit with:
+- **`AdminUnit`** (object): The selected administrative unit with:
   - `id` (string): Unit identifier
   - `center_lat` (float): Latitude of the unit center (-90 to 90). Used for selecting hemisphere for the dengue model.
+  - `admin_level` (integer, optional): The admin level (0=country, 1=state/province, 2=district)
+  - `ParentAdminUnit` (object, optional): Parent administrative unit (same structure, recursive). Used to traverse the admin unit hierarchy.
 - **`Disease`** (object): Disease-specific configuration (see below)
 - **`case_file`** (object): Population and geographic data with:
   - `admin_zones` (array): List of administrative zones, each containing:
@@ -80,10 +82,6 @@ All configuration files must include the following shared fields:
 
 ### Optional Fields (covid_jax_model and dengue_jax_model)
 
-- **`admin_unit_1_id`** (string, default: `""`): Secondary administrative unit identifier used by the webapp.
-- **`admin_unit_2_id`** (string, default: `""`): Tertiary administrative unit identifier used by the webapp.
-- **`AdminUnit1`** (object, optional): Secondary administrative unit (same structure as `AdminUnit0`) a major administrative territory within a country, like a state or prefacture.
-- **`AdminUnit2`** (object, optional): Tertiary administrative unit (same structure as `AdminUnit0`) a minor administrative territory within a level 1 admin unit, such as a county or ward.
 - **`id`** (string, optional): Simulation identifier, random string used by the web application.
 - **`simulation_name`** (string, default: `""`): Friendly name for the simulation, used by the web application for display.
 - **`owner`** (string, optional): Owner identifier, used by the web application.
