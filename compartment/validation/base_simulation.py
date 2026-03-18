@@ -20,9 +20,13 @@ class TravelVolume(BaseModel):
             v = v / 100.0
         return v
 
+
 class AdminUnit(BaseModel):
     id: str
     center_lat: float = Field(ge=-90, le=90)
+    admin_level: Optional[int] = None
+    ParentAdminUnit: Optional["AdminUnit"] = None
+
 
 class CaseFileDemographics(BaseModel):
     age_0_17: float = Field(default=25.0, ge=0, le=100)
@@ -32,8 +36,8 @@ class CaseFileDemographics(BaseModel):
 
 class CaseFileAdminZone(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
-    #admin_code: Optional[str] = None
-    #admin_iso_code: Optional[str] = None
+    # admin_code: Optional[str] = None
+    # admin_iso_code: Optional[str] = None
     admin_level: Optional[int] = None
     center_lat: float = Field(ge=-90, le=90)
     center_lon: float = Field(ge=-180, le=180)
@@ -42,34 +46,39 @@ class CaseFileAdminZone(BaseModel):
     name: str
 
     population: int = Field(ge=0)
-    #osm_id: Optional[List[str]] = None
+    # osm_id: Optional[List[str]] = None
 
-    infected_population: float = Field(default=0.05, ge=0, le=100) # Covid: infected population, Dengue: first infection
-    seroprevalence: Optional[float] = Field(default=10.0, ge=0, le=100) # Dengue: susceptible to second infection
+    infected_population: float = Field(
+        default=0.05, ge=0, le=100
+    )  # Covid: infected population, Dengue: first infection
+    seroprevalence: Optional[float] = Field(
+        default=10.0, ge=0, le=100
+    )  # Dengue: susceptible to second infection
     temp_min: Optional[float] = Field(default=15)
     temp_max: Optional[float] = Field(default=30)
     temp_mean: Optional[float] = Field(default=25)
+
 
 class CaseFile(BaseModel):
     admin_zones: List[CaseFileAdminZone]
     demographics: CaseFileDemographics = CaseFileDemographics()
 
+
 class BaseSimulationShared(BaseModel):
     """
     Shared fields for all disease simulations (COVID, Dengue, etc.).
     """
-    model_config = ConfigDict(extra="ignore") # "forbid" would raise an error for unknown fields
+
+    model_config = ConfigDict(
+        extra="ignore"
+    )  # "forbid" would raise an error for unknown fields
 
     id: Optional[str] = None
     simulation_name: str = ""
 
-    # Admin units
-    admin_unit_0_id: str
-    admin_unit_1_id: str = ""
-    admin_unit_2_id: str = ""
-    AdminUnit0: AdminUnit
-    AdminUnit1: Optional[AdminUnit] = None
-    AdminUnit2: Optional[AdminUnit] = None
+    # Admin unit (stores deepest selected level; parent info derived via hierarchy)
+    admin_unit_id: str
+    AdminUnit: AdminUnit
 
     # Owner & meta
     owner: Optional[str] = None

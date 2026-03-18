@@ -2,9 +2,7 @@
     "data": {
         "getSimulationJob": {
             "id": "43d96740-3ed4-494f-93ee-0a2ce2686e57",
-            "admin_unit_0_id": "MDG",
-            "admin_unit_1_id": "MDG.1_1",
-            "admin_unit_2_id": "",
+            "admin_unit_id": "MDG.1_1",
             "createdAt": "2025-10-22T19:10:01.939Z",
             "disease_id": "e2f49c5a-346b-446a-948f-b1ad292ecb48",
             "end_date": "2026-10-22",
@@ -22,15 +20,16 @@
                 "returning": 10.0
             },
             "updatedAt": "2025-10-22T19:11:18.144Z",
-            "AdminUnit0": {
-                "id": "MDG",
-                "center_lat": -19.37564815173127
-            },
-            "AdminUnit1": {
+            "AdminUnit": {
                 "id": "MDG.1_1",
-                "center_lat": -18.93585290187204
+                "center_lat": -18.93585290187204,
+                "admin_level": 1,
+                "ParentAdminUnit": {
+                    "id": "MDG",
+                    "center_lat": -19.37564815173127,
+                    "admin_level": 0
+                }
             },
-            "AdminUnit2": null,
             "Disease": {
                 "id": "e2f49c5a-346b-446a-948f-b1ad292ecb48",
                 "createdAt": "2025-10-22T19:10:01.719Z",

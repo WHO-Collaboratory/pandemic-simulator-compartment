@@ -1,9 +1,7 @@
 GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
   getSimulationJob(id: $id) {
     id
-    admin_unit_0_id
-    admin_unit_1_id
-    admin_unit_2_id
+    admin_unit_id
     createdAt
     disease_id
     end_date
@@ -21,17 +19,20 @@ GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
       returning
     }
     updatedAt
-    AdminUnit0 {
+    AdminUnit {
       id
       center_lat
-    }
-    AdminUnit1 {
-      id
-      center_lat
-    }
-    AdminUnit2 {
-      id
-      center_lat
+      admin_level
+      ParentAdminUnit {
+        id
+        center_lat
+        admin_level
+        ParentAdminUnit {
+          id
+          center_lat
+          admin_level
+        }
+      }
     }
     Disease {
       id

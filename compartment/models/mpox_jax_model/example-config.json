@@ -27,8 +27,8 @@
       }
     ]
   },
-  "admin_unit_0_id": "USA",
-  "AdminUnit0": {
+  "admin_unit_id": "USA",
+  "AdminUnit": {
     "id": "USA",
     "center_lat": 37.0902
   },

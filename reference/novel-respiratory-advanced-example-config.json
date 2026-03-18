@@ -1,9 +1,9 @@
 {
-    "admin_unit_0_id": "MDG",
+    "admin_unit_id": "MDG",
     "start_date": "2025-11-18",
     "end_date": "2025-12-18",
     "run_mode": "UNCERTAINTY",
-    "AdminUnit0": {
+    "AdminUnit": {
         "id": "MDG",
         "center_lat": -19.37564815173127
     },
