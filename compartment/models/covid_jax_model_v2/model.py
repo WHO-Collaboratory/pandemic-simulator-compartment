@@ -3,6 +3,7 @@ import logging
 import numpy as onp
 from compartment.helpers import setup_logging, prepare_covid_initial_state
 from compartment.model import Model
+from compartment.parameters import ValueType
 
 # Initialize logging
 setup_logging()
@@ -100,12 +101,15 @@ class CovidJaxModelV2(Model):
             source="exposed",
             target="infected",
             variable_name="theta",
-            label="Incubation Rate (E->I)",
-            description="Rate at which exposed individuals become infectious",
-            default=0.2,
-            min_value=0.01,
-            max_value=1.0,
-            unit="per day",
+            label="Incubation Period (E->I)",
+            description="Average number of days from exposure to becoming infectious",
+            default=5.0,
+            min_value=1.0,
+            max_value=100.0,
+            default_min=2.0,
+            default_max=14.0,
+            unit="days",
+            value_type=ValueType.DAYS,
         )
 
         schema.add_transmission_edge(
@@ -113,13 +117,14 @@ class CovidJaxModelV2(Model):
             target="hospitalized",
             variable_name="zeta",
             label="Hospitalization Rate (I->H)",
-            description="Rate at which infected individuals require hospitalization",
-            default=0.0004,
-            min_value=0.0001,
-            max_value=0.01,
-            default_min=0.0004,
-            default_max=0.004,
-            unit="per day",
+            description="Percentage of infected individuals who require hospitalization",
+            default=0.04,
+            min_value=0.01,
+            max_value=1.0,
+            default_min=0.04,
+            default_max=0.4,
+            unit="%",
+            value_type=ValueType.PERCENTAGE,
         )
 
         schema.add_transmission_edge(
@@ -145,6 +150,8 @@ class CovidJaxModelV2(Model):
             default=0.001,
             min_value=0.0001,
             max_value=0.01,
+            default_min=0.001,
+            default_max=0.005,
             unit="per day",
         )
 
@@ -152,24 +159,30 @@ class CovidJaxModelV2(Model):
             source="infected",
             target="recovered",
             variable_name="gamma",
-            label="Recovery Rate (I->R)",
-            description="Rate at which infected individuals recover and gain immunity",
-            default=0.14,
-            min_value=0.01,
-            max_value=1.0,
-            unit="per day",
+            label="Recovery Period (I->R)",
+            description="Average number of days for an infected individual to recover",
+            default=7.14,
+            min_value=1.0,
+            max_value=100.0,
+            default_min=4.0,
+            default_max=10.0,
+            unit="days",
+            value_type=ValueType.DAYS,
         )
 
         schema.add_transmission_edge(
             source="hospitalized",
             target="recovered",
             variable_name="eta",
-            label="Hospital Recovery Rate (H->R)",
-            description="Rate at which hospitalized individuals recover",
-            default=0.14,
-            min_value=0.01,
-            max_value=1.0,
-            unit="per day",
+            label="Hospital Recovery Period (H->R)",
+            description="Average number of days for a hospitalized individual to recover",
+            default=7.14,
+            min_value=1.0,
+            max_value=100.0,
+            default_min=3.0,
+            default_max=14.0,
+            unit="days",
+            value_type=ValueType.DAYS,
         )
 
         # ---- Interventions ----

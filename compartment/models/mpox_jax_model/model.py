@@ -4,6 +4,7 @@ import numpy as onp
 import logging
 from compartment.helpers import setup_logging
 from compartment.model import Model
+from compartment.parameters import ValueType
 
 # Initialize logging
 setup_logging()
@@ -71,28 +72,30 @@ class MpoxJaxModel(Model):
             source="infected",
             target="recovered",
             variable_name="gamma",
-            label="Recovery Rate (I->R)",
-            description="Rate at which infected individuals recover and gain immunity",
-            default=0.1,
-            default_min=0.05,
-            default_max=0.2,
-            min_value=0.01,
-            max_value=1.0,
-            unit="per day",
+            label="Recovery Period (I->R)",
+            description="Average number of days for an infected individual to recover",
+            default=10.0,
+            default_min=5.0,
+            default_max=20.0,
+            min_value=1.0,
+            max_value=100.0,
+            unit="days",
+            value_type=ValueType.DAYS,
         )
 
         schema.add_transmission_edge(
             source="recovered",
             target="susceptible",
             variable_name="omega",
-            label="Waning Immunity Rate (R->S)",
-            description="Rate at which recovered individuals lose immunity and return to susceptible (1/immunity_duration)",
-            default=1 / 60,
-            min_value=1 / 365,
-            max_value=1 / 14,
-            default_min=1 / 90,
-            default_max=1 / 30,
-            unit="per day",
+            label="Waning Immunity Period (R->S)",
+            description="Average number of days before a recovered individual loses immunity",
+            default=60.0,
+            min_value=14.0,
+            max_value=365.0,
+            default_min=30.0,
+            default_max=90.0,
+            unit="days",
+            value_type=ValueType.DAYS,
         )
 
         schema.add_intervention(
