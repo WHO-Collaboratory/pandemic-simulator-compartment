@@ -1,0 +1,231 @@
+{
+  "disease_type": "MONKEYPOX",
+  "disease_label": "Monkeypox",
+  "description": "A simple SIR compartmental model for Monkeypox",
+  "compartments": [
+    {
+      "id": "S",
+      "label": "Susceptible",
+      "description": "Population susceptible to Monkeypox infection"
+    },
+    {
+      "id": "I",
+      "label": "Infected",
+      "description": "Currently infected population"
+    },
+    {
+      "id": "R",
+      "label": "Recovered",
+      "description": "Recovered and immune population"
+    }
+  ],
+  "transmission_edges": [
+    {
+      "source": "susceptible",
+      "target": "infected",
+      "variable_name": "beta",
+      "parameter": {
+        "name": "transmission_rate",
+        "label": "Transmission Rate (S->I)",
+        "description": "Rate at which susceptible individuals become infected through contact with infected individuals",
+        "value_type": "rate",
+        "default": 0.3,
+        "min_value": 0.01,
+        "max_value": 2.0,
+        "default_min": 0.1,
+        "default_max": 0.5,
+        "required": true,
+        "unit": "per day"
+      }
+    },
+    {
+      "source": "infected",
+      "target": "recovered",
+      "variable_name": "gamma",
+      "parameter": {
+        "name": "transmission_rate",
+        "label": "Recovery Rate (I->R)",
+        "description": "Rate at which infected individuals recover and gain immunity",
+        "value_type": "rate",
+        "default": 0.1,
+        "min_value": 0.01,
+        "max_value": 1.0,
+        "default_min": 0.05,
+        "default_max": 0.2,
+        "required": true,
+        "unit": "per day"
+      }
+    }
+  ],
+  "interventions": [
+    {
+      "id": "mask_wearing",
+      "label": "Mask Wearing",
+      "description": "Reduces transmission rate through mask usage in the population",
+      "parameters": [
+        {
+          "name": "adherence_min",
+          "label": "Adherence",
+          "description": "Minimum population adherence to the intervention",
+          "value_type": "percentage",
+          "default": 30.0,
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "transmission_percentage",
+          "label": "Transmission Reduction",
+          "description": "Percentage reduction in transmission while intervention is active",
+          "value_type": "percentage",
+          "default": 35.0,
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "start_date",
+          "label": "Start Date",
+          "description": "Date the intervention begins (leave blank for threshold-based)",
+          "value_type": "date",
+          "required": false
+        },
+        {
+          "name": "end_date",
+          "label": "End Date",
+          "description": "Date the intervention ends (leave blank for threshold-based)",
+          "value_type": "date",
+          "required": false
+        },
+        {
+          "name": "start_threshold",
+          "label": "Start Threshold",
+          "description": "Proportion of infected population that triggers the intervention",
+          "value_type": "percentage",
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "end_threshold",
+          "label": "End Threshold",
+          "description": "Proportion of infected population below which the intervention stops",
+          "value_type": "percentage",
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "vaccination",
+      "label": "Vaccination",
+      "description": "Reduces transmission rate through immunization of susceptible population",
+      "parameters": [
+        {
+          "name": "adherence_min",
+          "label": "Adherence",
+          "description": "Minimum population adherence to the intervention",
+          "value_type": "percentage",
+          "default": 60.0,
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "transmission_percentage",
+          "label": "Transmission Reduction",
+          "description": "Percentage reduction in transmission while intervention is active",
+          "value_type": "percentage",
+          "default": 80.0,
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "start_date",
+          "label": "Start Date",
+          "description": "Date the intervention begins (leave blank for threshold-based)",
+          "value_type": "date",
+          "required": false
+        },
+        {
+          "name": "end_date",
+          "label": "End Date",
+          "description": "Date the intervention ends (leave blank for threshold-based)",
+          "value_type": "date",
+          "required": false
+        },
+        {
+          "name": "start_threshold",
+          "label": "Start Threshold",
+          "description": "Proportion of infected population that triggers the intervention",
+          "value_type": "percentage",
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "end_threshold",
+          "label": "End Threshold",
+          "description": "Proportion of infected population below which the intervention stops",
+          "value_type": "percentage",
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        }
+      ]
+    }
+  ],
+  "travel_volume": null,
+  "admin_zone_fields": [],
+  "disease_parameters": [],
+  "simulation_parameters": [
+    {
+      "name": "start_date",
+      "label": "Start Date",
+      "description": "Simulation start date",
+      "value_type": "date",
+      "required": true
+    },
+    {
+      "name": "end_date",
+      "label": "End Date",
+      "description": "Simulation end date",
+      "value_type": "date",
+      "required": true
+    },
+    {
+      "name": "run_mode",
+      "label": "Run Mode",
+      "description": "Run a single deterministic simulation or uncertainty analysis with multiple runs",
+      "value_type": "select",
+      "default": "DETERMINISTIC",
+      "required": true,
+      "options": [
+        "DETERMINISTIC",
+        "UNCERTAINTY"
+      ]
+    },
+    {
+      "name": "simulation_type",
+      "label": "Simulation Type",
+      "description": "Type of simulation engine",
+      "value_type": "select",
+      "default": "COMPARTMENTAL",
+      "required": true,
+      "options": [
+        "COMPARTMENTAL",
+        "AGENT_BASED"
+      ]
+    }
+  ]
+}

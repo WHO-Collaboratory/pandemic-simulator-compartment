@@ -1,11 +1,11 @@
 {
-    "admin_unit_0_id": "MDG",
+    "admin_unit_id": "MDG",
     "start_date": "2025-01-01",
     "end_date": "2025-12-31",
     "travel_volume": {
         "leaving": 10.0
     },
-    "AdminUnit0": {
+    "AdminUnit": {
         "id": "MDG",
         "center_lat": -19.37564815173127
     },

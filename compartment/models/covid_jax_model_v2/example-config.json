@@ -1,8 +1,7 @@
 {
     "admin_unit_id": "MDG",
-    "start_date": "2025-11-18",
-    "end_date": "2025-12-18",
-    "run_mode": "UNCERTAINTY",
+    "start_date": "2025-11-01",
+    "end_date": "2025-12-31",
     "AdminUnit": {
         "id": "MDG",
         "center_lat": -19.37564815173127
@@ -19,72 +18,37 @@
         ],
         "transmission_edges": [
             {
-                "data": {
-                    "transmission_rate": 0.25,
-                    "variance_params": {
-                        "has_variance": true,
-                        "distribution_type": "UNIFORM",
-                        "field_name": null,
-                        "min": 0.2,
-                        "max": 0.3
-                    }
-                },
+                "data": { "transmission_rate": 0.25 },
                 "source": "susceptible",
                 "target": "exposed"
             },
             {
-                "data": {
-                    "transmission_rate": 0.2
-                },
+                "data": { "transmission_rate": 0.2 },
                 "source": "exposed",
                 "target": "infected"
             },
             {
-                "data": {
-                    "transmission_rate": 0.0004,
-                    "variance_params": {
-                        "has_variance": true,
-                        "distribution_type": "UNIFORM",
-                        "field_name": null,
-                        "min": 0.0004,
-                        "max": 0.004
-                    }
-                },
+                "data": { "transmission_rate": 0.0004 },
                 "source": "infected",
                 "target": "hospitalized"
             },
             {
-                "data": {
-                    "transmission_rate": 0.0001,
-                    "variance_params": {
-                        "has_variance": true,
-                        "distribution_type": "UNIFORM",
-                        "field_name": null,
-                        "min": 0.0001,
-                        "max": 0.001
-                    }
-                },
+                "data": { "transmission_rate": 0.0001 },
                 "source": "infected",
                 "target": "deceased"
             },
             {
-                "data": {
-                    "transmission_rate": 0.001
-                },
+                "data": { "transmission_rate": 0.001 },
                 "source": "hospitalized",
                 "target": "deceased"
             },
             {
-                "data": {
-                    "transmission_rate": 0.14
-                },
+                "data": { "transmission_rate": 0.14 },
                 "source": "infected",
                 "target": "recovered"
             },
             {
-                "data": {
-                    "transmission_rate": 0.14
-                },
+                "data": { "transmission_rate": 0.14 },
                 "source": "hospitalized",
                 "target": "recovered"
             }
@@ -92,34 +56,22 @@
     },
     "interventions": [
         {
-            "adherence_min": 20.0,
-            "end_date": "2025-12-18",
             "id": "mask_wearing",
-            "start_date": "2025-11-18",
+            "adherence_min": 20.0,
             "transmission_percentage": 35.0,
-            "variance_params": [
-                {
-                    "has_variance": true,
-                    "distribution_type": "UNIFORM",
-                    "field_name": "adherence_min",
-                    "min": 20.0,
-                    "max": 70.0
-                },
-                {
-                    "has_variance": true,
-                    "distribution_type": "UNIFORM",
-                    "field_name": "transmission_percentage",
-                    "min": 35.0,
-                    "max": 75.0
-                }
-            ]
+            "start_date": "2025-11-01",
+            "end_date": "2025-12-31",
+            "start_threshold": null,
+            "end_threshold": null
         },
         {
-            "adherence_min": 40.0,
-            "end_date": "2025-01-31",
             "id": "social_isolation",
-            "start_date": "2025-11-18",
-            "transmission_percentage": 50.0
+            "adherence_min": 40.0,
+            "transmission_percentage": 50.0,
+            "start_date": "2025-11-01",
+            "end_date": "2025-12-31",
+            "start_threshold": null,
+            "end_threshold": null
         }
     ],
     "case_file": {
@@ -174,6 +126,6 @@
         }
     },
     "travel_volume": {
-        "leaving": 20.0    
+        "leaving": 20.0
     }
 }

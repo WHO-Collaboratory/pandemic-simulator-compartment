@@ -1,54 +1,71 @@
 {
-    "admin_unit_0_id": "USA",
-    "start_date": "2025-01-01",
-    "end_date": "2025-04-01",
-    "AdminUnit0": {
-        "id": "USA",
-        "center_lat": 37.0902
-    },
-    "Disease": {
-        "disease_type": "MONKEYPOX",
-        "transmission_edges": [
-            {
-                "data": {
-                    "transmission_rate": 0.3
-                },
-                "source": "susceptible",
-                "target": "infected"
-            },
-            {
-                "data": {
-                    "transmission_rate": 0.1
-                },
-                "source": "infected",
-                "target": "recovered"
-            }
-        ]
-    },
-    "case_file": {
-        "admin_zones": [
-            {
-                "center_lat": 40.7128,
-                "center_lon": -74.0060,
-                "name": "New York",
-                "population": 8000000,
-                "infected_population": 1
-            },
-            {
-                "center_lat": 34.0522,
-                "center_lon": -118.2437,
-                "name": "Los Angeles",
-                "population": 4000000,
-                "infected_population": 5
-            },
-            {
-                "center_lat": 41.8781,
-                "center_lon": -87.6298,
-                "name": "Chicago",
-                "population": 2700000,
-                "infected_population": 8
-            }
-        ]
+  "start_date": "2026-03-06",
+  "end_date": "2032-03-06",
+  "Disease": {
+    "disease_type": "MONKEYPOX",
+    "transmission_edges": [
+      {
+        "source": "susceptible",
+        "target": "infected",
+        "data": {
+          "transmission_rate": 0.12
+        }
+      },
+      {
+        "source": "infected",
+        "target": "recovered",
+        "data": {
+          "transmission_rate": 0.05
+        }
+      },
+      {
+        "source": "recovered",
+        "target": "susceptible",
+        "data": {
+          "transmission_rate": 0.005
+        }
+      }
+    ]
+  },
+  "admin_unit_id": "USA",
+  "AdminUnit": {
+    "id": "USA",
+    "center_lat": 37.0902
+  },
+  "interventions": [
+    {
+      "id": "ring_vaccination",
+      "adherence_min": 70.0,
+      "transmission_percentage": 75.0,
+      "start_date": "2026-03-06",
+      "end_date": "2028-03-06",
+      "start_threshold": null,
+      "end_threshold": null
     }
+  ],
+  "case_file": {
+    "admin_zones": [
+      {
+        "center_lat": 40.7128,
+        "center_lon": -74.006,
+        "name": "Example Zone",
+        "population": 1000000,
+        "infected_population": 0.01
+      },
+      {
+        "center_lat": 34.0522,
+        "center_lon": -118.2437,
+        "name": "Example Zone 2",
+        "population": 2000000,
+        "infected_population": 0.01
+      },
+      {
+        "center_lat": 41.8781,
+        "center_lon": -87.6298,
+        "name": "Example Zone 3",
+        "population": 1500000,
+        "infected_population": 0.01
+      }
+    ]
+  }
 }
-
