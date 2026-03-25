@@ -110,12 +110,14 @@ class ValidationPostProcessor:
         from compartment.models.dengue_jax_model.model import DengueJaxModel
         from compartment.models.dengue_2strain.model import Dengue2StrainModel
         from compartment.models.mpox_jax_model.model import MpoxJaxModel
-        
+        from compartment.models.esbl_jax_model.model import ESBLJaxModel
+
         MODEL_REGISTRY = {
             "RESPIRATORY": CovidJaxModel,
             "VECTOR_BORNE": DengueJaxModel,
             "VECTOR_BORNE_2STRAIN": Dengue2StrainModel,
             "MONKEYPOX": MpoxJaxModel,
+            "ESBL": ESBLJaxModel,
         }
         
         model_class = MODEL_REGISTRY.get(disease_type)

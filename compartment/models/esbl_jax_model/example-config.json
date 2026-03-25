@@ -1,0 +1,71 @@
+{
+    "admin_unit_0_id": "FRA",
+    "start_date": "2005-01-01",
+    "end_date": "2015-12-31",
+    "simulation_type": "COMPARTMENTAL",
+    "run_mode": "DETERMINISTIC",
+    "AdminUnit0": {
+        "id": "FRA",
+        "center_lat": 46.2276
+    },
+    "Disease": {
+        "disease_type": "ESBL",
+
+        "beta":   0.01027,
+        "R_HC":   10.0,
+        "s_ESBL": 0.1,
+        "s_CR":   0.2,
+
+        "cr":     0.00822,
+        "dis":    0.00411,
+        "nu":     0.5,
+        "mu":     1.0,
+
+        "hr":     0.000714,
+        "dr":     0.142857,
+
+        "tau_t":  7.0,
+        "tau_r":  10.0,
+        "tau_dC": 912500.0,
+        "tau_dH": 912500.0,
+
+        "C_A_C":  1.5,
+        "C_B_C":  0.01,
+        "C_A_H":  20.0,
+        "C_B_H":  10.0,
+
+        "IMP_ESBL": 1.0,
+        "IMP_CR":   0.1,
+
+        "wt_community_colonization": 20.0,
+        "hospital_colonization":     40.0
+    },
+    "case_file": {
+        "admin_zones": [
+            {
+                "name": "Ile-de-France",
+                "center_lat": 48.8566,
+                "center_lon": 2.3522,
+                "population": 12000000,
+                "infected_population": 5.0,
+                "seroprevalence": 0.2
+            },
+            {
+                "name": "Auvergne-Rhone-Alpes",
+                "center_lat": 45.7640,
+                "center_lon": 4.8357,
+                "population": 8000000,
+                "infected_population": 3.0,
+                "seroprevalence": 0.1
+            },
+            {
+                "name": "Provence-Alpes-Cote-dAzur",
+                "center_lat": 43.9352,
+                "center_lon": 6.0679,
+                "population": 5000000,
+                "infected_population": 4.0,
+                "seroprevalence": 0.15
+            }
+        ]
+    }
+}

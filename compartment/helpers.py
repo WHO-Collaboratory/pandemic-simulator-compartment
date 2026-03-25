@@ -239,6 +239,9 @@ def create_jax_intervention_results(population_matrix: np.ndarray, intervention_
     elif disease_type == "VECTOR_BORNE_2STRAIN":
         infective_comps = ["I1", "I2", "I12", "I21"]
         infective_idx = [compartment_list.index(c) for c in infective_comps if c in compartment_list]
+    elif disease_type == "ESBL":
+        infective_comps = ["IWT_H", "IET_H", "ICT_H"]
+        infective_idx = [compartment_list.index(c) for c in infective_comps if c in compartment_list]
     else:
         # collapse 4d age strat matrix
         if population_matrix.ndim == 4:

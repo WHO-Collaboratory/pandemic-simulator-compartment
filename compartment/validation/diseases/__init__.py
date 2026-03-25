@@ -19,10 +19,12 @@ from .covid import CovidDiseaseConfig
 from .dengue import DengueDiseaseConfig
 from .dengue_2strain import Dengue2StrainDiseaseConfig
 from .mpox import MpoxDiseaseConfig
+from .esbl import ESBLDiseaseConfig
 
 __all__ = [
     "CovidDiseaseConfig",
     "DengueDiseaseConfig",
     "Dengue2StrainDiseaseConfig",
     "MpoxDiseaseConfig",
+    "ESBLDiseaseConfig",
 ]

@@ -7,6 +7,7 @@ from .diseases import (
     DengueDiseaseConfig,
     Dengue2StrainDiseaseConfig,
     MpoxDiseaseConfig,
+    ESBLDiseaseConfig,
 )
 
 # Shared models still used
@@ -31,6 +32,7 @@ __all__ = [
     "DengueDiseaseConfig",
     "Dengue2StrainDiseaseConfig",
     "MpoxDiseaseConfig",
+    "ESBLDiseaseConfig",
     # Shared models
     "BaseSimulationShared",
     "TravelVolume",
@@ -86,6 +88,8 @@ def load_simulation_config(config: dict, disease_type: str):
         disease_cls = CovidDiseaseConfig
     elif disease_type == "MONKEYPOX":
         disease_cls = MpoxDiseaseConfig
+    elif disease_type == "ESBL":
+        disease_cls = ESBLDiseaseConfig
     else:
         raise ValueError(f"Invalid disease type: {disease_type}")
     
