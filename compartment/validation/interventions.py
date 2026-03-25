@@ -16,7 +16,7 @@ class Intervention(BaseModel):
     """
     Matches exactly the intervention objects from the uploaded config.
     """
-    id: Literal["social_isolation", "vaccination", "mask_wearing", "lock_down", "chemical", "physical", "ring_vaccination"]
+    id: Literal["social_isolation", "vaccination", "mask_wearing", "lock_down", "chemical", "physical", "ring_vaccination", "antibiotic_stewardship", "infection_control"]
     type: Literal["INTERVENTION"] = "INTERVENTION"
     label: Optional[str] = None
 

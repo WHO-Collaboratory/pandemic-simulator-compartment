@@ -48,11 +48,15 @@ def _get_model_class(disease_type: str):
         from compartment.models.dengue_2strain.model import Dengue2StrainModel
 
         registry["VECTOR_BORNE_2STRAIN"] = Dengue2StrainModel
+    elif disease_type == "KLEBSIELLA_AMR":
+        from compartment.models.klebsiella_amr_model.model import KlebsiellaAmrModel
+
+        registry["KLEBSIELLA_AMR"] = KlebsiellaAmrModel
 
     if disease_type not in registry:
         print(f"Error: Unknown disease type '{disease_type}'", file=sys.stderr)
         print(
-            "Available types: MONKEYPOX, RESPIRATORY, VECTOR_BORNE, VECTOR_BORNE_2STRAIN",
+            "Available types: MONKEYPOX, RESPIRATORY, VECTOR_BORNE, VECTOR_BORNE_2STRAIN, KLEBSIELLA_AMR",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -69,6 +73,7 @@ def _list_available() -> list[str]:
         "RESPIRATORY",
         "VECTOR_BORNE",
         "VECTOR_BORNE_2STRAIN",
+        "KLEBSIELLA_AMR",
     ]
     available = []
     for dt in types_to_check:

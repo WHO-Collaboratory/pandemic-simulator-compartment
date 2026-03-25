@@ -10,8 +10,9 @@ from .diseases import (
     Dengue2StrainDiseaseConfig,
 )
 
-# Auto-generated disease config (migrated to declarative parameters)
+# Auto-generated disease configs (migrated to declarative parameters)
 from .diseases import MpoxDiseaseConfig
+from .diseases import KlebsiellaAmrDiseaseConfig
 
 # Shared models still used
 from .base_simulation import BaseSimulationShared, TravelVolume
@@ -37,6 +38,7 @@ __all__ = [
     "DengueDiseaseConfig",
     "Dengue2StrainDiseaseConfig",
     "MpoxDiseaseConfig",
+    "KlebsiellaAmrDiseaseConfig",
     # Shared models
     "BaseSimulationShared",
     "TravelVolume",
@@ -60,12 +62,14 @@ def _get_model_registry() -> dict:
     from compartment.models.dengue_jax_model.model import DengueJaxModel
     from compartment.models.dengue_2strain.model import Dengue2StrainModel
     from compartment.models.mpox_jax_model.model import MpoxJaxModel
+    from compartment.models.klebsiella_amr_model.model import KlebsiellaAmrModel
 
     return {
         "RESPIRATORY": CovidJaxModel,
         "VECTOR_BORNE": DengueJaxModel,
         "VECTOR_BORNE_2STRAIN": Dengue2StrainModel,
         "MONKEYPOX": MpoxJaxModel,
+        "KLEBSIELLA_AMR": KlebsiellaAmrModel,
     }
 
 

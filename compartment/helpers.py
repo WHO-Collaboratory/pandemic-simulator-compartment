@@ -233,6 +233,17 @@ def compute_multi_run_compartment_deltas(
     return avg_deltas
 
 
+def _get_intervention_model_registry() -> dict:
+    """Lazy-import model registry for infective compartment lookup."""
+    from compartment.models.mpox_jax_model.model import MpoxJaxModel
+    from compartment.models.klebsiella_amr_model.model import KlebsiellaAmrModel
+
+    return {
+        "MONKEYPOX": MpoxJaxModel,
+        "KLEBSIELLA_AMR": KlebsiellaAmrModel,
+    }
+
+
 def create_jax_intervention_results(
     population_matrix: np.ndarray,
     intervention_dict: dict,
@@ -284,7 +295,21 @@ def create_jax_intervention_results(
         if population_matrix.ndim == 4:
             population_matrix = population_matrix.sum(axis=2)
         compartment_list = [s for s in compartment_list if "_total" not in s]
-        infective_idx = [compartment_list.index("I")]
+
+        # Use schema-declared infective compartments when available;
+        # fall back to "I" for legacy models.
+        model_registry = _get_intervention_model_registry()
+        model_class = model_registry.get(disease_type)
+        if model_class and hasattr(model_class, "COMPARTMENTS") and hasattr(model_class.COMPARTMENTS, "infective_ids"):
+            infective_comps = list(model_class.COMPARTMENTS.infective_ids)
+            infective_idx = [
+                compartment_list.index(c) for c in infective_comps if c in compartment_list
+            ]
+        elif "I" in compartment_list:
+            infective_idx = [compartment_list.index("I")]
+        else:
+            # No infective compartment found — use empty list
+            infective_idx = []
 
     # Track ON/OFF status for each intervention across timesteps
     status = {name: False for name in intervention_dict.keys()}
@@ -755,6 +780,13 @@ def extract_admin_units(case_file):
     return [case["name"] for case in case_file]
 
 
+def _date_to_ordinal(val):
+    """Convert a date string or date/datetime object to an ordinal int."""
+    if isinstance(val, (date, datetime)):
+        return val.toordinal()
+    return datetime.strptime(val, "%Y-%m-%d").date().toordinal()
+
+
 def create_intervention_dict(intervention_nodes, start_date):
     intervention_dict = {}
     for intervention in intervention_nodes:
@@ -763,11 +795,7 @@ def create_intervention_dict(intervention_nodes, start_date):
             intervention.get("start_date") is not None
             and intervention.get("start_date") != ""
         ):
-            start_date_ordinal = (
-                datetime.strptime(intervention.get("start_date"), "%Y-%m-%d")
-                .date()
-                .toordinal()
-            )
+            start_date_ordinal = _date_to_ordinal(intervention["start_date"])
         else:
             start_date_ordinal = None
             intervention["start_date"] = None
@@ -775,11 +803,7 @@ def create_intervention_dict(intervention_nodes, start_date):
             intervention.get("end_date") is not None
             and intervention.get("end_date") != ""
         ):
-            end_date_ordinal = (
-                datetime.strptime(intervention.get("end_date"), "%Y-%m-%d")
-                .date()
-                .toordinal()
-            )
+            end_date_ordinal = _date_to_ordinal(intervention["end_date"])
         else:
             end_date_ordinal = None
             intervention["end_date"] = None
@@ -791,9 +815,7 @@ def create_intervention_dict(intervention_nodes, start_date):
             and intervention.get("end_threshold") is None
         ):
             intervention["start_date"] = start_date
-            start_date_ordinal = (
-                datetime.strptime(start_date, "%Y-%m-%d").date().toordinal()
-            )
+            start_date_ordinal = _date_to_ordinal(start_date)
 
         temp = {
             intervention.get("id"): {
