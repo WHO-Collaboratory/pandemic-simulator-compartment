@@ -1,0 +1,88 @@
+{
+  "start_date": "2026-03-25",
+  "end_date": "2027-03-25",
+  "Disease": {
+    "disease_type": "KLEBSIELLA_AMR",
+    "transmission_edges": [
+      {
+        "source": "Sc_u",
+        "target": "CWc_u",
+        "data": {
+          "transmission_rate": 0.0098
+        }
+      },
+      {
+        "source": "CWc_u",
+        "target": "Sc_u",
+        "data": {
+          "transmission_rate": 60.0
+        }
+      },
+      {
+        "source": "CWh_u",
+        "target": "IW_h",
+        "data": {
+          "transmission_rate": 500.0
+        }
+      },
+      {
+        "source": "IW_h",
+        "target": "Sh_u",
+        "data": {
+          "transmission_rate": 14.0
+        }
+      }
+    ],
+    "hospital_transmission_mult": 14.0,
+    "fitness_cost_esbl": 1.92,
+    "fitness_cost_crk": 2.25,
+    "super_colonization_coeff": 0.177,
+    "treatment_susceptibility": 0.1,
+    "treatment_clearance_mult": 3.0,
+    "plasmid_loss_rate": 0.044,
+    "import_esbl": 326.1,
+    "import_crk": 5.6,
+    "admission_rate": 0.000274,
+    "discharge_rate": 0.1,
+    "ceph_consumption_community": 1.0,
+    "ceph_consumption_hospital": 0.15,
+    "carb_consumption_hospital": 0.08,
+    "treatment_duration": 10.0
+  },
+  "admin_unit_id": "USA",
+  "AdminUnit": {
+    "id": "USA",
+    "center_lat": 37.0902
+  },
+  "interventions": [
+    {
+      "id": "antibiotic_stewardship",
+      "adherence_min": 80.0,
+      "transmission_percentage": 30.0,
+      "start_date": null,
+      "end_date": null,
+      "start_threshold": null,
+      "end_threshold": null
+    },
+    {
+      "id": "infection_control",
+      "adherence_min": 90.0,
+      "transmission_percentage": 50.0,
+      "start_date": null,
+      "end_date": null,
+      "start_threshold": null,
+      "end_threshold": null
+    }
+  ],
+  "case_file": {
+    "admin_zones": [
+      {
+        "center_lat": 40.7128,
+        "center_lon": -74.006,
+        "name": "Example Zone",
+        "population": 1000000,
+        "infected_population": 1
+      }
+    ]
+  }
+}

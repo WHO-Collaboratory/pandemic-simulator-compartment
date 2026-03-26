@@ -69,7 +69,7 @@ def _get_model_class(disease_type: str):
 
     # Only import what's needed to keep startup fast
     if disease_type == "MONKEYPOX":
-        from compartment.models.mpox_jax_model.model import MpoxJaxModel
+        from compartment.models.test_mpox_jax_model.model import MpoxJaxModel
 
         registry["MONKEYPOX"] = MpoxJaxModel
     elif disease_type == "RESPIRATORY":
@@ -81,14 +81,22 @@ def _get_model_class(disease_type: str):
 
         registry["VECTOR_BORNE"] = DengueJaxModel
     elif disease_type == "VECTOR_BORNE_2STRAIN":
-        from compartment.models.dengue_2strain.model import Dengue2StrainModel
+        from compartment.models.test_dengue_2strain.model import Dengue2StrainModel
 
         registry["VECTOR_BORNE_2STRAIN"] = Dengue2StrainModel
+    elif disease_type == "KLEBSIELLA_AMR":
+        from compartment.models.test_klebsiella_amr_model.model import KlebsiellaAmrModel
+
+        registry["KLEBSIELLA_AMR"] = KlebsiellaAmrModel
+    elif disease_type == "COVID_SIR_STOCHASTIC":
+        from compartment.models.test_covid_sir_stochastic.model import CovidSirStochasticModel
+
+        registry["COVID_SIR_STOCHASTIC"] = CovidSirStochasticModel
 
     if disease_type not in registry:
         print(f"Error: Unknown disease type '{disease_type}'", file=sys.stderr)
         print(
-            "Available types: MONKEYPOX, RESPIRATORY, VECTOR_BORNE, VECTOR_BORNE_2STRAIN",
+            "Available types: MONKEYPOX, RESPIRATORY, VECTOR_BORNE, VECTOR_BORNE_2STRAIN, KLEBSIELLA_AMR, COVID_SIR_STOCHASTIC",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -105,6 +113,8 @@ def _list_available() -> list[str]:
         "RESPIRATORY",
         "VECTOR_BORNE",
         "VECTOR_BORNE_2STRAIN",
+        "KLEBSIELLA_AMR",
+        "COVID_SIR_STOCHASTIC",
     ]
     available = []
     for dt in types_to_check:

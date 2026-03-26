@@ -1,9 +1,9 @@
 """
-Monkeypox disease validation config -- auto-generated from model parameters.
+Klebsiella AMR disease validation config -- auto-generated from model parameters.
 
-This module no longer contains hand-written Pydantic models.  Instead it
-imports the ``MpoxJaxModel`` parameter schema and uses the schema generator
-to produce a ``MpoxDiseaseConfig`` class at import time.
+This module imports the ``KlebsiellaAmrModel`` parameter schema and uses the
+schema generator to produce a ``KlebsiellaAmrDiseaseConfig`` class at import
+time.
 
 The generated class is fully compatible with ``SimulationConfig[T]`` and
 the ``ValidationPostProcessor`` pipeline.
@@ -11,12 +11,12 @@ the ``ValidationPostProcessor`` pipeline.
 
 from __future__ import annotations
 
-from compartment.models.test_mpox_jax_model.model import MpoxJaxModel
+from compartment.models.test_klebsiella_amr_model.model import KlebsiellaAmrModel
 from compartment.schema_generator import generate_disease_config
 
-# Auto-generate MpoxDiseaseConfig from the model's parameter schema
-MpoxDiseaseConfig = generate_disease_config(
-    MpoxJaxModel._build_parameter_schema())
+# Auto-generate KlebsiellaAmrDiseaseConfig from the model's parameter schema
+KlebsiellaAmrDiseaseConfig = generate_disease_config(
+    KlebsiellaAmrModel._build_parameter_schema())
 
 # Re-export the supporting edge models so existing imports still work
 from compartment.schema_generator import (  # noqa: E402, F401
@@ -25,7 +25,7 @@ from compartment.schema_generator import (  # noqa: E402, F401
 )
 
 __all__ = [
-    "MpoxDiseaseConfig",
+    "KlebsiellaAmrDiseaseConfig",
     "TransmissionEdge",
     "TransmissionEdgeData",
 ]

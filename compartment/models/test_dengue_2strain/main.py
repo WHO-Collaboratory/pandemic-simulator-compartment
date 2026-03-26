@@ -1,7 +1,7 @@
 import logging
 import argparse
 from compartment.driver import drive_simulation
-from compartment.models.dengue_2strain.model import Dengue2StrainModel
+from compartment.models.test_dengue_2strain.model import Dengue2StrainModel
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)
 logging.getLogger("jax._src.xla_bridge").setLevel(logging.WARNING)

@@ -298,8 +298,7 @@ def run_simulation(
 
     if mode == "local":
         if output_path is None:
-            print("yo")
-            # print(results)
+            print(results)
         elif output_path is not None:
             write_results_to_local(results, output_path)
             logger.info(f"Results saved to: {output_path}")

@@ -1,0 +1,39 @@
+{
+  "start_date": "2026-03-26",
+  "end_date": "2026-06-24",
+  "Disease": {
+    "disease_type": "COVID_SIR_STOCHASTIC",
+    "transmission_edges": [
+      {
+        "source": "susceptible",
+        "target": "infected",
+        "data": {
+          "transmission_rate": 0.4
+        }
+      },
+      {
+        "source": "infected",
+        "target": "recovered",
+        "data": {
+          "transmission_rate": 7.0
+        }
+      }
+    ]
+  },
+  "admin_unit_id": "USA",
+  "AdminUnit": {
+    "id": "USA",
+    "center_lat": 37.0902
+  },
+  "case_file": {
+    "admin_zones": [
+      {
+        "center_lat": 40.7128,
+        "center_lon": -74.006,
+        "name": "Example Zone",
+        "population": 1000000,
+        "infected_population": 1
+      }
+    ]
+  }
+}

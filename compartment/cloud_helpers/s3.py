@@ -67,6 +67,7 @@ def record_and_upload_validation(
 ):
     validation_result = None
     validation_success = False
+    cleaned_config = None
     try:
         cleaned_config = load_simulation_config(config, disease_type)
         validation_result = {
