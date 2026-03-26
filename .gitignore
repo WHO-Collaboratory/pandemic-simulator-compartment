@@ -7,3 +7,8 @@ __pycache__/
 reference/temp*.json
 pandemic_simulator_compartment.egg-info/
 results/
+
+.tmp/
+TODO.md
+DONE.md
+CLAUDE.md
