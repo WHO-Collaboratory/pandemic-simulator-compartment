@@ -1,7 +1,7 @@
 import logging
 import argparse
 from compartment.driver import drive_simulation
-from compartment.models.covid_sir_stochastic.model import CovidSirStochasticModel
+from compartment.models.test_covid_sir_stochastic.model import CovidSirStochasticModel
 
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)

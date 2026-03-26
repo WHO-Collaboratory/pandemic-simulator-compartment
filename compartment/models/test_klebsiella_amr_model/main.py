@@ -1,7 +1,7 @@
 import logging
 import argparse
 from compartment.driver import drive_simulation
-from compartment.models.mpox_jax_model.model import MpoxJaxModel
+from compartment.models.test_klebsiella_amr_model.model import KlebsiellaAmrModel
 
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def lambda_handler(event, context):
     drive_simulation(
-        model_class=MpoxJaxModel,
+        model_class=KlebsiellaAmrModel,
         args={"mode": "cloud",
               "simulation_job_id": event["simulation_job_id"]},
     )
@@ -21,7 +21,7 @@ def lambda_handler(event, context):
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(
-        description="Run MPOX simulation with specified config file"
+        description="Run Klebsiella AMR simulation with specified config file"
     )
     parser.add_argument("--mode", choices=["local", "cloud"], default="local")
     parser.add_argument(
@@ -41,4 +41,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    drive_simulation(model_class=MpoxJaxModel, args=vars(args))
+    drive_simulation(model_class=KlebsiellaAmrModel, args=vars(args))

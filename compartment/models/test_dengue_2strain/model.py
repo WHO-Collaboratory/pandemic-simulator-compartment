@@ -8,6 +8,11 @@ from compartment.model import Model
 setup_logging()
 logger = logging.getLogger(__name__)
 
+""" 
+WARNING: This model is not currently supported in the pandemic simulator app, 
+but is available for testing and experimentation in the codebase. 
+"""
+
 class Dengue2StrainModel(Model):
     
     # Fixed compartment structure for 2-strain dengue model

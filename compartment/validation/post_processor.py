@@ -2,8 +2,6 @@ from __future__ import annotations
 from typing import Any, Dict, List, Callable
 from pydantic import BaseModel, Field, ConfigDict
 
-from compartment.models.klebsiella_amr_model.model import KlebsiellaAmrModel
-from compartment.models.covid_sir_stochastic.model import CovidSirStochasticModel
 from compartment.validation.simulation_config import SimulationConfig
 from compartment.helpers import (
     create_initial_population_matrix,
@@ -117,8 +115,10 @@ class ValidationPostProcessor:
         # === MODEL REGISTRY (import model classes) ===
         from compartment.models.covid_jax_model.model import CovidJaxModel
         from compartment.models.dengue_jax_model.model import DengueJaxModel
-        from compartment.models.dengue_2strain.model import Dengue2StrainModel
-        from compartment.models.mpox_jax_model.model import MpoxJaxModel
+        from compartment.models.test_dengue_2strain.model import Dengue2StrainModel
+        from compartment.models.test_mpox_jax_model.model import MpoxJaxModel
+        from compartment.models.test_klebsiella_amr_model.model import KlebsiellaAmrModel
+        from compartment.models.test_covid_sir_stochastic.model import CovidSirStochasticModel
 
         MODEL_REGISTRY = {
             "RESPIRATORY": CovidJaxModel,

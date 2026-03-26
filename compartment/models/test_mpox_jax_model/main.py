@@ -1,18 +1,19 @@
 import logging
 import argparse
 from compartment.driver import drive_simulation
-from compartment.models.covid_jax_model_v2.model import CovidJaxModelV2
+from compartment.models.test_mpox_jax_model.model import MpoxJaxModel
 
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)
 logging.getLogger("jax._src.xla_bridge").setLevel(logging.WARNING)
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 def lambda_handler(event, context):
     drive_simulation(
-        model_class=CovidJaxModelV2,
-        args={"mode": "cloud", "simulation_job_id": event["simulation_job_id"]},
+        model_class=MpoxJaxModel,
+        args={"mode": "cloud",
+              "simulation_job_id": event["simulation_job_id"]},
     )
     return None
 
@@ -20,7 +21,7 @@ def lambda_handler(event, context):
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(
-        description="Run pandemic simulation with specified config file"
+        description="Run MPOX simulation with specified config file"
     )
     parser.add_argument("--mode", choices=["local", "cloud"], default="local")
     parser.add_argument(
@@ -40,4 +41,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    drive_simulation(model_class=CovidJaxModelV2, args=vars(args))
+    drive_simulation(model_class=MpoxJaxModel, args=vars(args))

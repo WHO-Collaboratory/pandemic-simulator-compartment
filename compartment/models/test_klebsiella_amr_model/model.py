@@ -9,6 +9,10 @@ from compartment.parameters import ValueType
 setup_logging()
 logger = logging.getLogger(__name__)
 
+""" 
+WARNING: This model is not currently supported in the pandemic simulator app, 
+but is available for testing and experimentation in the codebase. 
+"""
 
 class KlebsiellaAmrModel(Model):
     """

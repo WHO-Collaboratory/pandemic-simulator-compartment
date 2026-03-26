@@ -11,7 +11,7 @@ the ``ValidationPostProcessor`` pipeline.
 
 from __future__ import annotations
 
-from compartment.models.klebsiella_amr_model.model import KlebsiellaAmrModel
+from compartment.models.test_klebsiella_amr_model.model import KlebsiellaAmrModel
 from compartment.schema_generator import generate_disease_config
 
 # Auto-generate KlebsiellaAmrDiseaseConfig from the model's parameter schema

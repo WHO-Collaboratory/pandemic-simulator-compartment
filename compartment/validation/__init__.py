@@ -62,10 +62,10 @@ logger = logging.getLogger("compartment.validation")
 def _get_model_registry() -> dict:
     from compartment.models.covid_jax_model.model import CovidJaxModel
     from compartment.models.dengue_jax_model.model import DengueJaxModel
-    from compartment.models.dengue_2strain.model import Dengue2StrainModel
-    from compartment.models.mpox_jax_model.model import MpoxJaxModel
-    from compartment.models.klebsiella_amr_model.model import KlebsiellaAmrModel
-    from compartment.models.covid_sir_stochastic.model import CovidSirStochasticModel
+    from compartment.models.test_dengue_2strain.model import Dengue2StrainModel
+    from compartment.models.test_mpox_jax_model.model import MpoxJaxModel
+    from compartment.models.test_klebsiella_amr_model.model import KlebsiellaAmrModel
+    from compartment.models.test_covid_sir_stochastic.model import CovidSirStochasticModel
 
     return {
         "RESPIRATORY": CovidJaxModel,
