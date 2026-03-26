@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Callable
 from pydantic import BaseModel, Field, ConfigDict
 
 from compartment.models.klebsiella_amr_model.model import KlebsiellaAmrModel
+from compartment.models.covid_sir_stochastic.model import CovidSirStochasticModel
 from compartment.validation.simulation_config import SimulationConfig
 from compartment.helpers import (
     create_initial_population_matrix,
@@ -125,6 +126,7 @@ class ValidationPostProcessor:
             "VECTOR_BORNE_2STRAIN": Dengue2StrainModel,
             "MONKEYPOX": MpoxJaxModel,
             "KLEBSIELLA_AMR": KlebsiellaAmrModel,
+            "COVID_SIR_STOCHASTIC": CovidSirStochasticModel,
         }
 
         model_class = MODEL_REGISTRY.get(disease_type)

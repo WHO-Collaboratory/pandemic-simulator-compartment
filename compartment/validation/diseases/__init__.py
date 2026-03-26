@@ -20,6 +20,7 @@ from .dengue import DengueDiseaseConfig
 from .dengue_2strain import Dengue2StrainDiseaseConfig
 from .mpox import MpoxDiseaseConfig
 from .klebsiella_amr import KlebsiellaAmrDiseaseConfig
+from .covid_sir_stochastic import CovidSirStochasticDiseaseConfig
 
 __all__ = [
     "CovidDiseaseConfig",
@@ -27,4 +28,5 @@ __all__ = [
     "Dengue2StrainDiseaseConfig",
     "MpoxDiseaseConfig",
     "KlebsiellaAmrDiseaseConfig",
+    "CovidSirStochasticDiseaseConfig",
 ]

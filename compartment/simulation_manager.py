@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import jax
+import jax.numpy as jnp
 from jax.experimental.ode import odeint
 
 from compartment.helpers import get_simulation_step_size, setup_logging
@@ -24,8 +25,28 @@ class SimulationManager:
         init_state, comp_list = self.model.prepare_initial_state()
         params = self.model.get_params()
 
-        pred = odeint(self.model.derivative, init_state, ts, params)
+        # Models that set STOCHASTIC = True use fixed-step Euler
+        # integration (dt = step) so their derivative can make
+        # random draws.  All other models use the adaptive ODE solver.
+        if getattr(self.model, "STOCHASTIC", False):
+            pred = self._euler_integrate(init_state, ts, params)
+        else:
+            pred = odeint(self.model.derivative, init_state, ts, params)
+
         out = jax.device_get(pred)  # returns numpy arrays
 
         logger.info("run_simulation function ENDING")
         return np.array(out)  # optional; out is already host-side
+
+    def _euler_integrate(self, y0, ts, params):
+        """Fixed-step Euler integration for stochastic models."""
+        results = [y0]
+        y = y0
+        for i in range(1, len(ts)):
+            dt = ts[i] - ts[i - 1]
+            dy = self.model.derivative(y, ts[i - 1], params)
+            y = y + dt * dy
+            # Clamp to non-negative (stochastic draws can overshoot)
+            y = jnp.maximum(y, 0.0)
+            results.append(y)
+        return jnp.stack(results)

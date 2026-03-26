@@ -237,10 +237,12 @@ def _get_intervention_model_registry() -> dict:
     """Lazy-import model registry for infective compartment lookup."""
     from compartment.models.mpox_jax_model.model import MpoxJaxModel
     from compartment.models.klebsiella_amr_model.model import KlebsiellaAmrModel
+    from compartment.models.covid_sir_stochastic.model import CovidSirStochasticModel
 
     return {
         "MONKEYPOX": MpoxJaxModel,
         "KLEBSIELLA_AMR": KlebsiellaAmrModel,
+        "COVID_SIR_STOCHASTIC": CovidSirStochasticModel,
     }
 
 

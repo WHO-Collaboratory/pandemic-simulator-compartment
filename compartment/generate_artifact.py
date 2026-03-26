@@ -52,11 +52,15 @@ def _get_model_class(disease_type: str):
         from compartment.models.klebsiella_amr_model.model import KlebsiellaAmrModel
 
         registry["KLEBSIELLA_AMR"] = KlebsiellaAmrModel
+    elif disease_type == "COVID_SIR_STOCHASTIC":
+        from compartment.models.covid_sir_stochastic.model import CovidSirStochasticModel
+
+        registry["COVID_SIR_STOCHASTIC"] = CovidSirStochasticModel
 
     if disease_type not in registry:
         print(f"Error: Unknown disease type '{disease_type}'", file=sys.stderr)
         print(
-            "Available types: MONKEYPOX, RESPIRATORY, VECTOR_BORNE, VECTOR_BORNE_2STRAIN, KLEBSIELLA_AMR",
+            "Available types: MONKEYPOX, RESPIRATORY, VECTOR_BORNE, VECTOR_BORNE_2STRAIN, KLEBSIELLA_AMR, COVID_SIR_STOCHASTIC",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -74,6 +78,7 @@ def _list_available() -> list[str]:
         "VECTOR_BORNE",
         "VECTOR_BORNE_2STRAIN",
         "KLEBSIELLA_AMR",
+        "COVID_SIR_STOCHASTIC",
     ]
     available = []
     for dt in types_to_check:
