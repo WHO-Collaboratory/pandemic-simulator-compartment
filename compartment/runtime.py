@@ -24,7 +24,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import jax.numpy as jnp
+try:
+    import jax.numpy as jnp
+except ImportError:
+    import numpy as jnp  # type: ignore[no-redef]
 
 
 # ---------------------------------------------------------------------------

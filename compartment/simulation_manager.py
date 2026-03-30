@@ -25,28 +25,46 @@ class SimulationManager:
         init_state, comp_list = self.model.prepare_initial_state()
         params = self.model.get_params()
 
-        # Models that set STOCHASTIC = True use fixed-step Euler
-        # integration (dt = step) so their derivative can make
-        # random draws.  All other models use the adaptive ODE solver.
-        if getattr(self.model, "STOCHASTIC", False):
-            pred = self._euler_integrate(init_state, ts, params)
-        else:
-            pred = odeint(self.model.derivative, init_state, ts, params)
+        # Default: adaptive ODE solver (JAX).
+        # Models can set SOLVER = "euler" to use fixed-step Euler
+        # integration instead — required for stochastic models and
+        # compatible with plain numpy models.
+        # Legacy: STOCHASTIC = True also triggers Euler.
+        solver = getattr(self.model, "SOLVER", None)
+        if solver is None:
+            solver = "euler" if getattr(self.model, "STOCHASTIC", False) else "odeint"
 
-        out = jax.device_get(pred)  # returns numpy arrays
+        if solver == "euler":
+            logger.info("solver: euler")
+            pred = self._euler_integrate(init_state, ts, params)
+            if isinstance(pred, jax.Array):
+                pred = jax.device_get(pred)
+            out = np.asarray(pred)
+        else:
+            logger.info("solver: odeint")
+            pred = odeint(self.model.derivative, init_state, ts, params)
+            out = jax.device_get(pred)
 
         logger.info("run_simulation function ENDING")
-        return np.array(out)  # optional; out is already host-side
+        return np.array(out)
 
     def _euler_integrate(self, y0, ts, params):
-        """Fixed-step Euler integration for stochastic models."""
+        """Fixed-step Euler integration.
+
+        Works with both JAX and plain numpy arrays — the array module
+        is detected from *y0* so numpy-only models never touch JAX.
+        """
+        if isinstance(y0, jax.Array):
+            xp = jnp
+        else:
+            xp = np
+
         results = [y0]
         y = y0
         for i in range(1, len(ts)):
             dt = ts[i] - ts[i - 1]
             dy = self.model.derivative(y, ts[i - 1], params)
             y = y + dt * dy
-            # Clamp to non-negative (stochastic draws can overshoot)
-            y = jnp.maximum(y, 0.0)
+            y = xp.maximum(y, 0.0)
             results.append(y)
-        return jnp.stack(results)
+        return xp.stack(results)

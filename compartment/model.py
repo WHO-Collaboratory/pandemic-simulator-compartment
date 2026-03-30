@@ -6,7 +6,11 @@ from abc import ABC
 from typing import Any, ClassVar
 
 import numpy as np
-import jax.numpy as jnp
+
+try:
+    import jax.numpy as jnp
+except ImportError:
+    jnp = np  # numpy fallback for models that don't use JAX
 
 from compartment.parameters import (
     CompartmentDef,
