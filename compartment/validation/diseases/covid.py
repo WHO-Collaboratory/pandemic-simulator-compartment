@@ -48,8 +48,7 @@ class CovidDiseaseNode(BaseModel):
 
 class CovidDiseaseConfig(BaseDiseaseConfig):
     disease_type: Literal["RESPIRATORY"] = "RESPIRATORY"
-    transmission_edges: List[CovidTransmissionEdge]
-    
+    transmission_edges: Optional[List[CovidTransmissionEdge]] = None
     disease_nodes: Optional[List[CovidDiseaseNode]] = None
     compartment_list: Optional[List[str]] = None
 
