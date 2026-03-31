@@ -18,8 +18,14 @@ from .diseases import CovidSirStochasticDiseaseConfig
 # Shared models still used
 from .base_simulation import BaseSimulationShared, TravelVolume
 from .interventions import (
-    Intervention,
-    InterventionVarianceParams,
+    FieldConfig,
+    FieldConfigItems,
+    NormalizedIntervention,
+    NormalizedInterventions,
+    InterventionLookup,
+    NormalizedTransmissionEdge,
+    NormalizedTransmissionEdges,
+    TransmissionEdgeLookup,
 )
 
 import logging
@@ -44,8 +50,15 @@ __all__ = [
     # Shared models
     "BaseSimulationShared",
     "TravelVolume",
-    "Intervention",
-    "InterventionVarianceParams",
+    # Normalized models
+    "FieldConfig",
+    "FieldConfigItems",
+    "NormalizedIntervention",
+    "NormalizedInterventions",
+    "InterventionLookup",
+    "NormalizedTransmissionEdge",
+    "NormalizedTransmissionEdges",
+    "TransmissionEdgeLookup",
     # Utility functions
     "log_pydantic_errors",
     "load_simulation_config",
