@@ -19,17 +19,10 @@ from compartment.helpers import (
 )
 from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.cloud_helpers.gql import (
-    get_admin_unit_references,
     get_simulation_job,
-    get_simulation_job_admin_units,
 )
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
 from compartment.cloud_helpers.gql import write_to_gql
-from compartment.cloud_helpers.simulation_helpers import (
-    transform_normalized_interventions,
-    transform_normalized_transmission_edges,
-    transform_simulation_job_admin_units,
-)
 from compartment.model import Model
 
 # Makes sure unix implementations don't deadlock
@@ -84,88 +77,8 @@ def run_simulation(
         logger.info(f"simulation_job_id: {simulation_job_id}")
         logger.info(f"graphql_endpoint: {
                     simulation_params.get('GRAPHQL_ENDPOINT')}")
-        # Grab simulation job and clean validated config for model
+        # Grab simulation job config from GraphQL
         config = get_simulation_job(simulation_params, GRAPHQL_QUERY)
-
-        # sim_job = config["data"]["getSimulationJob"]
-
-        ########### START NORMALIZATION ###########
-        sim_job_admin_units = get_simulation_job_admin_units(
-            simulation_params, simulation_job_id
-        )
-
-        if sim_job_admin_units:
-            logger.info(
-                f"Using {
-                    len(sim_job_admin_units)
-                } admin units from SimulationJobAdminUnit table"
-            )
-            admin_unit_ids = [u["admin_unit_id"] for u in sim_job_admin_units]
-            admin_unit_refs = get_admin_unit_references(
-                simulation_params, admin_unit_ids
-            )
-            config["data"]["getSimulationJob"]["case_file"]["admin_zones"] = (
-                transform_simulation_job_admin_units(
-                    sim_job_admin_units, admin_unit_refs
-                )
-            )
-        else:
-            logger.info(
-                "No SimulationJobAdminUnits found, using embedded case_file.admin_zones"
-            )
-
-        # Transform normalized interventions from join tables to legacy format
-        # Priority: Use new Interventions join table if available, fall back to embedded interventions
-        normalized_interventions = config["data"]["getSimulationJob"].get(
-            "Interventions", {}
-        )
-        normalized_items = (
-            normalized_interventions.get("items", [])
-            if normalized_interventions
-            else []
-        )
-
-        logger.info(f"normalized_items: {normalized_items}")
-
-        if normalized_items:
-            logger.info(
-                f"Using {
-                    len(normalized_items)
-                } interventions from normalized join tables"
-            )
-            config["data"]["getSimulationJob"]["interventions"] = (
-                transform_normalized_interventions(normalized_items)
-            )
-        else:
-            logger.info(
-                "No normalized interventions found, using embedded interventions field"
-            )
-
-        # Transform normalized transmission edges from join tables to legacy format
-        # Priority: Use new TransmissionEdges join table if available, fall back to embedded Disease.transmission_edges
-        normalized_transmission_edges = config["data"]["getSimulationJob"].get(
-            "TransmissionEdges", {}
-        )
-        normalized_edge_items = (
-            normalized_transmission_edges.get("items", [])
-            if normalized_transmission_edges
-            else []
-        )
-
-        if normalized_edge_items:
-            logger.info(
-                f"Using {
-                    len(normalized_edge_items)
-                } transmission edges from normalized join tables"
-            )
-            config["data"]["getSimulationJob"]["Disease"]["transmission_edges"] = (
-                transform_normalized_transmission_edges(normalized_edge_items)
-            )
-        else:
-            logger.info(
-                "No normalized transmission edges found, using embedded Disease.transmission_edges"
-            )
-        ########### END NORMALIZATION ###########
 
         owner = config["data"]["getSimulationJob"].get("owner")
     else:
@@ -238,26 +151,30 @@ def run_simulation(
         n_sims = 30
         ci = 0.95
 
-        if getattr(cleaned_config, "transmission_dict", None) is not None:
-            # Handle Disease as either dict or Pydantic model
-            disease_section = cleaned_config.Disease
-            if isinstance(disease_section, dict):
-                transmission_edges_dicts = as_dict_list(
-                    disease_section.get("transmission_edges")
-                )
-            else:
-                transmission_edges_dicts = as_dict_list(
-                    disease_section.transmission_edges
-                )
-        else:
-            transmission_edges_dicts = None
+        # Extract normalized TransmissionEdges and Interventions for uncertainty
+        transmission_edge_items = []
+        interventions_items = []
 
-        # Handle interventions as either list of dicts or Pydantic models
-        interventions = getattr(cleaned_config, "interventions", [])
-        interventions_dicts = as_dict_list(interventions)
+        transmission_edges_section = getattr(cleaned_config, "TransmissionEdges", None)
+        if transmission_edges_section:
+            if isinstance(transmission_edges_section, dict):
+                transmission_edge_items = transmission_edges_section.get("items", [])
+            else:
+                transmission_edge_items = getattr(transmission_edges_section, "items", [])
+
+        interventions_section = getattr(cleaned_config, "Interventions", None)
+        if interventions_section:
+            if isinstance(interventions_section, dict):
+                interventions_items = interventions_section.get("items", [])
+            else:
+                interventions_items = getattr(interventions_section, "items", [])
+
+        # Convert to dicts if they're Pydantic models
+        transmission_edge_dicts = as_dict_list(transmission_edge_items)
+        intervention_dicts = as_dict_list(interventions_items)
 
         uncertainty_params = build_uncertainty_params(
-            transmission_edges_dicts, interventions_dicts
+            transmission_edge_dicts, intervention_dicts
         )
 
         logger.info(f"Number of simulations: {n_sims}")
