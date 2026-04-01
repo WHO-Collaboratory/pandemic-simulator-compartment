@@ -9,53 +9,13 @@ from compartment.parameters import ValueType
 setup_logging()
 logger = logging.getLogger(__name__)
 
-""" 
-WARNING: This model is not currently supported in the pandemic simulator app, 
-but is available for testing and experimentation in the codebase. 
+"""
+WARNING: This model is not currently supported in the pandemic simulator app,
+but is available for testing and experimentation in the codebase.
 """
 
 class CovidJaxModelV2(Model):
-    """A class representing a compartmental model with dynamic travel and intervention mechanisms"""
-
-    def __init__(self, config):
-        """Initialize the COVID v2 compartmental model.
-
-        Common fields (start_date, transmission params, intervention_dict,
-        Intervention objects, etc.) are extracted by ``super().__init__()``.
-        Model-specific fields are set here.
-        """
-        super().__init__(config)
-
-        # COVID v2 population matrix is NOT transposed (prepare_covid_initial_state
-        # handles the reshaping internally).  Override the base class .T:
-        self.population_matrix = np.array(config["initial_population"])
-
-        # COVID v2 uses runtime compartment list (may exclude optional compartments)
-        self.compartment_list = config["compartment_list"]
-
-        # Travel
-        self.travel_matrix = np.fill_diagonal(
-            np.array(config["travel_matrix"]), 1.0, inplace=False
-        )
-        self.sigma = config["travel_volume"]["leaving"]
-
-        # Save original rates for reference
-        self.original_rates = {"beta": self.beta}
-
-        # Demographics & age stratification
-        self.demographics = config["case_file"]["demographics"]
-        self.age_stratification = list(self.demographics.values())
-        self.age_groups = list(self.demographics.keys())
-        self.interaction_matrix = np.array(
-            [[5.46, 5.18, 0.93], [1.70, 9.18, 1.68], [0.83, 5.90, 3.80]]
-        )
-
-        # Add lock_down and vaccination statuses (not in define_parameters
-        # but needed for backward compat with the old intervention system
-        # and post-processing).
-        self.intervention_statuses["lock_down"] = False
-        self.intervention_statuses["vaccination"] = False
-
+    """SEIHDR compartmental model with age-stratified transmission and spatial mobility."""
     @classmethod
     def define_parameters(cls, schema):
         schema.set_model_info(
@@ -208,69 +168,57 @@ class CovidJaxModelV2(Model):
             transmission_reduction=50.0,
         )
 
-    @classmethod
-    def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
-        """
-        Standard SEIHDR initial population for respiratory diseases.
-        Uses base class implementation (S-I split).
-        """
-        return super().get_initial_population(admin_zones, compartment_list, **kwargs)
+    # ------------------------------------------------------------------
+    # Model interface
+    # ------------------------------------------------------------------
 
-    # disease_type  — derived from schema (set_model_info)
-    # COMPARTMENTS  — derived from schema (add_compartment)
-    # get_params()  — derived from schema (edge order: beta, theta, zeta, delta, epsilon, gamma, eta)
-    # All inherited from base class; no need to override.
+    def __init__(self, config):
+        super().__init__(config)
+        self.population_matrix = np.array(config["initial_population"])
 
-    def _sync_total_compartments(self):
-        """Add ``_total`` tracking compartments for active base compartments.
+        # Travel
+        self.travel_matrix = np.fill_diagonal(
+            np.array(config["travel_matrix"]), 1.0, inplace=False
+        )
+        self.sigma = config["travel_volume"]["leaving"]
 
-        Iterates over the schema's ``COMPARTMENT_LIST`` (populated by
-        ``build()``) and appends a zero row to the population matrix for
-        every ``_total`` compartment whose base compartment is present in
-        the runtime ``self.compartment_list``.
-        """
-        zero_row = onp.zeros((1, *self.population_matrix[0].shape))
-        for cid in list(self.COMPARTMENTS):
-            if cid.endswith("_total"):
-                base_id = cid.removesuffix("_total")
-                if (
-                    base_id in self.compartment_list
-                    and cid not in self.compartment_list
-                ):
-                    self.population_matrix = onp.vstack(
-                        (self.population_matrix, zero_row)
-                    )
-                    self.compartment_list = self.compartment_list + [cid]
+        # Demographics & age stratification
+        self.demographics = config["case_file"]["demographics"]
+        self.age_stratification = list(self.demographics.values())
+        self.age_groups = list(self.demographics.keys())
+        self.interaction_matrix = np.array(
+            [[5.46, 5.18, 0.93], [1.70, 9.18, 1.68], [0.83, 5.90, 3.80]]
+        )
 
     def prepare_initial_state(self):
         self.population_matrix, self.interaction_matrix = prepare_covid_initial_state(
             self.population_matrix, self.interaction_matrix, self.demographics
         )
-        self._sync_total_compartments()
+
+        # Append zero rows for auto-generated _total compartments
+        n_base = len([c for c in self.compartment_list if not c.endswith("_total")])
+        n_total_comps = len(self.compartment_list) - n_base
+        if n_total_comps > 0 and self.population_matrix.shape[0] < len(self.compartment_list):
+            zero_rows = onp.zeros((n_total_comps, *self.population_matrix[0].shape))
+            self.population_matrix = onp.vstack((self.population_matrix, zero_rows))
 
         return self.population_matrix, self.compartment_list
 
     def derivative(self, y, t, p):
-        """
-        Calculates how each compartment changes over time, used by ODE solver.
+        """Compute derivatives with age-stratified force of infection.
 
         Uses the escape-hatch pattern: ``_compute_derivatives()`` handles
-        the 6 standard ``rate * source`` edges (E→I, I→H, I→D, H→D, I→R,
-        H→R), while the S→E force of infection — which requires an
-        age-stratified contact matrix — is computed manually and applied
-        via ``_apply_flow()``.
-
-        Edges whose source or target compartment is absent from the
-        runtime ``compartment_list`` are automatically skipped by the
-        framework, so optional compartments (E, H, D) work without
-        conditional rate zeroing.
+        the 6 standard edges (E->I, I->H, I->D, H->D, I->R, H->R),
+        while S->E uses an age-stratified contact matrix and is applied
+        manually via ``_apply_flow()``.
         """
+        C = self.COMPARTMENTS
         params = self._unpack_params(p)
         age_trans = self.interaction_matrix
 
         states = {comp: y[i] for i, comp in enumerate(self.compartment_list)}
-        S = states["S"]
-        I = states["I"]  # noqa: E741
+        S = states[C.S]
+        I = states[C.I]  # noqa: E741
 
         # Population for FOI (exclude deaths and _total compartments)
         non_total = [c for c in self.compartment_list if not c.endswith("_total")]
@@ -278,7 +226,7 @@ class CovidJaxModelV2(Model):
         N_total = sum(pop_terms).sum(axis=0)
         I_frac = I / N_total[None, :]
 
-        # --- Interventions (schema-driven via Intervention objects) ---
+        # --- Interventions (schema-driven) ---
         rates = {"beta": params["beta"]}
         prop_infective_scalar = I.sum() / N_total.sum()
         rates, contact_matrix = self._apply_interventions(
@@ -292,7 +240,7 @@ class CovidJaxModelV2(Model):
         # --- Standard edges via framework (skip manual FOI edge) ---
         derivs = self._compute_derivatives(states, rates, skip_edges={"beta"})
 
-        # --- Manual FOI: age-stratified contact matrix (S→E or S→I) ---
+        # --- Manual FOI: age-stratified contact matrix (S->E or S->I) ---
         BETA = ((rates["beta"] * contact_matrix) @ I_frac.T).T
         omega = age_trans @ BETA
         flow_foi = S * omega

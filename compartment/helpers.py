@@ -722,17 +722,25 @@ def create_compartment_list(disease_nodes):
 def create_transmission_dict(transmission_edge_items):
     """Map normalized TransmissionEdges.items to transmission rate variables.
 
+    The API sends values as pre-converted rates (e.g. 1/14 = 0.0714 for a
+    14-day period).  Since ``_load_transmission_params`` applies ``_to_rate()``
+    based on the model schema's value_type, we convert API values back to
+    native units here so the downstream conversion produces correct rates.
+
+    - DAYS:       API sends 1/days (rate) -> we store days (1/value)
+    - PERCENTAGE: API sends fraction   -> we store percentage (value * 100)
+    - RATE:       API sends rate       -> stored as-is
+
     Args:
         transmission_edge_items: List of dicts from TransmissionEdges.items[]
-            Each has transmittion_edge (lookup with source/target),
-            value, and FieldConfigs.items[].disease_param.
     """
     transmission_dict = {}
     for edge in transmission_edge_items:
-        lookup = edge.get("transmittion_edge", {})
+        lookup = edge.get("transmission_edge", {})
         source = lookup.get("source", "")
         target = lookup.get("target", "")
         edge_id = f"{source}->{target}"
+        value_type = lookup.get("value_type", "RATE")
 
         # Get variable name from FieldConfigs.disease_param if available
         field_configs = edge.get("FieldConfigs", {})
@@ -749,7 +757,20 @@ def create_transmission_dict(transmission_edge_items):
             variable = edge_to_variable.get(edge_id)
 
         if variable:
-            transmission_dict[variable] = edge.get("value", lookup.get("default_value", 0))
+            value = edge.get("value", 0)
+
+            # Convert API rate back to native units so _load_transmission_params
+            # can apply _to_rate() consistently
+            if value_type == "DAYS" and value > 0:
+                value = 1.0 / value  # rate -> days
+            elif value_type == "PERCENTAGE":
+                value = value * 100.0  # fraction -> percentage
+
+            # When multiple edges map to the same param (e.g. S->I and S->E
+            # both map to beta), prefer the non-zero value so the active
+            # path wins over the inactive one.
+            if variable not in transmission_dict or value != 0:
+                transmission_dict[variable] = value
 
     return transmission_dict
 
@@ -774,7 +795,7 @@ def build_uncertainty_params(transmission_edge_items: list, intervention_items: 
                     param_name = fc.get("disease_param", "").lower()
                     if not param_name:
                         # Fall back to edge_to_variable mapping
-                        lookup = edge.get("transmittion_edge", {})
+                        lookup = edge.get("transmission_edge", {})
                         edge_id = f"{lookup.get('source', '')}->{lookup.get('target', '')}"
                         param_name = edge_to_variable.get(edge_id)
                     if param_name:

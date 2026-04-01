@@ -72,15 +72,13 @@ class NormalizedInterventions(BaseModel):
 
 
 class TransmissionEdgeLookup(BaseModel):
-    """The transmittion_edge reference record (note: typo in API schema)."""
+    """The transmission_edge reference record (note: typo in API schema)."""
     id: str
     value_type: Optional[str] = None
-    default_value: Optional[float] = None
     disease_type: Optional[str] = None
     description: Optional[str] = None
     source: str
     target: str
-    order: Optional[int] = None
 
 
 class NormalizedTransmissionEdge(BaseModel):
@@ -88,7 +86,7 @@ class NormalizedTransmissionEdge(BaseModel):
     id: Optional[str] = None
     simulation_job_id: Optional[str] = None
     transmission_edge_id: Optional[str] = None
-    transmittion_edge: TransmissionEdgeLookup
+    transmission_edge: TransmissionEdgeLookup
     value: float
     FieldConfigs: Optional[FieldConfigItems] = None
 
