@@ -174,6 +174,12 @@ class CovidJaxModel(Model):
 
     def __init__(self, config):
         super().__init__(config)
+
+        # The schema defines full SEIHDR capability, but the config's
+        # compartment_list (from disease_nodes) defines what's active
+        # at runtime.  Override the schema-derived list.
+        self.compartment_list = config["compartment_list"]
+
         self.population_matrix = np.array(config["initial_population"])
 
         # Travel
@@ -195,12 +201,17 @@ class CovidJaxModel(Model):
             self.population_matrix, self.interaction_matrix, self.demographics
         )
 
-        # Append zero rows for auto-generated _total compartments
-        n_base = len([c for c in self.compartment_list if not c.endswith("_total")])
-        n_total_comps = len(self.compartment_list) - n_base
-        if n_total_comps > 0 and self.population_matrix.shape[0] < len(self.compartment_list):
-            zero_rows = onp.zeros((n_total_comps, *self.population_matrix[0].shape))
-            self.population_matrix = onp.vstack((self.population_matrix, zero_rows))
+        # Add _total compartments only for active edge targets
+        active_set = set(self.compartment_list)
+        schema = type(self)._get_cached_schema()
+        for edge in schema.transmission_edges:
+            tid = edge.target_id
+            total_id = f"{tid}_total"
+            if tid in active_set and total_id not in active_set:
+                zero_row = onp.zeros((1, *self.population_matrix[0].shape))
+                self.population_matrix = onp.vstack((self.population_matrix, zero_row))
+                self.compartment_list = self.compartment_list + [total_id]
+                active_set.add(total_id)
 
         return self.population_matrix, self.compartment_list
 
@@ -233,9 +244,10 @@ class CovidJaxModel(Model):
             t, rates, prop_infective_scalar
         )
 
-        # Non-intervention rates (all standard edges)
-        for name in ["theta", "zeta", "delta", "epsilon", "gamma", "eta"]:
-            rates[name] = params[name]
+        # Add all active (non-None) rates for standard edges
+        for name, value in params.items():
+            if name != "beta" and value is not None:
+                rates[name] = value
 
         # --- Standard edges via framework (skip manual FOI edge) ---
         derivs = self._compute_derivatives(states, rates, skip_edges={"beta"})
