@@ -140,13 +140,13 @@ class ValidationPostProcessor:
         model_class = MODEL_REGISTRY.get(disease_type)
 
         # === COMPARTMENT LIST ===
-        # Priority: explicit compartment_list > disease_nodes > model class
-        if disease_dict.get("compartment_list"):
+        # Priority: model class (authoritative) > explicit config > disease_nodes
+        if model_class and hasattr(model_class, "COMPARTMENT_LIST"):
+            compartment_list = model_class.COMPARTMENT_LIST
+        elif disease_dict.get("compartment_list"):
             compartment_list = disease_dict["compartment_list"]
         elif disease_dict.get("disease_nodes"):
             compartment_list = create_compartment_list(disease_dict["disease_nodes"])
-        elif model_class and hasattr(model_class, "COMPARTMENT_LIST"):
-            compartment_list = model_class.COMPARTMENT_LIST
         else:
             raise ValueError(
                 "Either 'disease_nodes' or 'compartment_list' must be provided in Disease config. "
