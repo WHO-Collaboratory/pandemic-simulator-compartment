@@ -140,13 +140,25 @@ class ValidationPostProcessor:
         model_class = MODEL_REGISTRY.get(disease_type)
 
         # === COMPARTMENT LIST ===
-        # Priority: model class (authoritative) > explicit config > disease_nodes
-        if model_class and hasattr(model_class, "COMPARTMENT_LIST"):
-            compartment_list = model_class.COMPARTMENT_LIST
-        elif disease_dict.get("compartment_list"):
+        # Models with FLEXIBLE_COMPARTMENTS = True (e.g. COVID) derive
+        # their active compartments from the config (disease_nodes or
+        # compartment_list).  Models with fixed compartments (e.g. dengue)
+        # use their schema-derived COMPARTMENT_LIST regardless of what
+        # the frontend sends in disease_nodes.
+        use_config_compartments = (
+            model_class and getattr(model_class, "FLEXIBLE_COMPARTMENTS", False)
+        )
+
+        if use_config_compartments and disease_dict.get("disease_nodes"):
+            compartment_list = create_compartment_list(disease_dict["disease_nodes"])
+        elif use_config_compartments and disease_dict.get("compartment_list"):
             compartment_list = disease_dict["compartment_list"]
+        elif model_class and hasattr(model_class, "COMPARTMENT_LIST"):
+            compartment_list = model_class.COMPARTMENT_LIST
         elif disease_dict.get("disease_nodes"):
             compartment_list = create_compartment_list(disease_dict["disease_nodes"])
+        elif disease_dict.get("compartment_list"):
+            compartment_list = disease_dict["compartment_list"]
         else:
             raise ValueError(
                 "Either 'disease_nodes' or 'compartment_list' must be provided in Disease config. "
