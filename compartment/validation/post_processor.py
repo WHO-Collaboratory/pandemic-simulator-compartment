@@ -139,16 +139,16 @@ class ValidationPostProcessor:
 
         model_class = MODEL_REGISTRY.get(disease_type)
 
-        # === COMPARTMENT LIST (check model class attribute first) ===
-        if model_class and hasattr(model_class, "COMPARTMENT_LIST"):
-            # Use model's hardcoded compartment list
-            compartment_list = model_class.COMPARTMENT_LIST
-        elif disease_dict.get("compartment_list"):
-            # Explicit compartment list provided in config
-            compartment_list = disease_dict["compartment_list"]
-        elif disease_dict.get("disease_nodes"):
-            # Extract from disease graph structure (flexible models like COVID)
+        # === COMPARTMENT LIST ===
+        # Prefer disease_nodes from config (supports flexible models like COVID
+        # where the config determines active compartments at runtime).
+        # Fall back to explicit compartment_list, then model class attribute.
+        if disease_dict.get("disease_nodes"):
             compartment_list = create_compartment_list(disease_dict["disease_nodes"])
+        elif disease_dict.get("compartment_list"):
+            compartment_list = disease_dict["compartment_list"]
+        elif model_class and hasattr(model_class, "COMPARTMENT_LIST"):
+            compartment_list = model_class.COMPARTMENT_LIST
         else:
             raise ValueError(
                 "Either 'disease_nodes' or 'compartment_list' must be provided in Disease config. "
