@@ -140,13 +140,11 @@ class ValidationPostProcessor:
         model_class = MODEL_REGISTRY.get(disease_type)
 
         # === COMPARTMENT LIST ===
-        # Prefer disease_nodes from config (supports flexible models like COVID
-        # where the config determines active compartments at runtime).
-        # Fall back to explicit compartment_list, then model class attribute.
-        if disease_dict.get("disease_nodes"):
-            compartment_list = create_compartment_list(disease_dict["disease_nodes"])
-        elif disease_dict.get("compartment_list"):
+        # Priority: explicit compartment_list > disease_nodes > model class
+        if disease_dict.get("compartment_list"):
             compartment_list = disease_dict["compartment_list"]
+        elif disease_dict.get("disease_nodes"):
+            compartment_list = create_compartment_list(disease_dict["disease_nodes"])
         elif model_class and hasattr(model_class, "COMPARTMENT_LIST"):
             compartment_list = model_class.COMPARTMENT_LIST
         else:

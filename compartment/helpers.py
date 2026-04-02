@@ -18,15 +18,31 @@ import sys
 
 
 def load_config_from_json(config_path: str) -> dict:
-    """Load simulation config from a local JSON file."""
+    """Load simulation config from a local JSON file.
+
+    Handles convenience shortcuts so users skip cloud-only boilerplate:
+    - Wraps top-level admin_zones into case_file
+    - Adds default demographics if missing
+    """
     with open(config_path, "r") as f:
         config_data = json.load(f)
 
-    # If the JSON is already in the GraphQL response format, return as-is
+    # Already in GraphQL response format — return as-is
     if "data" in config_data and "getSimulationJob" in config_data["data"]:
         return config_data
 
-    # Otherwise, wrap it in the expected format
+    # Wrap top-level admin_zones into case_file
+    if "admin_zones" in config_data and "case_file" not in config_data:
+        config_data["case_file"] = {"admin_zones": config_data.pop("admin_zones")}
+
+    # Move top-level demographics into case_file
+    if "case_file" in config_data:
+        if "demographics" not in config_data["case_file"]:
+            config_data["case_file"]["demographics"] = config_data.pop(
+                "demographics",
+                {"age_0_17": 25.0, "age_18_55": 50.0, "age_56_plus": 25.0},
+            )
+
     return {"data": {"getSimulationJob": config_data}}
 
 

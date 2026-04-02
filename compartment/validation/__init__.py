@@ -17,12 +17,13 @@ from .diseases import CovidSirStochasticDiseaseConfig
 
 # Shared models still used
 from .base_simulation import BaseSimulationShared, TravelVolume
+from .field_configs import FieldConfig, FieldConfigItems
 from .interventions import (
-    FieldConfig,
-    FieldConfigItems,
     NormalizedIntervention,
     NormalizedInterventions,
     InterventionLookup,
+)
+from .transmission_edges import (
     NormalizedTransmissionEdge,
     NormalizedTransmissionEdges,
     TransmissionEdgeLookup,

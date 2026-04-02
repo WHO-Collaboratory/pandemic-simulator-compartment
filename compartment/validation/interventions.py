@@ -1,33 +1,14 @@
 from __future__ import annotations
-from typing import Optional, List, Literal
-from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List
+from pydantic import BaseModel, field_validator
 from datetime import date
 
-
-class FieldConfig(BaseModel):
-    """Shared FieldConfig model for both interventions and transmission edges."""
-    id: Optional[str] = None
-    field_key: Optional[str] = None
-    has_variance: bool = False
-    distribution_type: Literal["UNIFORM", "NORMAL"] = "UNIFORM"
-    disease_param: Optional[str] = None
-    min: Optional[float] = None
-    max: Optional[float] = None
-    parent_id: Optional[str] = None
-
-
-class FieldConfigItems(BaseModel):
-    items: List[FieldConfig] = []
-
-
-# ---------------------------------------------------------------------------
-# Normalized Intervention models (from Interventions join table)
-# ---------------------------------------------------------------------------
+from compartment.validation.field_configs import FieldConfigItems
 
 
 class InterventionLookup(BaseModel):
     """The Intervention reference record from the lookup table."""
-    id: str
+    id: Optional[str] = None
     name: str
     display_name: Optional[str] = None
 
@@ -64,33 +45,3 @@ class NormalizedIntervention(BaseModel):
 class NormalizedInterventions(BaseModel):
     """Container for Interventions.items[] on the SimulationJob."""
     items: List[NormalizedIntervention] = []
-
-
-# ---------------------------------------------------------------------------
-# Normalized TransmissionEdge models (from TransmissionEdges join table)
-# ---------------------------------------------------------------------------
-
-
-class TransmissionEdgeLookup(BaseModel):
-    """The transmission_edge reference record (note: typo in API schema)."""
-    id: str
-    value_type: Optional[str] = None
-    disease_type: Optional[str] = None
-    description: Optional[str] = None
-    source: str
-    target: str
-
-
-class NormalizedTransmissionEdge(BaseModel):
-    """A single item from TransmissionEdges.items[] in the new schema."""
-    id: Optional[str] = None
-    simulation_job_id: Optional[str] = None
-    transmission_edge_id: Optional[str] = None
-    transmission_edge: TransmissionEdgeLookup
-    value: float
-    FieldConfigs: Optional[FieldConfigItems] = None
-
-
-class NormalizedTransmissionEdges(BaseModel):
-    """Container for TransmissionEdges.items[] on the SimulationJob."""
-    items: List[NormalizedTransmissionEdge] = []

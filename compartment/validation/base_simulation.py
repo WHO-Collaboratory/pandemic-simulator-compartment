@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal, Optional, List
+from typing import Annotated, Literal, Optional, List
 from uuid import uuid4
 from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
@@ -76,8 +76,8 @@ class BaseSimulationShared(BaseModel):
     id: Optional[str] = None
     simulation_name: str = ""
 
-    # Admin unit (stores deepest selected level; parent info derived via hierarchy)
-    admin_unit_id: str
+    # Admin unit (optional for local configs — derived from first admin zone)
+    admin_unit_id: str = "LOCAL"
     AdminUnit: AdminUnit
 
     # Owner & meta
@@ -104,6 +104,20 @@ class BaseSimulationShared(BaseModel):
         if start and v < start:
             raise ValueError("end_date must be on or after start_date")
         return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def derive_admin_unit(cls, values):
+        """Synthesize AdminUnit from first admin zone if not provided."""
+        if isinstance(values, dict) and not values.get("AdminUnit"):
+            case_file = values.get("case_file", {})
+            zones = case_file.get("admin_zones", []) if isinstance(case_file, dict) else []
+            if zones:
+                values["AdminUnit"] = {
+                    "id": values.get("admin_unit_id", "LOCAL"),
+                    "center_lat": zones[0].get("center_lat", 0),
+                }
+        return values
 
     @model_validator(mode="after")
     def derive_time_steps(self):

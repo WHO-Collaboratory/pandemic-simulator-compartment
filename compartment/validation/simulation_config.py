@@ -4,10 +4,8 @@ from pydantic import ConfigDict
 
 from compartment.validation.base_simulation import BaseSimulationShared
 from compartment.validation.disease_config import BaseDiseaseConfig
-from compartment.validation.interventions import (
-    NormalizedInterventions,
-    NormalizedTransmissionEdges,
-)
+from compartment.validation.interventions import NormalizedInterventions
+from compartment.validation.transmission_edges import NormalizedTransmissionEdges
 
 
 # Type variable for the disease config
