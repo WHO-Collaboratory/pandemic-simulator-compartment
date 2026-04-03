@@ -18,15 +18,31 @@ import sys
 
 
 def load_config_from_json(config_path: str) -> dict:
-    """Load simulation config from a local JSON file."""
+    """Load simulation config from a local JSON file.
+
+    Handles convenience shortcuts so users skip cloud-only boilerplate:
+    - Wraps top-level admin_zones into case_file
+    - Adds default demographics if missing
+    """
     with open(config_path, "r") as f:
         config_data = json.load(f)
 
-    # If the JSON is already in the GraphQL response format, return as-is
+    # Already in GraphQL response format — return as-is
     if "data" in config_data and "getSimulationJob" in config_data["data"]:
         return config_data
 
-    # Otherwise, wrap it in the expected format
+    # Wrap top-level admin_zones into case_file
+    if "admin_zones" in config_data and "case_file" not in config_data:
+        config_data["case_file"] = {"admin_zones": config_data.pop("admin_zones")}
+
+    # Move top-level demographics into case_file
+    if "case_file" in config_data:
+        if "demographics" not in config_data["case_file"]:
+            config_data["case_file"]["demographics"] = config_data.pop(
+                "demographics",
+                {"age_0_17": 25.0, "age_18_55": 50.0, "age_56_plus": 25.0},
+            )
+
     return {"data": {"getSimulationJob": config_data}}
 
 
@@ -719,61 +735,114 @@ def create_compartment_list(disease_nodes):
     return sorted(compartments, key=lambda x: master_order.index(x))
 
 
-def create_transmission_dict(transmission_edges):
-    """Map transmission edges to transmission rate variables"""
+def create_transmission_dict(transmission_edge_items):
+    """Map normalized TransmissionEdges.items to transmission rate variables.
+
+    The API sends values as pre-converted rates (e.g. 1/14 = 0.0714 for a
+    14-day period).  Since ``_load_transmission_params`` applies ``_to_rate()``
+    based on the model schema's value_type, we convert API values back to
+    native units here so the downstream conversion produces correct rates.
+
+    - DAYS:       API sends 1/days (rate) -> we store days (1/value)
+    - PERCENTAGE: API sends fraction   -> we store percentage (value * 100)
+    - RATE:       API sends rate       -> stored as-is
+
+    Args:
+        transmission_edge_items: List of dicts from TransmissionEdges.items[]
+    """
     transmission_dict = {}
-    for edge in transmission_edges:
-        variable = edge_to_variable.get(edge["id"])
+    for edge in transmission_edge_items:
+        lookup = edge.get("transmission_edge", {})
+        source = lookup.get("source", "")
+        target = lookup.get("target", "")
+        edge_id = f"{source}->{target}"
+        value_type = lookup.get("value_type", "RATE")
+
+        # Get variable name from FieldConfigs.disease_param if available
+        field_configs = edge.get("FieldConfigs", {})
+        field_config_items = field_configs.get("items", []) if field_configs else []
+
+        variable = None
+        if field_config_items:
+            disease_param = field_config_items[0].get("disease_param", "")
+            if disease_param:
+                variable = disease_param.lower()
+
+        # Fall back to edge_to_variable mapping
+        if not variable:
+            variable = edge_to_variable.get(edge_id)
+
         if variable:
-            transmission_rate = edge["data"].get(
-                "transmission_rate", 0
-            )  # Default to 0 if not present
-            transmission_dict[variable] = transmission_rate
+            value = edge.get("value", 0)
+
+            # Convert API rate back to native units so _load_transmission_params
+            # can apply _to_rate() consistently
+            if value_type == "DAYS" and value > 0:
+                value = 1.0 / value  # rate -> days
+            elif value_type == "PERCENTAGE":
+                value = value * 100.0  # fraction -> percentage
+
+            # When multiple edges map to the same param (e.g. S->I and S->E
+            # both map to beta), prefer the non-zero value so the active
+            # path wins over the inactive one.
+            if variable not in transmission_dict or value != 0:
+                transmission_dict[variable] = value
 
     return transmission_dict
 
 
-def build_uncertainty_params(transmission_edges: list, interventions: list):
+def build_uncertainty_params(transmission_edge_items: list, intervention_items: list):
+    """Build uncertainty parameters from normalized TransmissionEdges.items
+    and Interventions.items.
+
+    Args:
+        transmission_edge_items: List of dicts from TransmissionEdges.items[]
+        intervention_items: List of dicts from Interventions.items[]
+    """
     uncertainty_params = []
 
-    if transmission_edges:
-        # Process transmission edges
-        for edge in transmission_edges:
-            edge_id = edge.get("id")
-            data = edge.get("data", {})
-            variance_params = data.get("variance_params")
+    if transmission_edge_items:
+        for edge in transmission_edge_items:
+            field_configs = edge.get("FieldConfigs", {})
+            field_config_items = field_configs.get("items", []) if field_configs else []
 
-            if variance_params and variance_params.get("has_variance"):
-                param_name = edge_to_variable.get(edge_id)
-                if param_name:
-                    uncertainty_params.append(
-                        {
-                            "param": param_name,
-                            "dist": variance_params.get("distribution_type", "uniform"),
-                            "min": variance_params.get("min", 0),
-                            "max": variance_params.get("max", 0),
-                        }
-                    )
+            for fc in field_config_items:
+                if fc.get("has_variance"):
+                    param_name = fc.get("disease_param", "").lower()
+                    if not param_name:
+                        # Fall back to edge_to_variable mapping
+                        lookup = edge.get("transmission_edge", {})
+                        edge_id = f"{lookup.get('source', '')}->{lookup.get('target', '')}"
+                        param_name = edge_to_variable.get(edge_id)
+                    if param_name:
+                        uncertainty_params.append(
+                            {
+                                "param": param_name,
+                                "dist": fc.get("distribution_type", "uniform"),
+                                "min": fc.get("min", 0),
+                                "max": fc.get("max", 0),
+                            }
+                        )
 
-    if interventions:
-        # Process interventions
-        for intervention in interventions:
-            variance_params = intervention.get("variance_params", [])
-            if variance_params:
-                for var_param in variance_params:
-                    if var_param.get("has_variance"):
-                        field_name = var_param.get("field_name")
-                        if field_name:
-                            uncertainty_params.append(
-                                {
-                                    "param": f"intervention.{intervention['id']}.{field_name}",
-                                    "dist": var_param.get(
-                                        "distribution_type", "uniform"
-                                    ),
-                                    "min": var_param.get("min", 0) / 100,
-                                    "max": var_param.get("max", 0) / 100,
-                                }
-                            )
+    if intervention_items:
+        for item in intervention_items:
+            intervention_lookup = item.get("Intervention", {})
+            intervention_id = intervention_lookup.get("name", "").lower()
+            field_configs = item.get("FieldConfigs", {})
+            field_config_items = field_configs.get("items", []) if field_configs else []
+
+            for fc in field_config_items:
+                if fc.get("has_variance"):
+                    field_name = fc.get("field_key")
+                    if field_name:
+                        uncertainty_params.append(
+                            {
+                                "param": f"intervention.{intervention_id}.{field_name}",
+                                "dist": fc.get("distribution_type", "uniform"),
+                                "min": fc.get("min", 0) / 100,
+                                "max": fc.get("max", 0) / 100,
+                            }
+                        )
 
     return uncertainty_params
 
@@ -789,64 +858,64 @@ def _date_to_ordinal(val):
     return datetime.strptime(val, "%Y-%m-%d").date().toordinal()
 
 
-def create_intervention_dict(intervention_nodes, start_date):
+def create_intervention_dict(intervention_items, start_date):
+    """Create intervention dict from normalized Interventions.items.
+
+    Args:
+        intervention_items: List of dicts from Interventions.items[]
+            Each has Intervention (lookup with name), adherence_min,
+            transmission_percentage, start_date, end_date, etc.
+        start_date: Simulation start date (fallback if no dates/thresholds set).
+    """
     intervention_dict = {}
-    for intervention in intervention_nodes:
+    for item in intervention_items:
+        intervention_lookup = item.get("Intervention", {})
+        intervention_id = intervention_lookup.get("name", "").lower()
+
         # convert to ordinal to support jax timestep interventions
-        if (
-            intervention.get("start_date") is not None
-            and intervention.get("start_date") != ""
-        ):
-            start_date_ordinal = _date_to_ordinal(intervention["start_date"])
+        item_start_date = item.get("start_date")
+        if item_start_date is not None and item_start_date != "":
+            start_date_ordinal = _date_to_ordinal(item_start_date)
         else:
             start_date_ordinal = None
-            intervention["start_date"] = None
-        if (
-            intervention.get("end_date") is not None
-            and intervention.get("end_date") != ""
-        ):
-            end_date_ordinal = _date_to_ordinal(intervention["end_date"])
+            item_start_date = None
+
+        item_end_date = item.get("end_date")
+        if item_end_date is not None and item_end_date != "":
+            end_date_ordinal = _date_to_ordinal(item_end_date)
         else:
             end_date_ordinal = None
-            intervention["end_date"] = None
+            item_end_date = None
 
         if (
-            intervention.get("start_date") is None
-            and intervention.get("end_date") is None
-            and intervention.get("start_threshold") is None
-            and intervention.get("end_threshold") is None
+            item_start_date is None
+            and item_end_date is None
+            and item.get("start_threshold") is None
+            and item.get("end_threshold") is None
         ):
-            intervention["start_date"] = start_date
+            item_start_date = start_date
             start_date_ordinal = _date_to_ordinal(start_date)
 
-        temp = {
-            intervention.get("id"): {
-                "start_threshold": intervention.get("start_threshold") / 100
-                if intervention.get("start_threshold") is not None
-                else None,
-                "end_threshold": intervention.get("end_threshold") / 100
-                if intervention.get("end_threshold") is not None
-                else None,
-                "start_date": intervention.get("start_date", None),
-                "start_date_ordinal": start_date_ordinal,
-                "end_date": intervention.get("end_date", None),
-                "end_date_ordinal": end_date_ordinal,
-                "adherence_min": intervention.get("adherence_min") / 100
-                if intervention.get("adherence_min") is not None
-                else None,
-                "transmission_percentage": intervention.get("transmission_percentage")
-                / 100
-                if intervention.get("transmission_percentage") is not None
-                else 0.05,
-                "start_threshold_node_id": intervention.get(
-                    "start_threshold_node_id", None
-                ),
-                "end_threshold_node_id": intervention.get(
-                    "end_threshold_node_id", None
-                ),
-            }
+        intervention_dict[intervention_id] = {
+            "start_threshold": item.get("start_threshold") / 100
+            if item.get("start_threshold") is not None
+            else None,
+            "end_threshold": item.get("end_threshold") / 100
+            if item.get("end_threshold") is not None
+            else None,
+            "start_date": item_start_date,
+            "start_date_ordinal": start_date_ordinal,
+            "end_date": item_end_date,
+            "end_date_ordinal": end_date_ordinal,
+            "adherence_min": item.get("adherence_min") / 100
+            if item.get("adherence_min") is not None
+            else None,
+            "transmission_percentage": item.get("transmission_percentage") / 100
+            if item.get("transmission_percentage") is not None
+            else 0.05,
+            "start_threshold_node_id": item.get("start_threshold_node_id", None),
+            "end_threshold_node_id": item.get("end_threshold_node_id", None),
         }
-        intervention_dict.update(temp)
 
     return intervention_dict
 

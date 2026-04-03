@@ -134,11 +134,11 @@ def generate_disease_config(schema: ModelParameterSchema) -> type:
     fields["disease_type"] = (
         disease_literal, Field(default=schema.disease_type))
 
-    # transmission_edges (required if the model has any edges defined)
+    # transmission_edges (optional — edges now come from TransmissionEdges join table)
     if schema.transmission_edges:
         fields["transmission_edges"] = (
-            List[GeneratedTransmissionEdge],
-            ...,  # required
+            Optional[List[GeneratedTransmissionEdge]],
+            Field(default=None),
         )
 
     # Disease-specific parameters

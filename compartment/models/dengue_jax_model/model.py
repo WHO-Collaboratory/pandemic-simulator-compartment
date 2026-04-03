@@ -2,28 +2,37 @@ import jax.numpy as np
 import logging
 import numpy as onp
 from compartment.helpers import setup_logging
-from datetime import datetime
-from compartment.interventions import jax_prop_intervention, jax_timestep_intervention
 from compartment.model import Model
-from compartment.temperature import temperature_seasonality_jax, calculate_thermal_responses, calculate_surviving_offspring, get_carrying_capacity
+from compartment.parameters import ValueType
+from compartment.interventions import jax_prop_intervention, jax_timestep_intervention
+from compartment.temperature import (
+    temperature_seasonality_jax,
+    calculate_thermal_responses,
+    calculate_surviving_offspring,
+    get_carrying_capacity,
+)
 
 # Initialize logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
+
 class DengueJaxModel(Model):
-    
-    # Fixed compartment structure for 4-serotype dengue model
-    COMPARTMENT_LIST = [
-        'SV', 'EV1', 'EV2', 'EV3', 'EV4', 'IV1', 'IV2', 'IV3', 'IV4',
-        'S0', 'E1', 'E2', 'E3', 'E4', 'I1', 'I2', 'I3', 'I4',
-        'C1', 'C2', 'C3', 'C4', 'Snot1', 'Snot2', 'Snot3', 'Snot4',
-        'E12', 'E13', 'E14', 'E21', 'E23', 'E24', 'E31', 'E32', 'E34', 'E41', 'E42', 'E43',
-        'I12', 'I13', 'I14', 'I21', 'I23', 'I24', 'I31', 'I32', 'I34', 'I41', 'I42', 'I43',
-        'H1', 'H2', 'H3', 'H4', 'R1', 'R2', 'R3', 'R4'
-    ]
-    
-    # Custom compartment grouping for delta calculations
+    """4-serotype dengue vector-borne model with temperature-driven dynamics.
+
+    Compartments are hardcoded (56 core + 8 cumulative) because the
+    4-serotype × 2-infection structure is fixed.  Users configure
+    transmission edges, interventions, and the immunity period.
+    """
+
+    @classmethod
+    def _add_total_compartments(cls, schema):
+        # Suppress framework auto-generation of per-edge _total
+        # compartments.  Dengue declares its own aggregate totals
+        # (E_total, I_total, etc.) covering all serotypes.
+        pass
+
+    # Output grouping: collapse serotype detail for display
     COMPARTMENT_DELTA_GROUPING = {
         "SV": ["SV"],
         "EV": ["EV1", "EV2", "EV3", "EV4"],
@@ -33,289 +42,527 @@ class DengueJaxModel(Model):
         "I": ["I1", "I2", "I3", "I4"],
         "C": ["C1", "C2", "C3", "C4"],
         "Snot": ["Snot1", "Snot2", "Snot3", "Snot4"],
-        "E2": ["E12", "E13", "E14", "E21", "E23", "E24", "E31", "E32", "E34", "E41", "E42", "E43"],
-        "I2": ["I12", "I13", "I14", "I21", "I23", "I24", "I31", "I32", "I34", "I41", "I42", "I43"],
+        "E2": [
+            "E12", "E13", "E14", "E21", "E23", "E24",
+            "E31", "E32", "E34", "E41", "E42", "E43",
+        ],
+        "I2": [
+            "I12", "I13", "I14", "I21", "I23", "I24",
+            "I31", "I32", "I34", "I41", "I42", "I43",
+        ],
         "H": ["H1", "H2", "H3", "H4"],
-        "R": ["R1", "R2", "R3", "R4"]
+        "R": ["R1", "R2", "R3", "R4"],
     }
 
+    # ------------------------------------------------------------------
+    # Declarative parameter schema
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def define_parameters(cls, schema):
+        schema.set_model_info(
+            disease_type="VECTOR_BORNE",
+            label="Dengue (4-serotype)",
+            description="A 4-serotype vector-borne dengue model with temperature-driven mosquito dynamics",
+        )
+
+        # ---- Vector compartments ----
+        schema.add_compartment("SV", "Susceptible Vectors", "Susceptible mosquito population")
+        for s in range(1, 5):
+            schema.add_compartment(
+                f"EV{s}", f"Exposed Vectors (serotype {s})",
+                f"Mosquitoes exposed to serotype {s}",
+            )
+        for s in range(1, 5):
+            schema.add_compartment(
+                f"IV{s}", f"Infectious Vectors (serotype {s})",
+                f"Mosquitoes infectious with serotype {s}",
+            )
+
+        # ---- Human primary infection compartments ----
+        schema.add_compartment("S0", "Susceptible", "Fully susceptible human population")
+        for s in range(1, 5):
+            schema.add_compartment(
+                f"E{s}", f"Exposed (serotype {s})",
+                f"Humans exposed to serotype {s} (primary infection)",
+            )
+        for s in range(1, 5):
+            schema.add_compartment(
+                f"I{s}", f"Infected (serotype {s})",
+                f"Humans infected with serotype {s} (primary infection)",
+                infective=True,
+            )
+
+        # ---- Cross-protection compartments ----
+        for s in range(1, 5):
+            schema.add_compartment(
+                f"C{s}", f"Cross-protected (serotype {s})",
+                f"Recovered from serotype {s}, temporarily cross-protected",
+            )
+        for s in range(1, 5):
+            schema.add_compartment(
+                f"Snot{s}", f"Susceptible (not {s})",
+                f"Immune to serotype {s}, susceptible to other serotypes",
+            )
+
+        # ---- Human secondary infection compartments ----
+        serotype_pairs = [
+            (i, j) for i in range(1, 5) for j in range(1, 5) if i != j
+        ]
+        for i, j in serotype_pairs:
+            schema.add_compartment(
+                f"E{i}{j}", f"Exposed 2nd ({i}→{j})",
+                f"Previously infected with serotype {i}, now exposed to serotype {j}",
+            )
+        for i, j in serotype_pairs:
+            schema.add_compartment(
+                f"I{i}{j}", f"Infected 2nd ({i}→{j})",
+                f"Secondary infection: previously serotype {i}, now serotype {j}",
+                infective=True,
+            )
+
+        # ---- Hospitalized & Recovered ----
+        for s in range(1, 5):
+            schema.add_compartment(
+                f"H{s}", f"Hospitalized (serotype {s})",
+                f"Hospitalized from secondary infection leading to serotype {s}",
+            )
+        for s in range(1, 5):
+            schema.add_compartment(
+                f"R{s}", f"Recovered (serotype {s})",
+                f"Recovered from secondary infection with serotype {s}",
+            )
+
+        # ---- Cumulative tracking (aggregated across serotypes) ----
+        schema.add_compartment("E_total", "Exposed Total", "Cumulative primary exposures")
+        schema.add_compartment("I_total", "Infected Total", "Cumulative primary infections")
+        schema.add_compartment("C_total", "Cross-protected Total", "Cumulative cross-protected")
+        schema.add_compartment("Snot_total", "Partially Susceptible Total", "Cumulative partially susceptible")
+        schema.add_compartment("E2_total", "Exposed 2nd Total", "Cumulative secondary exposures")
+        schema.add_compartment("I2_total", "Infected 2nd Total", "Cumulative secondary infections")
+        schema.add_compartment("H_total", "Hospitalized Total", "Cumulative hospitalizations")
+        schema.add_compartment("R_total", "Recovered Total", "Cumulative recoveries")
+
+        # ---- Disease parameters ----
+        schema.add_disease_parameter(
+            name="immunity_period",
+            label="Cross-Immunity Period",
+            description="Duration of cross-serotype immunity after primary infection (days). 0 = no cross-immunity.",
+            value_type=ValueType.INTEGER,
+            default=240,
+            default_min=90,
+            default_max=365,
+            min_value=0,
+            max_value=730,
+            unit="days",
+        )
+
+        # ---- Admin zone fields (dengue-specific) ----
+        schema.add_admin_zone_field(
+            name="seroprevalence",
+            label="Seroprevalence",
+            description="Percentage of population with prior dengue exposure",
+            value_type=ValueType.PERCENTAGE,
+            default=30.0,
+            min_value=0.0,
+            max_value=100.0,
+            unit="%",
+        )
+        schema.add_admin_zone_field(
+            name="temp_min",
+            label="Min Temperature",
+            description="Minimum annual temperature (°C)",
+            value_type=ValueType.FLOAT,
+            default=15.0,
+            min_value=-10.0,
+            max_value=45.0,
+            unit="°C",
+        )
+        schema.add_admin_zone_field(
+            name="temp_max",
+            label="Max Temperature",
+            description="Maximum annual temperature (°C)",
+            value_type=ValueType.FLOAT,
+            default=30.0,
+            min_value=-10.0,
+            max_value=50.0,
+            unit="°C",
+        )
+        schema.add_admin_zone_field(
+            name="temp_mean",
+            label="Mean Temperature",
+            description="Mean annual temperature (°C)",
+            value_type=ValueType.FLOAT,
+            default=25.0,
+            min_value=-10.0,
+            max_value=45.0,
+            unit="°C",
+        )
+
+        # ---- Travel ----
+        schema.set_travel_volume(
+            leaving_default=20.0,
+            leaving_min=0.0,
+            leaving_max=100.0,
+            returning_default=12.0,
+        )
+
+        # ---- Interventions ----
+        schema.add_intervention(
+            id="physical",
+            label="Bite Reduction",
+            description="Physical measures to reduce mosquito biting rate (bed nets, repellent)",
+            adherence=50.0,
+            transmission_reduction=50.0,
+        )
+
+        schema.add_intervention(
+            id="chemical",
+            label="Vector Control",
+            description="Chemical vector control reducing mosquito survival (spraying, larvicide)",
+            adherence=50.0,
+            transmission_reduction=50.0,
+        )
+
+    # ------------------------------------------------------------------
+    # Model interface
+    # ------------------------------------------------------------------
+
     def __init__(self, config):
-        # same as covid jax model
         self.population_matrix = np.array(config["initial_population"])
-        self.compartment_list = self.COMPARTMENT_LIST  # Use class attribute
+        self.compartment_list = list(self.COMPARTMENTS)
+
         self.start_date = config["start_date"]
         self.start_date_ordinal = self.start_date.toordinal()
         self.n_timesteps = config["time_steps"]
-        # for Jax replace travel matrix diag with 1.0
-        self.travel_matrix = np.fill_diagonal(np.array(config["travel_matrix"]), 1.0, inplace=False)
         self.admin_units = config["admin_units"]
+
+        # Travel
+        self.travel_matrix = np.fill_diagonal(
+            np.array(config["travel_matrix"]), 1.0, inplace=False
+        )
+        self.sigma = config["travel_volume"]["leaving"]
+
+        # Demographics
         self.demographics = config["case_file"]["demographics"]
         self.age_stratification = list(self.demographics.values())
         self.age_groups = list(self.demographics.keys())
-        self.sigma = config['travel_volume']['leaving'] 
 
         # Temperature
-        self.hemisphere = config['hemisphere']
-        self.temp_min = config['temperature']['temp_min']
-        self.temp_max = config['temperature']['temp_max']
-        self.temp_average = config['temperature']['temp_mean']
+        self.hemisphere = config["hemisphere"]
+        self.temp_min = config["temperature"]["temp_min"]
+        self.temp_max = config["temperature"]["temp_max"]
+        self.temp_average = config["temperature"]["temp_mean"]
 
-        # Interventions      
-        self.intervention_dict = config["intervention_dict"]
-        self.intervention_statuses = {
-            "physical": False,
-            "chemical": False
-        }
+        # Interventions
+        self.intervention_dict = config.get("intervention_dict", {})
+        self.intervention_statuses = {"physical": False, "chemical": False}
 
-        # Extra
         self.payload = config
-        
-        # Rate of loss of cross-protection
-        # zeta = 1/immunity_period, default = 1/240, if immunity_period is 0 then zeta = 0 
-        self.zeta = (
-            1 / config['Disease']['immunity_period']
-            if config['Disease']['immunity_period'] not in [None, 0]
-            else 0 if config['Disease']['immunity_period'] == 0
-            else 1 / 240
-        )
 
-        # Dengue default parameters
-        self.delta_H = 1/5.9    # Host exposed --> infected
-        self.eta = 1/5          # Host infected --> recovered
-        self.E_a = 0.05         # Activation energy 
-        self.k = 8.617e-5       # Boltzmann-Arrhenius constant 
-        self.N_v_m = 1.5        # Maximum carrying capacity
-        self.T_0 = 29           # Reference temperature where carrying capacity is greatest
-        self.kappa = 1e-5      # Helper population for mosquitos 
-        self.theta = 0.01       # hospitalized --> infected. This value is from pg. 4 of Paz-Bailey et al.
-        self.omega = 1/4.9      # hospitalized --> recovered
-    
+        # ---- Dengue parameters ----
+        # Cross-immunity period → loss rate
+        disease_cfg = config.get("Disease", {})
+        immunity = disease_cfg.get("immunity_period", 240)
+        if immunity is None:
+            immunity = 240
+        self.zeta_cross = 1.0 / immunity if immunity > 0 else 0.0
+
+        # Fixed epidemiological rates
+        self.delta_H = 1 / 5.9      # Host latent period (E→I)
+        self.eta_recovery = 1 / 5    # Host recovery rate (I→R)
+        self.theta_hosp = 0.01       # Hospitalization rate (I2→H)
+        self.omega_hosp = 1 / 4.9    # Hospital recovery rate (H→R)
+
+        # Fixed biological constants
+        self.E_a = 0.05        # Activation energy
+        self.k = 8.617e-5      # Boltzmann-Arrhenius constant
+        self.N_v_m = 1.5       # Maximum carrying capacity
+        self.T_0 = 29          # Reference temperature
+        self.kappa = 1e-5      # Helper population for mosquitoes
+
     @classmethod
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
-        import numpy as onp
-        column_mapping = {value: index for index, value in enumerate(compartment_list)}
+        column_mapping = {v: i for i, v in enumerate(compartment_list)}
         initial_population = onp.zeros((len(admin_zones), len(compartment_list)))
 
         for i, zone in enumerate(admin_zones):
-            # Mosquito population - all start as susceptible vectors
-            # Note: SV population is initialized to 0, actual vector dynamics handled in model
-            initial_population[i, column_mapping['SV']] = 0
+            # Mosquito population - starts at 0, dynamics handled in model
+            initial_population[i, column_mapping["SV"]] = 0
 
-            # Human population
-            population = zone['population']
-            seroprevalence = zone.get('seroprevalence', 0) or 0
-            infected_population = zone.get('infected_population', 0) or 0
+            population = zone["population"]
+            seroprevalence = zone.get("seroprevalence", 0) or 0
+            infected_population = zone.get("infected_population", 0) or 0
 
-            # Equal distribution across 4 serotypes (25% each)
+            # Equal distribution across 4 serotypes
             serotype_weights = [0.25] * 4
 
             # Distribute seroprevalence across Snot1-4
             total_snot = 0
             for idx, weight in enumerate(serotype_weights, 1):
                 snot_pop = round(weight * seroprevalence / 100 * population, 2)
-                initial_population[i, column_mapping[f'Snot{idx}']] = snot_pop
+                initial_population[i, column_mapping[f"Snot{idx}"]] = snot_pop
                 total_snot += snot_pop
 
             # Distribute infected across I1-4
             infected_assigned = 0
             for idx, weight in enumerate(serotype_weights, 1):
                 i_pop = round(weight * infected_population / 100 * population, 2)
-                initial_population[i, column_mapping[f'I{idx}']] = i_pop
+                initial_population[i, column_mapping[f"I{idx}"]] = i_pop
                 infected_assigned += i_pop
 
-            # Remaining population goes to S0 (fully susceptible)
-            S0 = population - total_snot - infected_assigned
-            initial_population[i, column_mapping['S0']] = S0
+            # Remaining → fully susceptible
+            initial_population[i, column_mapping["S0"]] = (
+                population - total_snot - infected_assigned
+            )
 
         return initial_population
 
-    @property
-    def disease_type(self):
-        return "VECTOR_BORNE"
-
     def get_params(self):
-        """ Get params tuple for ODE solver """
+        """Pack temperature/calendar params for the ODE solver."""
         numeric_day = int(self.start_date.strftime("%j"))
         hemisphere_flag = 0 if self.hemisphere == "North" else 1
         return (
-            self.temp_max, 
+            self.temp_max,
             self.temp_min,
-            self.temp_average, 
+            self.temp_average,
             numeric_day,
-            hemisphere_flag
+            hemisphere_flag,
         )
-    
-    def _add_cumulative_compartments(self):
-        # stack compartment totals
-        E_total = I_total = C_total = Snot_total = E2_total = I2_total = H_total = R_total = onp.zeros(len(self.admin_units))
-        self.population_matrix = onp.vstack((self.population_matrix, E_total, I_total, C_total, Snot_total, E2_total, I2_total, H_total, R_total))
-        self.compartment_list = self.compartment_list + ['E_total', 'I_total', 'C_total', 'Snot_total', 'E2_total', 'I2_total', 'H_total', 'R_total']
+
+    # ------------------------------------------------------------------
+    # Simulation setup
+    # ------------------------------------------------------------------
 
     def prepare_initial_state(self):
-        # For jax dengue we are switching from rows being regions to columns being regions
+        # Transpose: rows=compartments, columns=regions
         self.population_matrix = self.population_matrix.T
-        self._add_cumulative_compartments()
-        
-        return self.population_matrix , self.compartment_list
+        return self.population_matrix, self.compartment_list
+
+    # ------------------------------------------------------------------
+    # ODE derivative
+    # ------------------------------------------------------------------
 
     def derivative(self, y, t, p):
-        y = np.clip(y, 0.0, 1e9) # clip to avoid infs
+        y = np.clip(y, 0.0, 1e9)
         Tmax, Tmin, Tmean, numeric_day, hemisphere = p
 
         current_day = numeric_day + t
-        current_ordinal_day = self.start_date_ordinal + t
         n_regions = self.travel_matrix.shape[0]
 
-        #Compartments
+        # ---- Unpack all compartments ----
         error_val = 1e-6
-        SV, EV1, EV2, EV3, EV4, IV1, IV2, IV3, IV4, S0, E1, E2, E3, E4, I1, I2, I3, I4, C1, C2, C3, C4, Snot1, Snot2, Snot3, Snot4, E12, E13, E14, E21, E23, E24, E31, E32, E34, E41, E42, E43, I12, I13, I14, I21, I23, I24, I31, I32, I34, I41, I42, I43, H1, H2, H3, H4, R1, R2, R3, R4, E_total, I_total, C_total, Snot_total, E2_total, I2_total, H_total, R_total = y 
-        #Sum of vectors and sum of people
+        (
+            SV, EV1, EV2, EV3, EV4, IV1, IV2, IV3, IV4,
+            S0, E1, E2, E3, E4, I1, I2, I3, I4,
+            C1, C2, C3, C4, Snot1, Snot2, Snot3, Snot4,
+            E12, E13, E14, E21, E23, E24, E31, E32, E34, E41, E42, E43,
+            I12, I13, I14, I21, I23, I24, I31, I32, I34, I41, I42, I43,
+            H1, H2, H3, H4, R1, R2, R3, R4,
+            E_total, I_total, C_total, Snot_total,
+            E2_total, I2_total, H_total, R_total,
+        ) = y
+
         NV = error_val + sum([SV, EV1, EV2, EV3, EV4, IV1, IV2, IV3, IV4])
-        N = error_val + sum([S0, E1, E2, E3, E4, I1, I2, I3, I4, C1, C2, C3, C4, Snot1, Snot2, Snot3, Snot4, E12, E13, E14, E21, E23, E24, E31, E32, E34, E41, E42, E43, I12, I13, I14, I21, I23, I24, I31, I32, I34, I41, I42, I43, H1, H2, H3, H4, R1, R2, R3, R4]) 
+        N = error_val + sum([
+            S0, E1, E2, E3, E4, I1, I2, I3, I4,
+            C1, C2, C3, C4, Snot1, Snot2, Snot3, Snot4,
+            E12, E13, E14, E21, E23, E24, E31, E32, E34, E41, E42, E43,
+            I12, I13, I14, I21, I23, I24, I31, I32, I34, I41, I42, I43,
+            H1, H2, H3, H4, R1, R2, R3, R4,
+        ])
 
-        mu = 1 / (73 * 365) # global death rate for 73-year lifespan
-        births = mu * N # births per timestep
-        
-        #Temperature-related functions - these need to be run every timestep
-        temperature = temperature_seasonality_jax(Tmax, Tmin, Tmean, current_day, hemisphere)
-        l_V_T, s_V_T, d_V_T, epsilon_V_T, delta_V_T, gamma_T, b_V_T, mu_V_T = calculate_thermal_responses(temperature)
+        mu = 1 / (73 * 365)
+        births = mu * N
+
+        # ---- Temperature-driven vector parameters ----
+        temperature = temperature_seasonality_jax(
+            Tmax, Tmin, Tmean, current_day, hemisphere
+        )
+        (l_V_T, s_V_T, d_V_T, epsilon_V_T,
+         delta_V_T, gamma_T, b_V_T, mu_V_T) = calculate_thermal_responses(temperature)
         vector_surviving_offspring, mu_V_T0 = calculate_surviving_offspring()
-        carrying_capacity = get_carrying_capacity(temperature, vector_surviving_offspring, mu_V_T0, self.N_v_m, self.E_a, N, T0=29, k=self.k)
-        I_H_total = sum([I1, I2, I3, I4, I12, I13, I14, I21, I23, I24, I31, I32, I34, I41, I42, I43]) #This is the count of all infective mosquitos, this is used for the FOI for all susceptible humans (S0)
-        I_H_prop_infected = np.sum(I_H_total) / np.sum(N) # convert to scalar, proportion of total infected humans
+        carrying_capacity = get_carrying_capacity(
+            temperature, vector_surviving_offspring, mu_V_T0,
+            self.N_v_m, self.E_a, N, T0=29, k=self.k,
+        )
 
+        I_H_total = sum([
+            I1, I2, I3, I4,
+            I12, I13, I14, I21, I23, I24,
+            I31, I32, I34, I41, I42, I43,
+        ])
+        I_H_prop_infected = np.sum(I_H_total) / np.sum(N)
+
+        # ---- Interventions (shared intervention logic) ----
+        current_ordinal_day = self.start_date_ordinal + t
         rates = {"b_V_T": b_V_T, "s_V_T": s_V_T}
-        #INTERVENTIONS
-        rates, self.intervention_statuses, contact_matrix = jax_timestep_intervention(self.intervention_dict, current_ordinal_day, rates, self.intervention_statuses, self.travel_matrix)
-        rates, self.intervention_statuses, contact_matrix = jax_prop_intervention(self.intervention_dict, I_H_prop_infected, rates, self.intervention_statuses, self.travel_matrix)
-        #Unpack rates
-        b_V_T = rates['b_V_T']
-        s_V_T = rates['s_V_T']
+        rates, self.intervention_statuses, contact_matrix = jax_timestep_intervention(
+            self.intervention_dict, current_ordinal_day, rates,
+            self.intervention_statuses, self.travel_matrix,
+        )
+        rates, self.intervention_statuses, contact_matrix = jax_prop_intervention(
+            self.intervention_dict, I_H_prop_infected, rates,
+            self.intervention_statuses, self.travel_matrix,
+        )
+        b_V_T = rates["b_V_T"]
+        s_V_T = rates["s_V_T"]
 
-        #Converting scalars to arrays
+        # Broadcast scalars to region arrays
         l_V_T = np.repeat(l_V_T, n_regions)
         d_V_T = np.repeat(d_V_T, n_regions)
         epsilon_V_T = np.repeat(epsilon_V_T, n_regions)
         mu_V_T = np.repeat(mu_V_T, n_regions)
 
-        #FOI for hosts
-        transmission_rate_H = b_V_T * gamma_T #In this case, this value is a scalar since temperature is the same across regions
+        # ---- Force of infection (host) ----
+        transmission_rate_H = b_V_T * gamma_T
         BETA_H = transmission_rate_H * contact_matrix
-        I_V_total = sum([IV1, IV2, IV3, IV4]) #This is the count of all infective mosquitos, this is used for the FOI for all susceptible humans (S0)
-        LAMBDA_H_all = BETA_H @ (I_V_total/N) 
-        LAMBDA_H_1 = BETA_H @ (IV1/N)    
-        LAMBDA_H_2 = BETA_H @ (IV2/N)
-        LAMBDA_H_3 = BETA_H @ (IV3/N)
-        LAMBDA_H_4 = BETA_H @ (IV4/N)
-        LAMBDA_H_Snot1 = BETA_H @ (sum([IV2, IV3, IV4])/N)
-        LAMBDA_H_Snot2 = BETA_H @ (sum([IV1, IV3, IV4])/N)
-        LAMBDA_H_Snot3 = BETA_H @ (sum([IV1, IV2, IV4])/N)
-        LAMBDA_H_Snot4 = BETA_H @ (sum([IV1, IV2, IV3])/N)
+        I_V_total = sum([IV1, IV2, IV3, IV4])
+        LAMBDA_H_all = BETA_H @ (I_V_total / N)
+        LAMBDA_H_1 = BETA_H @ (IV1 / N)
+        LAMBDA_H_2 = BETA_H @ (IV2 / N)
+        LAMBDA_H_3 = BETA_H @ (IV3 / N)
+        LAMBDA_H_4 = BETA_H @ (IV4 / N)
+        LAMBDA_H_Snot1 = BETA_H @ (sum([IV2, IV3, IV4]) / N)
+        LAMBDA_H_Snot2 = BETA_H @ (sum([IV1, IV3, IV4]) / N)
+        LAMBDA_H_Snot3 = BETA_H @ (sum([IV1, IV2, IV4]) / N)
+        LAMBDA_H_Snot4 = BETA_H @ (sum([IV1, IV2, IV3]) / N)
 
+        # ---- Force of infection (vector) ----
+        transmission_rate_V = b_V_T * delta_V_T
+        BETA_V = transmission_rate_V * contact_matrix
+        LAMBDA_V_all = BETA_V @ (I_H_total / N)
+        LAMBDA_V_1 = BETA_V @ (sum([I1, I21, I31, I41]) / N)
+        LAMBDA_V_2 = BETA_V @ (sum([I2, I12, I32, I42]) / N)
+        LAMBDA_V_3 = BETA_V @ (sum([I3, I13, I23, I43]) / N)
+        LAMBDA_V_4 = BETA_V @ (sum([I4, I14, I24, I34]) / N)
 
-        #FOI for vectors
-        transmission_rate_V = b_V_T * delta_V_T #In this case, this value is a scalar since temperature is the same across regions
-        BETA_V = transmission_rate_V * contact_matrix 
-        LAMBDA_V_all = BETA_V @ (I_H_total/N)
-        LAMBDA_V_1 = BETA_V @ (sum([I1, I21, I31, I41])/N)
-        LAMBDA_V_2 = BETA_V @ (sum([I2, I12, I32, I42])/N)
-        LAMBDA_V_3 = BETA_V @ (sum([I3, I13, I23, I43])/N)
-        LAMBDA_V_4 = BETA_V @ (sum([I4, I14, I24, I34])/N)
-        
-        ## vector ode's:
-        SV_dot = ((l_V_T * s_V_T * d_V_T) / mu_V_T) * NV * (1 - (NV / carrying_capacity)) - (SV * LAMBDA_V_all) - mu_V_T * SV
-        
-        #Includes humans who are infected with each serotype on the first infection and on the 2nd infection
-        EV1_dot = (SV * LAMBDA_V_1) - (epsilon_V_T + mu_V_T) * EV1
-        EV2_dot = (SV * LAMBDA_V_2) - (epsilon_V_T + mu_V_T) * EV2
-        EV3_dot = (SV * LAMBDA_V_3) - (epsilon_V_T + mu_V_T) * EV3
-        EV4_dot = (SV * LAMBDA_V_4) - (epsilon_V_T + mu_V_T) * EV4
-        
+        # ---- Local aliases for model parameters ----
+        delta_H = self.delta_H
+        eta = self.eta_recovery
+        zeta = self.zeta_cross
+        theta = self.theta_hosp
+        omega = self.omega_hosp
+
+        # ---- Vector ODEs ----
+        SV_dot = (
+            (l_V_T * s_V_T * d_V_T) / mu_V_T
+        ) * NV * (1 - NV / carrying_capacity) - SV * LAMBDA_V_all - mu_V_T * SV
+
+        EV1_dot = SV * LAMBDA_V_1 - (epsilon_V_T + mu_V_T) * EV1
+        EV2_dot = SV * LAMBDA_V_2 - (epsilon_V_T + mu_V_T) * EV2
+        EV3_dot = SV * LAMBDA_V_3 - (epsilon_V_T + mu_V_T) * EV3
+        EV4_dot = SV * LAMBDA_V_4 - (epsilon_V_T + mu_V_T) * EV4
+
         IV1_dot = epsilon_V_T * EV1 - mu_V_T * IV1 + self.kappa
         IV2_dot = epsilon_V_T * EV2 - mu_V_T * IV2 + self.kappa
         IV3_dot = epsilon_V_T * EV3 - mu_V_T * IV3 + self.kappa
         IV4_dot = epsilon_V_T * EV4 - mu_V_T * IV4 + self.kappa
 
-        #host ode'set
+        # ---- Host primary infection ODEs ----
         S0_dot = -S0 * LAMBDA_H_all + births - mu * S0
 
-        E1_dot = S0 * LAMBDA_H_1 - self.delta_H * E1 - mu * E1
-        E2_dot = S0 * LAMBDA_H_2 - self.delta_H * E2 - mu * E2
-        E3_dot = S0 * LAMBDA_H_3 - self.delta_H * E3 - mu * E3
-        E4_dot = S0 * LAMBDA_H_4 - self.delta_H * E4 - mu * E4
+        E1_dot = S0 * LAMBDA_H_1 - delta_H * E1 - mu * E1
+        E2_dot = S0 * LAMBDA_H_2 - delta_H * E2 - mu * E2
+        E3_dot = S0 * LAMBDA_H_3 - delta_H * E3 - mu * E3
+        E4_dot = S0 * LAMBDA_H_4 - delta_H * E4 - mu * E4
         E_total_dot = S0 * (LAMBDA_H_1 + LAMBDA_H_2 + LAMBDA_H_3 + LAMBDA_H_4)
 
-        I1_dot = self.delta_H * E1 - self.eta * I1 - mu * I1
-        I2_dot = self.delta_H * E2 - self.eta * I2 - mu * I2
-        I3_dot = self.delta_H * E3 - self.eta * I3 - mu * I3
-        I4_dot = self.delta_H * E4 - self.eta * I4 - mu * I4
-        I_total_dot = self.delta_H * (E1 + E2 + E3 + E4)
+        I1_dot = delta_H * E1 - eta * I1 - mu * I1
+        I2_dot = delta_H * E2 - eta * I2 - mu * I2
+        I3_dot = delta_H * E3 - eta * I3 - mu * I3
+        I4_dot = delta_H * E4 - eta * I4 - mu * I4
+        I_total_dot = delta_H * (E1 + E2 + E3 + E4)
 
-        C1_dot = self.eta * I1 - self.zeta * C1 - mu * C1
-        C2_dot = self.eta * I2 - self.zeta * C2 - mu * C2
-        C3_dot = self.eta * I3 - self.zeta * C3 - mu * C3
-        C4_dot = self.eta * I4 - self.zeta * C4 - mu * C4
-        C_total_dot = self.eta * (I1 + I2 + I3 + I4)
+        C1_dot = eta * I1 - zeta * C1 - mu * C1
+        C2_dot = eta * I2 - zeta * C2 - mu * C2
+        C3_dot = eta * I3 - zeta * C3 - mu * C3
+        C4_dot = eta * I4 - zeta * C4 - mu * C4
+        C_total_dot = eta * (I1 + I2 + I3 + I4)
 
-        #People who already got bitten with DENV1, now only susceptible to other serotypes
-        Snot1_dot = self.zeta * C1 - Snot1 * LAMBDA_H_Snot1 - mu * Snot1
-        Snot2_dot = self.zeta * C2 - Snot2 * LAMBDA_H_Snot2 - mu * Snot2
-        Snot3_dot = self.zeta * C3 - Snot3 * LAMBDA_H_Snot3 - mu * Snot3
-        Snot4_dot = self.zeta * C4 - Snot4 * LAMBDA_H_Snot4 - mu * Snot4
-        Snot_total_dot = self.zeta * (C1 + C2 + C3 + C4)
-        
-        E12_dot = Snot1 * LAMBDA_H_2 - self.delta_H * E12 - mu * E12
-        E13_dot = Snot1 * LAMBDA_H_3 - self.delta_H * E13 - mu * E13
-        E14_dot = Snot1 * LAMBDA_H_4 - self.delta_H * E14 - mu * E14
-        
-        E21_dot = Snot2 * LAMBDA_H_1 - self.delta_H * E21 - mu * E21
-        E23_dot = Snot2 * LAMBDA_H_3 - self.delta_H * E23 - mu * E23
-        E24_dot = Snot2 * LAMBDA_H_4 - self.delta_H * E24 - mu * E24
+        Snot1_dot = zeta * C1 - Snot1 * LAMBDA_H_Snot1 - mu * Snot1
+        Snot2_dot = zeta * C2 - Snot2 * LAMBDA_H_Snot2 - mu * Snot2
+        Snot3_dot = zeta * C3 - Snot3 * LAMBDA_H_Snot3 - mu * Snot3
+        Snot4_dot = zeta * C4 - Snot4 * LAMBDA_H_Snot4 - mu * Snot4
+        Snot_total_dot = zeta * (C1 + C2 + C3 + C4)
 
-        E31_dot = Snot3 * LAMBDA_H_1 - self.delta_H * E31 - mu * E31
-        E32_dot = Snot3 * LAMBDA_H_2 - self.delta_H * E32 - mu * E32
-        E34_dot = Snot3 * LAMBDA_H_4 - self.delta_H * E34 - mu * E34
+        # ---- Host secondary infection ODEs ----
+        E12_dot = Snot1 * LAMBDA_H_2 - delta_H * E12 - mu * E12
+        E13_dot = Snot1 * LAMBDA_H_3 - delta_H * E13 - mu * E13
+        E14_dot = Snot1 * LAMBDA_H_4 - delta_H * E14 - mu * E14
 
-        E41_dot = Snot4 * LAMBDA_H_1 - self.delta_H * E41 - mu * E41
-        E42_dot = Snot4 * LAMBDA_H_2 - self.delta_H * E42 - mu * E42
-        E43_dot = Snot4 * LAMBDA_H_3 - self.delta_H * E43 - mu * E43
-        E2_total_dot = (Snot1 * (LAMBDA_H_2 + LAMBDA_H_3 + LAMBDA_H_4)) + \
-            (Snot2 * (LAMBDA_H_1 + LAMBDA_H_3 + LAMBDA_H_4)) + \
-            (Snot3 * (LAMBDA_H_1 + LAMBDA_H_2 + LAMBDA_H_4)) + \
-            (Snot4 * (LAMBDA_H_1 + LAMBDA_H_2 + LAMBDA_H_3))
+        E21_dot = Snot2 * LAMBDA_H_1 - delta_H * E21 - mu * E21
+        E23_dot = Snot2 * LAMBDA_H_3 - delta_H * E23 - mu * E23
+        E24_dot = Snot2 * LAMBDA_H_4 - delta_H * E24 - mu * E24
 
-        I12_dot = self.delta_H * E12 - (self.theta + self.eta) * I12 - mu * I12
-        I13_dot = self.delta_H * E13 - (self.theta + self.eta) * I13 - mu * I13
-        I14_dot = self.delta_H * E14 - (self.theta + self.eta) * I14 - mu * I14
+        E31_dot = Snot3 * LAMBDA_H_1 - delta_H * E31 - mu * E31
+        E32_dot = Snot3 * LAMBDA_H_2 - delta_H * E32 - mu * E32
+        E34_dot = Snot3 * LAMBDA_H_4 - delta_H * E34 - mu * E34
 
-        I21_dot = self.delta_H * E21 - (self.theta + self.eta) * I21 - mu * I21
-        I23_dot = self.delta_H * E23 - (self.theta + self.eta) * I23 - mu * I23
-        I24_dot = self.delta_H * E24 - (self.theta + self.eta) * I24 - mu * I24
+        E41_dot = Snot4 * LAMBDA_H_1 - delta_H * E41 - mu * E41
+        E42_dot = Snot4 * LAMBDA_H_2 - delta_H * E42 - mu * E42
+        E43_dot = Snot4 * LAMBDA_H_3 - delta_H * E43 - mu * E43
 
-        I31_dot = self.delta_H * E31 - (self.theta + self.eta) * I31 - mu * I31
-        I32_dot = self.delta_H * E32 - (self.theta + self.eta) * I32 - mu * I32
-        I34_dot = self.delta_H * E34 - (self.theta + self.eta) * I34 - mu * I34
+        E2_total_dot = (
+            Snot1 * (LAMBDA_H_2 + LAMBDA_H_3 + LAMBDA_H_4)
+            + Snot2 * (LAMBDA_H_1 + LAMBDA_H_3 + LAMBDA_H_4)
+            + Snot3 * (LAMBDA_H_1 + LAMBDA_H_2 + LAMBDA_H_4)
+            + Snot4 * (LAMBDA_H_1 + LAMBDA_H_2 + LAMBDA_H_3)
+        )
 
-        I41_dot = self.delta_H * E41 - (self.theta + self.eta) * I41 - mu * I41
-        I42_dot = self.delta_H * E42 - (self.theta + self.eta) * I42 - mu * I42
-        I43_dot = self.delta_H * E43 - (self.theta + self.eta) * I43 - mu * I43
-        I2_total_dot = self.delta_H * (E12 + E13 + E14 + E21 + E23 + E24 + E31 + E32 + E34 + E41 + E42 + E43)
+        I12_dot = delta_H * E12 - (theta + eta) * I12 - mu * I12
+        I13_dot = delta_H * E13 - (theta + eta) * I13 - mu * I13
+        I14_dot = delta_H * E14 - (theta + eta) * I14 - mu * I14
 
-        H1_dot = self.theta * (I21 + I31 + I41) - self.omega * (H1) - mu * H1
-        H2_dot = self.theta * (I12 + I32 + I42) - self.omega * (H2) - mu * H2
-        H3_dot = self.theta * (I13 + I23 + I43) - self.omega * (H3) - mu * H3
-        H4_dot = self.theta * (I14 + I24 + I34) - self.omega * (H4) - mu * H4
-        H_total_dot = self.theta * (I21 + I31 + I41 + I12 + I32 + I42 + I13 + I23 + I43 + I14 + I24 + I34)
+        I21_dot = delta_H * E21 - (theta + eta) * I21 - mu * I21
+        I23_dot = delta_H * E23 - (theta + eta) * I23 - mu * I23
+        I24_dot = delta_H * E24 - (theta + eta) * I24 - mu * I24
 
-        #Recovered from 2nd infection since 2nd infection is what causes illness ore recovered from hospitalization
-        R1_dot = self.eta * (I21 + I31 + I41) + self.omega * (H1) - mu * R1
-        R2_dot = self.eta * (I12 + I32 + I42) + self.omega * (H2) - mu * R2
-        R3_dot = self.eta * (I13 + I23 + I43) + self.omega * (H3) - mu * R3
-        R4_dot = self.eta * (I14 + I24 + I34) + self.omega * (H4) - mu * R4
-        R_total_dot = (self.eta * (I21 + I31 + I41 + I12 + I32 + I42 + I13 + I23 + I43 + I14 + I24 + I34)) + (self.omega * (H1 + H2 + H3 + H4))
+        I31_dot = delta_H * E31 - (theta + eta) * I31 - mu * I31
+        I32_dot = delta_H * E32 - (theta + eta) * I32 - mu * I32
+        I34_dot = delta_H * E34 - (theta + eta) * I34 - mu * I34
 
-        return np.stack([SV_dot, EV1_dot, EV2_dot, EV3_dot, EV4_dot, IV1_dot, IV2_dot, IV3_dot, IV4_dot, S0_dot, E1_dot, E2_dot, E3_dot, E4_dot, I1_dot, I2_dot, 
-                        I3_dot, I4_dot, C1_dot, C2_dot, C3_dot, C4_dot, Snot1_dot, Snot2_dot, Snot3_dot, Snot4_dot, E12_dot, E13_dot, E14_dot, E21_dot, E23_dot, 
-                        E24_dot, E31_dot, E32_dot, E34_dot, E41_dot, E42_dot, E43_dot, I12_dot, I13_dot, I14_dot, I21_dot, I23_dot, I24_dot, I31_dot, I32_dot, 
-                        I34_dot, I41_dot, I42_dot, I43_dot, H1_dot, H2_dot, H3_dot, H4_dot, R1_dot, R2_dot, R3_dot, R4_dot,
-                        E_total_dot, I_total_dot, C_total_dot, Snot_total_dot, E2_total_dot, I2_total_dot, H_total_dot, R_total_dot])
+        I41_dot = delta_H * E41 - (theta + eta) * I41 - mu * I41
+        I42_dot = delta_H * E42 - (theta + eta) * I42 - mu * I42
+        I43_dot = delta_H * E43 - (theta + eta) * I43 - mu * I43
+        I2_total_dot = delta_H * (
+            E12 + E13 + E14 + E21 + E23 + E24
+            + E31 + E32 + E34 + E41 + E42 + E43
+        )
+
+        # ---- Hospitalized & Recovered ----
+        H1_dot = theta * (I21 + I31 + I41) - omega * H1 - mu * H1
+        H2_dot = theta * (I12 + I32 + I42) - omega * H2 - mu * H2
+        H3_dot = theta * (I13 + I23 + I43) - omega * H3 - mu * H3
+        H4_dot = theta * (I14 + I24 + I34) - omega * H4 - mu * H4
+        H_total_dot = theta * (
+            I21 + I31 + I41 + I12 + I32 + I42
+            + I13 + I23 + I43 + I14 + I24 + I34
+        )
+
+        R1_dot = eta * (I21 + I31 + I41) + omega * H1 - mu * R1
+        R2_dot = eta * (I12 + I32 + I42) + omega * H2 - mu * R2
+        R3_dot = eta * (I13 + I23 + I43) + omega * H3 - mu * R3
+        R4_dot = eta * (I14 + I24 + I34) + omega * H4 - mu * R4
+        R_total_dot = (
+            eta * (I21 + I31 + I41 + I12 + I32 + I42
+                   + I13 + I23 + I43 + I14 + I24 + I34)
+            + omega * (H1 + H2 + H3 + H4)
+        )
+
+        return np.stack([
+            SV_dot, EV1_dot, EV2_dot, EV3_dot, EV4_dot,
+            IV1_dot, IV2_dot, IV3_dot, IV4_dot,
+            S0_dot, E1_dot, E2_dot, E3_dot, E4_dot,
+            I1_dot, I2_dot, I3_dot, I4_dot,
+            C1_dot, C2_dot, C3_dot, C4_dot,
+            Snot1_dot, Snot2_dot, Snot3_dot, Snot4_dot,
+            E12_dot, E13_dot, E14_dot, E21_dot, E23_dot, E24_dot,
+            E31_dot, E32_dot, E34_dot, E41_dot, E42_dot, E43_dot,
+            I12_dot, I13_dot, I14_dot, I21_dot, I23_dot, I24_dot,
+            I31_dot, I32_dot, I34_dot, I41_dot, I42_dot, I43_dot,
+            H1_dot, H2_dot, H3_dot, H4_dot,
+            R1_dot, R2_dot, R3_dot, R4_dot,
+            E_total_dot, I_total_dot, C_total_dot, Snot_total_dot,
+            E2_total_dot, I2_total_dot, H_total_dot, R_total_dot,
+        ])

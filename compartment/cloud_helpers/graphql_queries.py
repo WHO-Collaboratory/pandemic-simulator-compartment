@@ -49,62 +49,8 @@ GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
       }
       immunity_period
       interactions_per_period
-      intervention_nodes {
-        data {
-          adherence_max
-          adherence_min
-          alias
-          end_date
-          end_threshold
-          end_threshold_node_id
-          label
-          start_date
-          start_threshold
-          start_threshold_node_id
-        }
-        id
-        type
-      }
       model_type
-      transmission_edges {
-        data {
-          transmission_rate
-          variance_params {
-            has_variance
-            distribution_type
-            field_name
-            min
-            max
-          }
-        }
-        id
-        source
-        target
-        type
-      }
       updatedAt
-    }
-    interventions {
-      adherence_max
-      adherence_min
-      end_date
-      end_threshold
-      end_threshold_node_id
-      id
-      label
-      start_date
-      start_threshold
-      start_threshold_node_id
-      type
-      transmission_percentage
-      hour_reduction
-      variance_params {
-        has_variance
-        distribution_type
-        field_name
-        min
-        max
-      }
     }
     Interventions {
       items {
@@ -142,15 +88,13 @@ GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
         id
         simulation_job_id
         transmission_edge_id
-        transmittion_edge {
+        transmission_edge {
           id
           value_type
-          default_value
           disease_type
           description
           source
           target
-          order
         }
         value
         FieldConfigs {

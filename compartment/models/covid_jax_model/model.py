@@ -1,177 +1,269 @@
 import jax.numpy as np
 import logging
 import numpy as onp
-from datetime import datetime
 from compartment.helpers import setup_logging, prepare_covid_initial_state
-from compartment.interventions import jax_timestep_intervention, jax_prop_intervention
 from compartment.model import Model
+from compartment.parameters import ValueType
+
 # Initialize logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
+"""
+WARNING: This model is not currently supported in the pandemic simulator app,
+but is available for testing and experimentation in the codebase.
+"""
+
 class CovidJaxModel(Model):
-    """ A class representing a compartmental model with dynamic travel and intervention mechanisms """
-    
+    """SEIHDR compartmental model with age-stratified transmission and spatial mobility."""
+
+    # Schema defines all possible compartments (S-E-I-H-D-R), but the
+    # config's disease_nodes determines which are active at runtime.
+    FLEXIBLE_COMPARTMENTS = True
+
+    @classmethod
+    def define_parameters(cls, schema):
+        schema.set_model_info(
+            disease_type="RESPIRATORY",
+            label="Novel Respiratory (Advanced)",
+            description="An SEIHDR compartmental model for novel respiratory diseases with age-stratified transmission",
+        )
+
+        # ---- Compartments (S-E-I-H-D-R) ----
+        schema.add_compartment(
+            "S", "Susceptible", "Population susceptible to infection"
+        )
+        schema.add_compartment(
+            "E", "Exposed", "Population exposed but not yet infectious"
+        )
+        schema.add_compartment(
+            "I",
+            "Infected",
+            "Currently infected and infectious population",
+            infective=True,
+        )
+        schema.add_compartment(
+            "H", "Hospitalized", "Infected individuals requiring hospitalization"
+        )
+        schema.add_compartment(
+            "D", "Deceased", "Population that has died from the disease"
+        )
+        schema.add_compartment("R", "Recovered", "Recovered and immune population")
+
+        # ---- Transmission edges ----
+        schema.add_transmission_edge(
+            source="susceptible",
+            target="exposed",
+            variable_name="beta",
+            frequency_dependent=True,
+            label="Transmission Rate (S->E)",
+            description="Rate at which susceptible individuals become exposed through contact with infected individuals",
+            default=0.25,
+            min_value=0.01,
+            max_value=2.0,
+            default_min=0.2,
+            default_max=0.3,
+            unit="per day",
+        )
+
+        schema.add_transmission_edge(
+            source="exposed",
+            target="infected",
+            variable_name="theta",
+            label="Incubation Period (E->I)",
+            description="Average number of days from exposure to becoming infectious",
+            default=5.0,
+            min_value=1.0,
+            max_value=100.0,
+            default_min=2.0,
+            default_max=14.0,
+            unit="days",
+            value_type=ValueType.DAYS,
+        )
+
+        schema.add_transmission_edge(
+            source="infected",
+            target="hospitalized",
+            variable_name="zeta",
+            label="Hospitalization Rate (I->H)",
+            description="Percentage of infected individuals who require hospitalization",
+            default=0.04,
+            min_value=0.01,
+            max_value=1.0,
+            default_min=0.04,
+            default_max=0.4,
+            unit="%",
+            value_type=ValueType.PERCENTAGE,
+        )
+
+        schema.add_transmission_edge(
+            source="infected",
+            target="deceased",
+            variable_name="delta",
+            label="Infection Fatality Rate (I->D)",
+            description="Rate at which infected individuals die from the disease",
+            default=0.0001,
+            min_value=0.00001,
+            max_value=0.01,
+            default_min=0.0001,
+            default_max=0.001,
+            unit="per day",
+        )
+
+        schema.add_transmission_edge(
+            source="hospitalized",
+            target="deceased",
+            variable_name="epsilon",
+            label="Hospital Fatality Rate (H->D)",
+            description="Rate at which hospitalized individuals die",
+            default=0.001,
+            min_value=0.0001,
+            max_value=0.01,
+            default_min=0.001,
+            default_max=0.005,
+            unit="per day",
+        )
+
+        schema.add_transmission_edge(
+            source="infected",
+            target="recovered",
+            variable_name="gamma",
+            label="Recovery Period (I->R)",
+            description="Average number of days for an infected individual to recover",
+            default=7.14,
+            min_value=1.0,
+            max_value=100.0,
+            default_min=4.0,
+            default_max=10.0,
+            unit="days",
+            value_type=ValueType.DAYS,
+        )
+
+        schema.add_transmission_edge(
+            source="hospitalized",
+            target="recovered",
+            variable_name="eta",
+            label="Hospital Recovery Period (H->R)",
+            description="Average number of days for a hospitalized individual to recover",
+            default=7.14,
+            min_value=1.0,
+            max_value=100.0,
+            default_min=3.0,
+            default_max=14.0,
+            unit="days",
+            value_type=ValueType.DAYS,
+        )
+
+        # ---- Interventions ----
+        schema.add_intervention(
+            id="mask_wearing",
+            label="Mask Wearing",
+            description="Reduces transmission rate through mask usage in the population",
+            target_rates=["beta"],
+            adherence=20.0,
+            transmission_reduction=35.0,
+        )
+
+        schema.add_intervention(
+            id="social_isolation",
+            label="Social Isolation",
+            description="Reduces transmission rate through social distancing and isolation measures",
+            target_rates=["beta"],
+            adherence=40.0,
+            transmission_reduction=50.0,
+        )
+
+    # ------------------------------------------------------------------
+    # Model interface
+    # ------------------------------------------------------------------
+
     def __init__(self, config):
-        """ Initialize the CompartmentalModel with a configuration dictionary """
-        # Load population and travel data
-        self.population_matrix = np.array(config["initial_population"])
-        self.travel_matrix = np.fill_diagonal(np.array(config["travel_matrix"]), 1.0, inplace=False)
+        super().__init__(config)
+
+        # The schema defines full SEIHDR capability, but the config's
+        # compartment_list (from disease_nodes) defines what's active
+        # at runtime.  Override the schema-derived list.
         self.compartment_list = config["compartment_list"]
-        self.sigma = config['travel_volume']['leaving'] 
 
-        # Load disease transmission parameters
-        transmission_dict = config.get("transmission_dict", {})
-        self.beta = transmission_dict.get("beta", None)         # susceptible → infected
-        self.gamma = transmission_dict.get("gamma", None)       # infected → recovered
-        self.theta = transmission_dict.get("theta", None)       # exposed → infected
-        self.zeta = transmission_dict.get("zeta", None)         # infected → hospitalized
-        self.delta = transmission_dict.get("delta", None)       # infected → deceased
-        self.eta = transmission_dict.get("eta", None)           # hospitalized → recovered
-        self.epsilon = transmission_dict.get("epsilon", None)   # hospitalized → deceased
-        self.original_rates = {"beta": self.beta}
+        self.population_matrix = np.array(config["initial_population"])
 
-        # Simulation parameters
-        self.start_date = config["start_date"]
-        self.start_date_ordinal = self.start_date.toordinal()
-        self.n_timesteps = config["time_steps"]
+        # Travel
+        self.travel_matrix = np.fill_diagonal(
+            np.array(config["travel_matrix"]), 1.0, inplace=False
+        )
+        self.sigma = config["travel_volume"]["leaving"]
 
-        # Administrative units & demographics
-        self.admin_units = config["admin_units"]
+        # Demographics & age stratification
         self.demographics = config["case_file"]["demographics"]
         self.age_stratification = list(self.demographics.values())
         self.age_groups = list(self.demographics.keys())
-        self.interaction_matrix = np.array([
-            [5.46, 5.18, 0.93], 
-            [1.70, 9.18, 1.68], 
-            [0.83, 5.90, 3.80]
-        ])
-
-        # Interventions      
-        self.intervention_dict = config["intervention_dict"]
-        self.intervention_statuses = {
-            "lock_down": False,
-            "mask_wearing": False,
-            "social_isolation": False,
-            "vaccination": False
-        }
-
-        self.payload = config
-    
-    @classmethod
-    def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
-        """
-        Standard SEIHDR initial population for respiratory diseases.
-        Uses base class implementation (S-I split).
-        """
-        return super().get_initial_population(admin_zones, compartment_list, **kwargs)
-
-    @property
-    def disease_type(self):
-        return "RESPIRATORY"
-
-    def get_params(self):
-        """ Get params tuple for ODE solver """
-        return (
-            self.interaction_matrix,
-            self.theta, 
-            self.gamma, 
-            self.zeta,
-            self.eta, 
-            self.epsilon, 
-            self.delta
+        self.interaction_matrix = np.array(
+            [[5.46, 5.18, 0.93], [1.70, 9.18, 1.68], [0.83, 5.90, 3.80]]
         )
-    
-    def _add_cumulative_compartments(self):
-        # stack compartment totals
-        S_idx = self.compartment_list.index('S')
-        cumulative_shape = onp.zeros((1, *self.population_matrix[S_idx].shape))
-        for comp in ["E", "I", "H"]:
-            if comp in self.compartment_list:
-                self.population_matrix = onp.vstack((self.population_matrix, cumulative_shape))
-                self.compartment_list = self.compartment_list + [f"{comp}_total"]
-    
+
     def prepare_initial_state(self):
         self.population_matrix, self.interaction_matrix = prepare_covid_initial_state(
-            self.population_matrix,
-            self.interaction_matrix,
-            self.demographics
+            self.population_matrix, self.interaction_matrix, self.demographics
         )
-        self._add_cumulative_compartments()
+
+        # Add _total compartments only for active edge targets
+        active_set = set(self.compartment_list)
+        schema = type(self)._get_cached_schema()
+        for edge in schema.transmission_edges:
+            tid = edge.target_id
+            total_id = f"{tid}_total"
+            if tid in active_set and total_id not in active_set:
+                zero_row = onp.zeros((1, *self.population_matrix[0].shape))
+                self.population_matrix = onp.vstack((self.population_matrix, zero_row))
+                self.compartment_list = self.compartment_list + [total_id]
+                active_set.add(total_id)
 
         return self.population_matrix, self.compartment_list
 
     def derivative(self, y, t, p):
+        """Compute derivatives with age-stratified force of infection.
+
+        Uses the escape-hatch pattern: ``_compute_derivatives()`` handles
+        the 6 standard edges (E->I, I->H, I->D, H->D, I->R, H->R),
+        while S->E uses an age-stratified contact matrix and is applied
+        manually via ``_apply_flow()``.
         """
-        Calculates how each compartment changes over time, used by ODE solver
-        Dynamically handles optional compartments in self.compartment_list
-        """
-        # Unpack rates
-        age_trans, theta, gamma, zeta, eta, epsilon, delta = p
+        C = self.COMPARTMENTS
+        params = self._unpack_params(p)
+        age_trans = self.interaction_matrix
 
         states = {comp: y[i] for i, comp in enumerate(self.compartment_list)}
-        S = states['S']
-        I = states['I']
-        R = states['R']
-        # Optional compartments
-        E = states.get('E')
-        H = states.get('H')
-        D = states.get('D')
+        S = states[C.S]
+        I = states[C.I]  # noqa: E741
 
-        current_ordinal_day = self.start_date_ordinal + t
-
-        # Compute total population excluding deaths and cumulative compartments
-        pop_terms = [comp for comp in (S, E, I, H, R) if comp is not None]
+        # Population for FOI (exclude deaths and _total compartments)
+        non_total = [c for c in self.compartment_list if not c.endswith("_total")]
+        pop_terms = [states[c] for c in non_total if c != "D"]
         N_total = sum(pop_terms).sum(axis=0)
         I_frac = I / N_total[None, :]
 
-        # Interventions
-        rates = {'beta': self.beta}
+        # --- Interventions (schema-driven) ---
+        rates = {"beta": params["beta"]}
         prop_infective_scalar = I.sum() / N_total.sum()
-        rates, self.intervention_statuses, contact_matrix = jax_timestep_intervention(
-            self.intervention_dict,
-            current_ordinal_day,
-            rates,
-            self.intervention_statuses,
-            self.travel_matrix
-        )
-        rates, self.intervention_statuses, contact_matrix = jax_prop_intervention(
-            self.intervention_dict,
-            prop_infective_scalar,
-            rates,
-            self.intervention_statuses,
-            self.travel_matrix
+        rates, contact_matrix = self._apply_interventions(
+            t, rates, prop_infective_scalar
         )
 
-        # Compute force of infection
-        BETA = ((rates['beta'] * contact_matrix) @ I_frac.T).T
+        # Add all active (non-None) rates for standard edges
+        for name, value in params.items():
+            if name != "beta" and value is not None:
+                rates[name] = value
+
+        # --- Standard edges via framework (skip manual FOI edge) ---
+        derivs = self._compute_derivatives(states, rates, skip_edges={"beta"})
+
+        # --- Manual FOI: age-stratified contact matrix (S->E or S->I) ---
+        BETA = ((rates["beta"] * contact_matrix) @ I_frac.T).T
         omega = age_trans @ BETA
+        flow_foi = S * omega
 
-        # Effective rate parameters based on compartment presence
-        theta = theta if E is not None else 0
-        zeta = zeta if H is not None else 0
-        delta = delta if D is not None else 0
-        eta = eta if H is not None else 0
-        epsilon = epsilon if H is not None and D is not None else 0
-
-        # Add derivatives to dictionary then stack results
-        derivs = {}
-
-        derivs['S'] = -S * omega
-        if E is not None:
-            derivs['E'] = S * omega - theta * E
-        derivs['I'] = (theta * E if E is not None else S * omega) - (gamma + zeta + delta) * I
-        if H is not None:
-            derivs['H'] = zeta * I - (eta + epsilon) * H
-        if D is not None:
-            derivs['D'] = (delta * I) + (epsilon * H if H is not None else 0)
-        derivs['R'] = gamma * I + (eta * (H if H is not None else 0))
-
-        # Cumulative compartments
-        if 'E_total' in self.compartment_list:
-            derivs['E_total'] = S * omega
-        derivs['I_total'] = (theta * E if E is not None else S * omega)
-        if 'H_total' in self.compartment_list:
-            derivs['H_total'] = zeta * I
+        # Route FOI to E if present, otherwise directly to I
+        target = "E" if "E" in states else "I"
+        self._apply_flow(derivs, "S", target, flow_foi)
 
         return np.stack([derivs[comp] for comp in self.compartment_list])

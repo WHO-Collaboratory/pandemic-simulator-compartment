@@ -102,15 +102,23 @@ class ValidationPostProcessor:
         disease_dict = config.Disease.model_dump()
         disease_type = config.Disease.disease_type
         admin_zones_dicts = [z.model_dump() for z in config.case_file.admin_zones]
-        interventions_list = (
-            [i.model_dump() for i in config.interventions]
-            if config.interventions
-            else []
-        )
         admin_unit_dict = config.AdminUnit.model_dump() if config.AdminUnit else None
         travel_volume_dict = (
             config.travel_volume.model_dump() if config.travel_volume else None
         )
+
+        # Extract normalized TransmissionEdges and Interventions
+        transmission_edge_items = []
+        if config.TransmissionEdges:
+            transmission_edge_items = [
+                e.model_dump() for e in config.TransmissionEdges.items
+            ]
+
+        intervention_items = []
+        if config.Interventions:
+            intervention_items = [
+                i.model_dump() for i in config.Interventions.items
+            ]
 
         # === MODEL REGISTRY (import model classes) ===
         from compartment.models.covid_jax_model.model import CovidJaxModel
@@ -131,16 +139,26 @@ class ValidationPostProcessor:
 
         model_class = MODEL_REGISTRY.get(disease_type)
 
-        # === COMPARTMENT LIST (check model class attribute first) ===
-        if model_class and hasattr(model_class, "COMPARTMENT_LIST"):
-            # Use model's hardcoded compartment list
-            compartment_list = model_class.COMPARTMENT_LIST
-        elif disease_dict.get("compartment_list"):
-            # Explicit compartment list provided in config
-            compartment_list = disease_dict["compartment_list"]
-        elif disease_dict.get("disease_nodes"):
-            # Extract from disease graph structure (flexible models like COVID)
+        # === COMPARTMENT LIST ===
+        # Models with FLEXIBLE_COMPARTMENTS = True (e.g. COVID) derive
+        # their active compartments from the config (disease_nodes or
+        # compartment_list).  Models with fixed compartments (e.g. dengue)
+        # use their schema-derived COMPARTMENT_LIST regardless of what
+        # the frontend sends in disease_nodes.
+        use_config_compartments = (
+            model_class and getattr(model_class, "FLEXIBLE_COMPARTMENTS", False)
+        )
+
+        if use_config_compartments and disease_dict.get("disease_nodes"):
             compartment_list = create_compartment_list(disease_dict["disease_nodes"])
+        elif use_config_compartments and disease_dict.get("compartment_list"):
+            compartment_list = disease_dict["compartment_list"]
+        elif model_class and hasattr(model_class, "COMPARTMENT_LIST"):
+            compartment_list = model_class.COMPARTMENT_LIST
+        elif disease_dict.get("disease_nodes"):
+            compartment_list = create_compartment_list(disease_dict["disease_nodes"])
+        elif disease_dict.get("compartment_list"):
+            compartment_list = disease_dict["compartment_list"]
         else:
             raise ValueError(
                 "Either 'disease_nodes' or 'compartment_list' must be provided in Disease config. "
@@ -158,29 +176,16 @@ class ValidationPostProcessor:
                 admin_zones_dicts, compartment_list
             )
 
-        # === TRANSMISSION DICT (only if transmission_edges exist) ===
+        # === TRANSMISSION DICT (from normalized TransmissionEdges) ===
         transmission_dict = {}
-        if disease_dict.get("transmission_edges"):
-            try:
-                transmission_dict = create_transmission_dict(
-                    disease_dict["transmission_edges"]
-                )
-            except (KeyError, AttributeError):
-                # If the helper can't process transmission edges (e.g., missing 'id' field
-                # or not in predefined mapping), create a simple dict
-                for edge in disease_dict["transmission_edges"]:
-                    # Create a key from source->target
-                    key = f"{edge.get('source', '')}_{edge.get('target', '')}"
-                    rate = edge.get("data", {}).get(
-                        "transmission_rate", edge.get("transmission_rate", 0)
-                    )
-                    transmission_dict[key] = rate
+        if transmission_edge_items:
+            transmission_dict = create_transmission_dict(transmission_edge_items)
 
         # === COMMON DERIVED FIELDS (only compute if data available) ===
         admin_units = extract_admin_units(admin_zones_dicts)
         intervention_dict = (
-            create_intervention_dict(interventions_list, config.start_date)
-            if interventions_list
+            create_intervention_dict(intervention_items, config.start_date)
+            if intervention_items
             else {}
         )
         travel_matrix = (

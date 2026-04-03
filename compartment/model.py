@@ -534,7 +534,10 @@ class Model(ABC):
             if edge.source_id not in states or edge.target_id not in states:
                 continue
 
-            rate = rates[edge.variable_name]
+            rate = rates.get(edge.variable_name)
+            # Skip edges with no rate (compartment not in this config variant)
+            if rate is None:
+                continue
             source = states[edge.source_id]
 
             if edge.frequency_dependent:
