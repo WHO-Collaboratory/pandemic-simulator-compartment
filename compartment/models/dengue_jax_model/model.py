@@ -199,14 +199,6 @@ class DengueJaxModel(Model):
             unit="°C",
         )
 
-        # ---- Travel ----
-        schema.set_travel_volume(
-            leaving_default=20.0,
-            leaving_min=0.0,
-            leaving_max=100.0,
-            returning_default=12.0,
-        )
-
         # ---- Interventions ----
         schema.add_intervention(
             id="physical",
@@ -273,8 +265,6 @@ class DengueJaxModel(Model):
         self.eta_recovery = 1 / 5    # Host recovery rate (I→R)
         self.theta_hosp = 0.01       # Hospitalization rate (I2→H)
         self.omega_hosp = 1 / 4.9    # Hospital recovery rate (H→R)
-
-        # Fixed biological constants
         self.E_a = 0.05        # Activation energy
         self.k = 8.617e-5      # Boltzmann-Arrhenius constant
         self.N_v_m = 1.5       # Maximum carrying capacity
