@@ -5,11 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_call:  # allows disease-pipeline to invoke this as a dependency
-
-concurrency:
-  group: "${{ github.workflow }}-${{ github.ref }}"
-  cancel-in-progress: true
+  workflow_call:
 
 jobs:
   test:
