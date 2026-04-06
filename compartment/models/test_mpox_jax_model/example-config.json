@@ -1,71 +1,45 @@
 {
-  "start_date": "2026-03-06",
-  "end_date": "2032-03-06",
-  "Disease": {
-    "disease_type": "MONKEYPOX",
-    "transmission_edges": [
-      {
-        "source": "susceptible",
-        "target": "infected",
-        "data": {
-          "transmission_rate": 0.12
-        }
-      },
-      {
-        "source": "infected",
-        "target": "recovered",
-        "data": {
-          "transmission_rate": 0.05
-        }
-      },
-      {
-        "source": "recovered",
-        "target": "susceptible",
-        "data": {
-          "transmission_rate": 0.005
-        }
-      }
-    ]
-  },
-  "admin_unit_id": "USA",
-  "AdminUnit": {
-    "id": "USA",
-    "center_lat": 37.0902
-  },
-  "interventions": [
-    {
-      "id": "ring_vaccination",
-      "adherence_min": 70.0,
-      "transmission_percentage": 75.0,
-      "start_date": "2026-03-06",
-      "end_date": "2028-03-06",
-      "start_threshold": null,
-      "end_threshold": null
-    }
-  ],
-  "case_file": {
+    "Disease": {
+        "disease_type": "MONKEYPOX",
+        "immunity_period": 60
+    },
+    "start_date": "2026-03-06",
+    "end_date": "2032-03-06",
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": { "name": "RING_VACCINATION", "display_name": "Ring Vaccination" },
+                "adherence_min": 70.0,
+                "transmission_percentage": 75.0,
+                "start_date": "2026-03-06",
+                "end_date": "2028-03-06"
+            }
+        ]
+    },
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": { "source": "susceptible", "target": "infected", "value_type": "RATE" },
+                "value": 0.12,
+                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "BETA", "min": 0, "max": 0 }] }
+            },
+            {
+                "transmission_edge": { "source": "infected", "target": "recovered", "value_type": "RATE" },
+                "value": 0.05,
+                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "GAMMA", "min": 0, "max": 0 }] }
+            },
+            {
+                "transmission_edge": { "source": "recovered", "target": "susceptible", "value_type": "DAYS" },
+                "value": 0.0167,
+                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "OMEGA", "min": 0, "max": 0 }] }
+            }
+        ]
+    },
     "admin_zones": [
-      {
-        "center_lat": 40.7128,
-        "center_lon": -74.006,
-        "name": "Example Zone",
-        "population": 1000000,
-        "infected_population": 0.01
-      },
-      {
-        "center_lat": 34.0522,
-        "center_lon": -118.2437,
-        "name": "Example Zone 2",
-        "population": 2000000,
-        "infected_population": 0.01
-      },
-      {
-        "center_lat": 41.8781,
-        "center_lon": -87.6298,
-        "name": "Example Zone 3",
-        "population": 1500000,
-        "infected_population": 0.01
-      }
-    ]
-  }
+        { "name": "Example Zone",   "center_lat": 40.7128, "center_lon": -74.006,  "population": 1000000, "infected_population": 0.01 },
+        { "name": "Example Zone 2", "center_lat": 34.0522, "center_lon": -118.2437, "population": 2000000, "infected_population": 0.1 },
+        { "name": "Example Zone 3", "center_lat": 41.8781, "center_lon": -87.6298,  "population": 1500000, "infected_population": 1.0 }
+    ],
+    "demographics": { "age_0_17": 25.0, "age_18_55": 50.0, "age_56_plus": 25.0 },
+    "travel_volume": { "leaving": 20.0 }
 }
