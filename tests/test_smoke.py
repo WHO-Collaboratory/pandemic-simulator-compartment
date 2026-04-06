@@ -32,19 +32,22 @@ from compartment.run_simulation import run_simulation
 
 MODELS_DIR = pathlib.Path(__file__).resolve().parent.parent / "compartment" / "models"
 
+# Keys match the disease_path values in the CI build matrix
+# (.github/workflows/disease-pipeline.yml) so that tests can be
+# filtered per-disease with: pytest -k "covid_jax_model"
 MODEL_CONFIGS = {
-    "covid": (
+    "covid_jax_model": (
         "covid_jax_model",
         "compartment.models.covid_jax_model.model.CovidJaxModel",
         MODELS_DIR / "covid_jax_model" / "example-config.json",
     ),
-    "dengue": (
+    "dengue_jax_model": (
         "dengue_jax_model",
         "compartment.models.dengue_jax_model.model.DengueJaxModel",
         MODELS_DIR / "dengue_jax_model" / "example-config.json",
     ),
-    "mpox": (
-        "test_mpox_jax_model",
+    "mpox_jax_model": (
+        "mpox_jax_model",
         "compartment.models.test_mpox_jax_model.model.MpoxJaxModel",
         MODELS_DIR / "test_mpox_jax_model" / "example-config.json",
     ),
