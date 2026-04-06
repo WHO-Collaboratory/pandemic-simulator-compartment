@@ -11,7 +11,7 @@ the ``ValidationPostProcessor`` pipeline.
 
 from __future__ import annotations
 
-from compartment.models.test_mpox_jax_model.model import MpoxJaxModel
+from compartment.models.mpox_jax_model.model import MpoxJaxModel
 from compartment.schema_generator import generate_disease_config
 
 # Auto-generate MpoxDiseaseConfig from the model's parameter schema

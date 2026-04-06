@@ -1,7 +1,7 @@
 import logging
 import argparse
 from compartment.driver import drive_simulation
-from compartment.models.test_mpox_jax_model.model import MpoxJaxModel
+from compartment.models.mpox_jax_model.model import MpoxJaxModel
 
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)

@@ -13,7 +13,7 @@ Run all smoke tests:
 python3 -m pytest tests/test_smoke.py -v -m integration
 
 Run just one model:
-python3 -m pytest tests/test_smoke.py -v -m integration -k "covid"
+python3 -m pytest tests/test_smoke.py -v -m integration -k "covid_jax_model"
 
 Run a specific test:
 python3 -m pytest tests/test_smoke.py::TestFlexibleCompartments::test_sir_only_no_extra_compartments -v
@@ -48,8 +48,8 @@ MODEL_CONFIGS = {
     ),
     "mpox_jax_model": (
         "mpox_jax_model",
-        "compartment.models.test_mpox_jax_model.model.MpoxJaxModel",
-        MODELS_DIR / "test_mpox_jax_model" / "example-config.json",
+        "compartment.models.mpox_jax_model.model.MpoxJaxModel",
+        MODELS_DIR / "mpox_jax_model" / "example-config.json",
     ),
 }
 
