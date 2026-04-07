@@ -9,8 +9,25 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  discover:
     runs-on: ubuntu-latest
+    outputs:
+      models: ${{ steps.find.outputs.models }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        run: |
+          models=$(ls -d compartment/models/*/example-config.json 2>/dev/null | xargs -I{} dirname {} | xargs -I{} basename {} | jq -R . | jq -sc .)
+          echo "models=$models" >> "$GITHUB_OUTPUT"
+          echo "Discovered models: $models"
+
+  test:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        model: ${{ fromJson(needs.discover.outputs.models) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,5 +42,5 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run smoke tests (all models with example-config.json)
-        run: uv run python -m pytest tests/test_smoke.py -v -m integration
+      - name: Smoke test ${{ matrix.model }}
+        run: uv run python -m pytest tests/test_smoke.py -v -m integration -k "${{ matrix.model }}"
