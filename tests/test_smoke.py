@@ -27,31 +27,51 @@ import pytest
 from compartment.run_simulation import run_simulation
 
 # ---------------------------------------------------------------------------
-# Model registry: (model_id, model_class_import, config_path)
+# Auto-discover models: any directory under compartment/models/ that has
+# both model.py and example-config.json is a testable model.
+# Filter by name with: pytest -k "dengue_jax_model"
 # ---------------------------------------------------------------------------
 
 MODELS_DIR = pathlib.Path(__file__).resolve().parent.parent / "compartment" / "models"
 
-# Keys match the disease_path values in the CI build matrix
-# (.github/workflows/disease-pipeline.yml) so that tests can be
-# filtered per-disease with: pytest -k "covid_jax_model"
-MODEL_CONFIGS = {
-    "covid_jax_model": (
-        "covid_jax_model",
-        "compartment.models.covid_jax_model.model.CovidJaxModel",
-        MODELS_DIR / "covid_jax_model" / "example-config.json",
-    ),
-    "dengue_jax_model": (
-        "dengue_jax_model",
-        "compartment.models.dengue_jax_model.model.DengueJaxModel",
-        MODELS_DIR / "dengue_jax_model" / "example-config.json",
-    ),
-    "mpox_jax_model": (
-        "mpox_jax_model",
-        "compartment.models.mpox_jax_model.model.MpoxJaxModel",
-        MODELS_DIR / "mpox_jax_model" / "example-config.json",
-    ),
-}
+
+def _discover_models() -> dict[str, tuple[str, str, pathlib.Path]]:
+    """Scan compartment/models/ for directories with model.py + example-config.json."""
+    import importlib, inspect
+    from compartment.model import Model
+
+    found = {}
+    for model_dir in sorted(MODELS_DIR.iterdir()):
+        config_path = model_dir / "example-config.json"
+        model_py = model_dir / "model.py"
+        if not config_path.exists() or not model_py.exists():
+            continue
+
+        dir_name = model_dir.name
+        module_path = f"compartment.models.{dir_name}.model"
+
+        # Find the Model subclass in the module
+        try:
+            module = importlib.import_module(module_path)
+        except Exception:
+            continue
+
+        model_class = None
+        for _, obj in inspect.getmembers(module, inspect.isclass):
+            if issubclass(obj, Model) and obj is not Model:
+                model_class = obj
+                break
+
+        if model_class is None:
+            continue
+
+        class_path = f"{module_path}.{model_class.__name__}"
+        found[dir_name] = (dir_name, class_path, config_path)
+
+    return found
+
+
+MODEL_CONFIGS = _discover_models()
 
 
 def _import_class(dotted_path: str):

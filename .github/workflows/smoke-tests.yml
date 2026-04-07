@@ -11,10 +11,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        disease_path: [covid_jax_model, dengue_jax_model, mpox_jax_model]
     steps:
       - uses: actions/checkout@v4
 
@@ -29,5 +25,5 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run smoke tests for ${{ matrix.disease_path }}
-        run: uv run python -m pytest tests/test_smoke.py -v -m integration -k "${{ matrix.disease_path }}"
+      - name: Run smoke tests (all models with example-config.json)
+        run: uv run python -m pytest tests/test_smoke.py -v -m integration
