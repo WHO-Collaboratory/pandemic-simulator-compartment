@@ -251,7 +251,7 @@ def compute_multi_run_compartment_deltas(
 
 def _get_intervention_model_registry() -> dict:
     """Lazy-import model registry for infective compartment lookup."""
-    from compartment.models.test_mpox_jax_model.model import MpoxJaxModel
+    from compartment.models.mpox_jax_model.model import MpoxJaxModel
     from compartment.models.test_klebsiella_amr_model.model import KlebsiellaAmrModel
     from compartment.models.test_covid_sir_stochastic.model import CovidSirStochasticModel
 

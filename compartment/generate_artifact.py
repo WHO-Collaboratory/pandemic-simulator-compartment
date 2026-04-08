@@ -69,7 +69,7 @@ def _get_model_class(disease_type: str):
 
     # Only import what's needed to keep startup fast
     if disease_type == "MONKEYPOX":
-        from compartment.models.test_mpox_jax_model.model import MpoxJaxModel
+        from compartment.models.mpox_jax_model.model import MpoxJaxModel
 
         registry["MONKEYPOX"] = MpoxJaxModel
     elif disease_type == "RESPIRATORY":

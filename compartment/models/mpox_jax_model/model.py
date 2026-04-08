@@ -15,7 +15,6 @@ WARNING: This model is not currently supported in the pandemic simulator app,
 but is available for testing and experimentation in the codebase. 
 """
 
-
 class MpoxJaxModel(Model):
     """A simple SIRS compartmental model for MPOX with spatial mobility"""
 

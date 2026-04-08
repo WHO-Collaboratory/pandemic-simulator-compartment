@@ -16,7 +16,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  smoke-tests:
+    uses: ./.github/workflows/smoke-tests.yml
+
   build-image:
+    needs: smoke-tests
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -66,6 +70,7 @@ jobs:
             MODEL_DIR=compartment/models/${{ matrix.disease_path }}/
 
   generate-artifact:
+    needs: smoke-tests
     runs-on: ubuntu-latest
     permissions:
       id-token: write
