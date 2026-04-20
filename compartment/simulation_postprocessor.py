@@ -24,7 +24,7 @@ class SimulationPostProcessor:
         self.admin_units = model.admin_units
         self.start_date = model.start_date
         self.n_timesteps = model.n_timesteps
-        self.demographics = getattr(model, "demographics", None) or {'age_0_17': 25.0, 'age_18_55': 50.0, 'age_56_plus': 25.0}
+        self.demographics = getattr(model, "demographics", None) or {}
         self.disease_type = model.disease_type
         self.step = get_simulation_step_size(model.n_timesteps)
         self.intervention_dict = getattr(model, "intervention_dict", {})
@@ -67,20 +67,15 @@ class SimulationPostProcessor:
             for comp in comps
         }
 
-        if self.disease_type == "RESPIRATORY":
-            group_names = []
-            for comp in self.compartment_list:
-                if comp in grouping.keys():
-                    group_names.append(comp)
-            # Filter col2grp to only include compartments in the compartment list
-            col2grp = {
-                comp: col2grp[comp]
-                for comp in self.compartment_list
-                if comp in col2grp
-            }
-            
-        else:
-            group_names = list(grouping.keys())
+        # Keep only groups that have at least one active compartment, in the
+        # order they appear in the active compartment_list.  This handles
+        # models with optional compartments (e.g. SEIHDR without H or D)
+        # without gating on disease_type.
+        active_set = set(self.compartment_list)
+        col2grp = {comp: grp for comp, grp in col2grp.items() if comp in active_set}
+        group_names = [grp for grp in grouping.keys() if any(
+            col2grp.get(c) == grp for c in active_set
+        )]
 
         # Prepare output array
         new_arr = np.zeros((T, len(group_names), R))
