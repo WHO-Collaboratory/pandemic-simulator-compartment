@@ -40,7 +40,7 @@ def load_config_from_json(config_path: str) -> dict:
         if "demographics" not in config_data["case_file"]:
             config_data["case_file"]["demographics"] = config_data.pop(
                 "demographics",
-                {"age_0_17": 25.0, "age_18_55": 50.0, "age_56_plus": 25.0},
+                {},
             )
 
     return {"data": {"getSimulationJob": config_data}}
@@ -502,8 +502,8 @@ def format_jax_output(
                     "time_series": df_nested.to_dict("records"),
                 }
             )
-    elif population_matrix.ndim == 4 and disease_type == "RESPIRATORY":
-        formatted_data["admin_zones"] = fast_format_jax_output_respiratory(
+    elif population_matrix.ndim == 4:
+        formatted_data["admin_zones"] = fast_format_jax_output_demographic(
             population_matrix,
             compartment_list,
             demographics,
@@ -533,7 +533,7 @@ def format_jax_output(
     return formatted_data
 
 
-def fast_format_jax_output_respiratory(
+def fast_format_jax_output_demographic(
     population_matrix,
     compartment_list,
     demographics,
@@ -545,8 +545,7 @@ def fast_format_jax_output_respiratory(
     payload,
 ):
     # Build index arrays - only include base compartments (not cumulative _total columns)
-    base_comps = ["S", "E", "I", "H", "D", "R"]
-    master_list = [c for c in compartment_list if c in base_comps]
+    master_list = [c for c in compartment_list if not c.endswith("_total")]
     age_labels = list(demographics.keys())
     dates = [
         (payload["start_date"] + timedelta(days=i * step)).strftime("%Y-%m-%d")
