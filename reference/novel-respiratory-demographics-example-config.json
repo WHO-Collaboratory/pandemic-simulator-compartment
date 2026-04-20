@@ -1,0 +1,56 @@
+{
+    "Disease": {
+        "disease_type": "RESPIRATORY",
+        "compartment_list": ["S", "E", "I", "H", "D", "R"]
+    },
+    "start_date": "2026-04-20",
+    "end_date": "2026-05-20",
+    "TransmissionEdges": {
+        "items": [
+            { "transmission_edge": { "value_type": "RATE",       "source": "susceptible",  "target": "exposed"      }, "value": 0.28   },
+            { "transmission_edge": { "value_type": "DAYS",       "source": "exposed",      "target": "infected"     }, "value": 5.0    },
+            { "transmission_edge": { "value_type": "PERCENTAGE", "source": "infected",     "target": "hospitalized" }, "value": 0.02   },
+            { "transmission_edge": { "value_type": "RATE",       "source": "infected",     "target": "deceased"     }, "value": 0.0001 },
+            { "transmission_edge": { "value_type": "RATE",       "source": "hospitalized", "target": "deceased"     }, "value": 0.001  },
+            { "transmission_edge": { "value_type": "DAYS",       "source": "infected",     "target": "recovered"    }, "value": 7.0    },
+            { "transmission_edge": { "value_type": "DAYS",       "source": "hospitalized", "target": "recovered"    }, "value": 12.0   }
+        ]
+    },
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": { "name": "SOCIAL_ISOLATION", "display_name": "Social Isolation" },
+                "adherence_min": 35.0,
+                "transmission_percentage": 45.0,
+                "start_date": "2025-05-01",
+                "end_date": "2025-07-31"
+            }
+        ]
+    },
+    "admin_zones": [
+        { "name": "Lagos",    "center_lat":  6.52, "center_lon":  3.38, "population": 15000000, "infected_population": 0.06 },
+        { "name": "Kinshasa", "center_lat": -4.32, "center_lon": 15.32, "population": 17000000, "infected_population": 0.04 },
+        { "name": "Dakar",    "center_lat": 14.72, "center_lon": -17.47, "population":  3800000, "infected_population": 0.03 }
+    ],
+    "travel_volume": { "leaving": 10.0 },
+    "demographics": {
+        "infant_0_4":    8.0,
+        "child_5_17":   22.0,
+        "adult_18_44":  38.0,
+        "adult_45_64":  20.0,
+        "elderly_65":   12.0
+    },
+    "contact_matrix_overrides": {
+        "infant_0_4":  { "infant_0_4": 2.1, "child_5_17": 3.2, "adult_18_44": 4.8, "adult_45_64": 2.5, "elderly_65": 1.2 },
+        "child_5_17":  { "infant_0_4": 1.1, "child_5_17": 9.5, "adult_18_44": 4.0, "adult_45_64": 1.8, "elderly_65": 0.9 },
+        "adult_18_44": { "infant_0_4": 1.0, "child_5_17": 2.3, "adult_18_44": 8.2, "adult_45_64": 3.5, "elderly_65": 1.5 },
+        "adult_45_64": { "infant_0_4": 0.8, "child_5_17": 1.5, "adult_18_44": 5.1, "adult_45_64": 6.8, "elderly_65": 2.8 },
+        "elderly_65":  { "infant_0_4": 0.6, "child_5_17": 1.0, "adult_18_44": 2.9, "adult_45_64": 4.2, "elderly_65": 5.5 }
+    },
+    "demographic_rate_overrides": {
+        "zeta":  { "infant_0_4": 0.05, "child_5_17": 0.08, "adult_18_44": 0.5,  "adult_45_64": 3.0,  "elderly_65": 12.0  },
+        "delta": { "infant_0_4": 0.00002, "child_5_17": 0.00003, "adult_18_44": 0.0001, "adult_45_64": 0.0008, "elderly_65": 0.004 },
+        "gamma": { "infant_0_4": 5.0,  "child_5_17": 5.5,  "adult_18_44": 7.0,  "adult_45_64": 9.0,  "elderly_65": 14.0  },
+        "eta":   { "infant_0_4": 6.0,  "child_5_17": 7.0,  "adult_18_44": 10.0, "adult_45_64": 14.0, "elderly_65": 21.0  }
+    }
+}
