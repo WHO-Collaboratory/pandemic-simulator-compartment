@@ -789,6 +789,112 @@ class TestCovidDisease:
                         f"{parts:.2f} != {val['age_all']:.2f}"
                     )
 
+    @pytest.mark.integration
+    def test_demographic_rate_overrides_change_outcome(self):
+        """High fatality rate for elderly should produce more deaths in that group.
+
+        This test proves that demographic_rate_overrides actually flow through the
+        ODE derivative computation and change simulation outcomes — not just that
+        the rate vectors are constructed correctly.
+
+        Setup: two equal-sized groups (young / elderly), same initial conditions,
+        same beta/gamma — but elderly delta is 500x higher.  After 150 days,
+        elderly deaths must exceed young deaths by a large margin.
+        """
+        from compartment.models.covid_jax_model.model import CovidJaxModel
+
+        config = {
+            "Disease": {
+                "disease_type": "RESPIRATORY",
+                "compartment_list": ["S", "E", "I", "D", "R"],
+            },
+            "start_date": "2025-01-01",
+            "end_date": "2025-06-01",
+            "admin_zones": [
+                {
+                    "name": "TestZone",
+                    "center_lat": 0.0,
+                    "center_lon": 0.0,
+                    "population": 1000000,
+                    "infected_population": 5.0,
+                }
+            ],
+            # Two equal groups — same initial conditions, same population weight.
+            # Only delta differs so any outcome difference is caused by the override.
+            "demographics": {"young": 50.0, "elderly": 50.0},
+            "travel_volume": {"leaving": 0},
+            # Identity contact matrix: each group infects only itself.
+            # Without this the warning fires and the matrix defaults to identity
+            # anyway, but declaring it explicitly makes the test self-documenting.
+            "contact_matrix_overrides": {
+                "young":   {"young": 1.0, "elderly": 0.0},
+                "elderly": {"young": 0.0, "elderly": 1.0},
+            },
+            "TransmissionEdges": {
+                "items": [
+                    {
+                        "transmission_edge": {
+                            "value_type": "RATE",
+                            "source": "susceptible",
+                            "target": "exposed",
+                        },
+                        "value": 0.35,
+                    },
+                    {
+                        "transmission_edge": {
+                            "value_type": "DAYS",
+                            "source": "exposed",
+                            "target": "infected",
+                        },
+                        "value": 5.0,
+                    },
+                    {
+                        "transmission_edge": {
+                            "value_type": "RATE",
+                            "source": "infected",
+                            "target": "deceased",
+                        },
+                        "value": 0.0001,  # base rate; overridden per group below
+                    },
+                    {
+                        "transmission_edge": {
+                            "value_type": "DAYS",
+                            "source": "infected",
+                            "target": "recovered",
+                        },
+                        "value": 7.0,
+                    },
+                ]
+            },
+            "Interventions": {"items": []},
+            # elderly delta is 500x higher → elderly should accumulate far more deaths
+            "demographic_rate_overrides": {
+                "delta": {"young": 0.0001, "elderly": 0.05},
+            },
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(config, f)
+            config_path = f.name
+
+        results = _run_model(CovidJaxModel, pathlib.Path(config_path))
+        ts = results[0]["parent_admin_total"]["time_series"]
+        final = ts[-1]
+
+        d_entry = final.get("D")
+        assert isinstance(d_entry, dict), (
+            f"Expected D compartment to be a dict with per-group values, got {type(d_entry)}"
+        )
+        d_young = d_entry.get("young", 0)
+        d_elderly = d_entry.get("elderly", 0)
+
+        assert d_elderly > 0, "Elderly group recorded zero deaths — rate override may not be applied"
+        assert d_young >= 0, "Young group deaths should be non-negative"
+        assert d_elderly > 10 * d_young, (
+            f"Elderly deaths ({d_elderly:.0f}) should be at least 10x young deaths ({d_young:.0f}). "
+            "demographic_rate_overrides for delta may not be flowing through the derivative."
+        )
+
 
 # ---------------------------------------------------------------------------
 # Dengue-specific disease tests
