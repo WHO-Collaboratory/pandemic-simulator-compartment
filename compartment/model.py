@@ -144,6 +144,8 @@ class Model(ABC):
         etc.).
         """
         self.config = config
+        self.contact_matrix = None
+        self._rate_vectors = None
 
         schema = type(self)._get_cached_schema()
         if not schema:
@@ -179,6 +181,9 @@ class Model(ABC):
         self.intervention_statuses = {
             intv_def.id: False for intv_def in schema.interventions
         }
+
+        self.contact_matrix = self._build_contact_matrix(config)
+        self._rate_vectors = self._build_rate_vectors(config)
 
     # ------------------------------------------------------------------
     # Schema-derived properties
@@ -422,6 +427,176 @@ class Model(ABC):
                 rate = None
             setattr(self, edge.variable_name, rate)
 
+    def _array_module(self):
+        """
+        Return the array module (``jax.numpy`` or ``numpy``) that matches the
+        type of ``self.population_matrix``.
+
+        This allows demographic helpers to produce arrays that are compatible
+        with the model's compute backend without hardcoding ``jnp``.  JAX
+        models get JAX arrays; plain-numpy models get numpy arrays.
+        """
+        pm = self.population_matrix
+        if type(pm).__module__.startswith("jax"):
+            return jnp
+        return np
+
+    def _build_contact_matrix(self, config: dict = None):
+        """
+        Build the demographic contact matrix from schema declarations and
+        optional config overrides.
+
+        Starts from identity, applies schema-declared overrides (model
+        defaults from ``set_contact_override()``), then applies any
+        per-run config overrides from ``config["contact_matrix_overrides"]``::
+
+            "contact_matrix_overrides": {
+                "age_0_17":    { "age_18_55": 3.0 },
+                "age_56_plus": { "age_0_17": 0.5, "age_56_plus": 2.5 }
+            }
+
+        Config overrides take precedence over schema defaults, so a run can
+        use a different contact structure without modifying the model.
+
+        Returns ``None`` if the schema declares no demographic groups.
+        """
+        schema = type(self)._get_cached_schema()
+        if not schema or not schema.demographic_groups:
+            return None
+
+        xp = self._array_module()
+
+        # Resolve the effective group IDs and matrix size.
+        # Config demographics take full precedence: a config can declare any
+        # number of groups with any names, regardless of what the schema
+        # declares as defaults.  The schema group IDs are only used when the
+        # config provides no demographics.
+        config_demo = {}
+        if config:
+            cf = config.get("case_file", {})
+            if isinstance(cf, dict):
+                config_demo = cf.get("demographics", {})
+
+        if config_demo:
+            effective_ids = list(config_demo.keys())
+        else:
+            effective_ids = [g.id for g in schema.demographic_groups]
+        A = len(effective_ids)
+
+        # Warn when demographics are provided but no contact matrix overrides.
+        # Without overrides the matrix defaults to identity — each group only
+        # contacts itself, so cross-group transmission is zero.  This is almost
+        # never intentional and produces misleading results silently.
+        config_contact_overrides = (config.get("contact_matrix_overrides") or {}) if config else {}
+        schema_ids = [g.id for g in schema.demographic_groups]
+        schema_has_overrides = bool(schema.contact_matrix_overrides) and effective_ids == schema_ids
+        if config_demo and not config_contact_overrides and not schema_has_overrides:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Demographics provided (%s) but no contact_matrix_overrides found. "
+                "The contact matrix defaults to identity, meaning demographic groups "
+                "do not mix — each group can only infect its own members. "
+                "Provide contact_matrix_overrides to model realistic cross-group transmission.",
+                ", ".join(effective_ids),
+            )
+
+        matrix = np.eye(A)
+
+        # Schema-level contact overrides (only applied when schema IDs match)
+        if effective_ids == schema_ids:
+            for override in schema.contact_matrix_overrides:
+                if override.from_group in effective_ids and override.to_group in effective_ids:
+                    i = effective_ids.index(override.from_group)
+                    j = effective_ids.index(override.to_group)
+                    matrix[i, j] = override.value
+
+        # Config-level overrides always applied (keys match whatever the config declared)
+        if config:
+            for from_group, targets in (config.get("contact_matrix_overrides") or {}).items():
+                if from_group not in effective_ids:
+                    continue
+                i = effective_ids.index(from_group)
+                for to_group, value in targets.items():
+                    if to_group in effective_ids:
+                        matrix[i, effective_ids.index(to_group)] = value
+
+        return xp.array(matrix)
+
+    def _build_rate_vectors(self, config: dict) -> dict | None:
+        """
+        Build per-demographic absolute rate vectors from the config.
+
+        Reads ``config["demographic_rate_overrides"]``, which maps
+        transmission-edge variable names to per-group absolute rates in the
+        same native units as the base rate (days, percentage, or raw rate)::
+
+            "demographic_rate_overrides": {
+                "zeta": {"age_56_plus": 15},          # 15% for elderly
+                "gamma": {"age_0_17": 5, "age_56_plus": 10}  # days to recover
+            }
+
+        For each declared edge, starts from the base scalar rate (already
+        converted to a per-day rate by :meth:`_load_transmission_params`)
+        and fills the ``(A,)`` vector.  Groups not listed get the base rate.
+        Specified groups get their absolute value converted by the edge's
+        ``value_type`` (so DAYS and PERCENTAGE are handled correctly).
+
+        These vectors are used directly in :meth:`_compute_derivatives`,
+        bypassing the intervention-scaled scalar.  This means:
+
+        - Uncertainty runs vary only the base scalar — demographic rates
+          are fixed epidemiological values, not sampled.
+        - Interventions do not scale edges that have demographic rate vectors.
+          This is intentional: demographic rates apply to edges like
+          ``zeta``/``delta``/``gamma`` that interventions do not target.
+
+        Returns ``None`` if no demographic groups are declared or no
+        overrides are provided.
+        """
+        schema = type(self)._get_cached_schema()
+        if not schema or not schema.demographic_groups:
+            return None
+
+        overrides = config.get("demographic_rate_overrides") or {}
+        if not overrides:
+            return None
+
+        xp = self._array_module()
+
+        # Resolve effective group IDs from config or schema (same logic as
+        # _build_contact_matrix — config demographics always win)
+        config_demo = config.get("case_file", {})
+        if isinstance(config_demo, dict):
+            config_demo = config_demo.get("demographics", {})
+        else:
+            config_demo = {}
+        group_ids = (
+            list(config_demo.keys())
+            if config_demo
+            else [g.id for g in schema.demographic_groups]
+        )
+        A = len(group_ids)
+        edge_value_types = {
+            e.variable_name: e.parameter.value_type
+            for e in schema.transmission_edges
+        }
+        result = {}
+
+        for variable_name, group_rates in overrides.items():
+            value_type = edge_value_types.get(variable_name)
+            if value_type is None:
+                continue
+            base_rate = getattr(self, variable_name, None)
+            if base_rate is None:
+                continue
+            vec = np.full(A, base_rate, dtype=float)
+            for group_id, raw_value in group_rates.items():
+                if group_id in group_ids:
+                    vec[group_ids.index(group_id)] = self._to_rate(raw_value, value_type)
+            result[variable_name] = xp.array(vec)
+
+        return result or None
+
     def get_params(self):
         """
         Return transmission parameters as a tuple in schema edge order.
@@ -538,6 +713,20 @@ class Model(ABC):
             # Skip edges with no rate (compartment not in this config variant)
             if rate is None:
                 continue
+
+            # Use absolute demographic rate vector if declared, bypassing the
+            # intervention-scaled scalar.  Demographic rates are fixed
+            # epidemiological values and do not participate in uncertainty
+            # sampling or intervention scaling.
+            rate_vectors = getattr(self, "_rate_vectors", None)
+            if rate_vectors and edge.variable_name in rate_vectors:
+                rate = rate_vectors[edge.variable_name]
+
+            # Reshape (A,) rate vector to (A, 1) so it broadcasts correctly
+            # against (A, R) state arrays without touching scalar rates.
+            if hasattr(rate, "ndim") and rate.ndim == 1:
+                rate = rate[:, None]
+
             source = states[edge.source_id]
 
             if edge.frequency_dependent:
@@ -702,6 +891,67 @@ class Model(ABC):
             initial_population[i, column_mapping["I"]] = infected
 
         return initial_population
+
+    def _prepare_demographic_state(self) -> None:
+        """
+        Expand ``self.population_matrix`` from *(K, R)* to *(K, A, R)* using
+        schema-declared demographic groups.
+
+        Each compartment slice is split across age groups by distributing the
+        population according to the fractional weights declared in
+        ``self.demographics`` (a ``{group_id: percentage}`` dict).  Groups not
+        present in the dict receive a weight of zero.
+
+        After stratification, zero-valued rows are appended for every
+        ``_total`` cumulative tracking compartment that is active in the
+        current run but not yet in the population matrix.
+
+        This method is intended for models that declare demographic groups via
+        ``schema.add_demographic_group()`` in ``define_parameters()``.  Models
+        that do not use demographics can ignore it entirely.
+
+        Modifies ``self.population_matrix`` and ``self.compartment_list`` in
+        place; returns ``None``.
+        """
+        import numpy as onp
+
+        schema = type(self)._get_cached_schema()
+        demographics = getattr(self, "demographics", None)
+
+        if demographics:
+            # Use the config's demographics values directly.  The keys may
+            # differ from the schema's declared group IDs (e.g. "low_risk"
+            # instead of "age_0_17") — using values() preserves the correct
+            # population split regardless of naming.
+            weights = onp.array(list(demographics.values()), dtype=float) / 100.0
+        elif schema and schema.demographic_groups:
+            # Fall back to schema default weights when no config demographics.
+            raw = onp.array(
+                [g.default_weight for g in schema.demographic_groups], dtype=float
+            )
+            weights = raw / raw.sum()
+        else:
+            weights = onp.array([1.0])
+
+        # population_matrix is (K, R) — expand to (K, A, R)
+        pm = onp.array(self.population_matrix)
+        self.population_matrix = pm[:, None, :] * weights[None, :, None]
+
+        # Append zero rows for _total compartments not already present
+        if schema:
+            active_set = set(self.compartment_list)
+            seen: set[str] = set()
+            for edge in schema.transmission_edges:
+                tid = edge.target_id
+                total_id = f"{tid}_total"
+                if tid in active_set and total_id not in active_set and tid not in seen:
+                    zero_row = onp.zeros((1, *self.population_matrix.shape[1:]))
+                    self.population_matrix = onp.vstack(
+                        (self.population_matrix, zero_row)
+                    )
+                    self.compartment_list = self.compartment_list + [total_id]
+                    active_set.add(total_id)
+                    seen.add(tid)
 
     def prepare_initial_state(self):
         pass
