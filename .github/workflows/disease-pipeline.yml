@@ -31,11 +31,11 @@ jobs:
       matrix:
         include:
           - disease_path: covid_jax_model
-            model_display_name: "COVID-19 (compartmental)"
+            model_display_name: "Novel Respiratory"
           - disease_path: dengue_jax_model
-            model_display_name: "Dengue (compartmental)"
+            model_display_name: "Dengue Novel Vector-Borne"
           - disease_path: mpox_jax_model
-            model_display_name: "Mpox (compartmental)"
+            model_display_name: "Test Mpox Model"
     steps:
       - uses: actions/checkout@v4
 
@@ -86,11 +86,11 @@ jobs:
       matrix:
         include:
           - disease_path: covid_jax_model
-            model_display_name: "COVID-19 (compartmental)"
+            model_display_name: "Novel Respiratory"
           - disease_path: dengue_jax_model
-            model_display_name: "Dengue (compartmental)"
+            model_display_name: "Dengue Novel Vector-Borne"
           - disease_path: mpox_jax_model
-            model_display_name: "Mpox (compartmental)"
+            model_display_name: "Test Mpox Model"
     steps:
       - uses: actions/checkout@v4
 
