@@ -12,3 +12,6 @@ results/
 TODO.md
 DONE.md
 CLAUDE.md
+
+# Platform integration notes (local / Cursor only; not distributed with the package)
+.cursor/MII_PUBLICATION.md

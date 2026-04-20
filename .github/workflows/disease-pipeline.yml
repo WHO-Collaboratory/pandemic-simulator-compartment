@@ -29,7 +29,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        disease_path: [covid_jax_model, dengue_jax_model, mpox_jax_model]
+        include:
+          - disease_path: covid_jax_model
+            model_display_name: "COVID-19 (compartmental)"
+          - disease_path: dengue_jax_model
+            model_display_name: "Dengue (compartmental)"
+          - disease_path: mpox_jax_model
+            model_display_name: "Mpox (compartmental)"
     steps:
       - uses: actions/checkout@v4
 
@@ -78,7 +84,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        disease_path: [covid_jax_model, dengue_jax_model, mpox_jax_model]
+        include:
+          - disease_path: covid_jax_model
+            model_display_name: "COVID-19 (compartmental)"
+          - disease_path: dengue_jax_model
+            model_display_name: "Dengue (compartmental)"
+          - disease_path: mpox_jax_model
+            model_display_name: "Mpox (compartmental)"
     steps:
       - uses: actions/checkout@v4
 
@@ -142,30 +154,24 @@ jobs:
         if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment' && startsWith(github.ref, 'refs/tags/')
         env:
           EVENT_BUS_NAME: ${{ secrets.MODEL_PUBLICATION_EVENT_BUS_NAME }}
+          MODEL_DISPLAY_NAME: ${{ matrix.model_display_name }}
+          SEMVER: ${{ github.ref_name }}
+          IMAGE_URI: ${{ secrets.DOCKER_REGISTRY }}/pandemic-simulator-compartment/${{ matrix.disease_path }}:${{ github.ref_name }}
+          ARTIFACT_HASH: ${{ steps.hash.outputs.sha256 }}
         run: |
           set -euo pipefail
-          if [ -z "${EVENT_BUS_NAME}" ]; then
-            echo "MODEL_PUBLICATION_EVENT_BUS_NAME secret is not set (required for tagged releases)."
-            exit 1
-          fi
-          case "${{ matrix.disease_path }}" in
-            covid_jax_model) DISPLAY_NAME="COVID-19 (compartmental)" ;;
-            dengue_jax_model) DISPLAY_NAME="Dengue (compartmental)" ;;
-            mpox_jax_model) DISPLAY_NAME="Mpox (compartmental)" ;;
-            *) DISPLAY_NAME="${{ matrix.disease_path }}" ;;
-          esac
-          IMAGE_URI="${{ secrets.DOCKER_REGISTRY }}/pandemic-simulator-compartment/${{ matrix.disease_path }}:${{ github.ref_name }}"
-          HASH="${{ steps.hash.outputs.sha256 }}"
-          S3_KEY="${HASH}.json"
+          : "${EVENT_BUS_NAME:?MODEL_PUBLICATION_EVENT_BUS_NAME secret is not set}"
+          S3_KEY="${ARTIFACT_HASH}.json"
           DETAIL_JSON=$(jq -nc \
-            --arg name "$DISPLAY_NAME" \
-            --arg semver "${{ github.ref_name }}" \
-            --arg image_uri "$IMAGE_URI" \
-            --arg artifact_hash "$HASH" \
-            --arg artifact_s3_key "$S3_KEY" \
+            --arg name "${MODEL_DISPLAY_NAME}" \
+            --arg semver "${SEMVER}" \
+            --arg image_uri "${IMAGE_URI}" \
+            --arg artifact_hash "${ARTIFACT_HASH}" \
+            --arg artifact_s3_key "${S3_KEY}" \
             '{name:$name, semver:$semver, image_uri:$image_uri, artifact_hash:$artifact_hash, artifact_s3_key:$artifact_s3_key}')
-          CLI_JSON=$(jq -nc \
-            --arg eb "$EVENT_BUS_NAME" \
-            --arg detail "$DETAIL_JSON" \
-            '{Entries:[{Source:"mii.publication",DetailType:"ModelVersionPublished",EventBusName:$eb,Detail:$detail}]}')
-          aws events put-events --cli-input-json "$CLI_JSON"
+          aws events put-events --cli-input-json "$(
+            jq -nc \
+              --arg eb "${EVENT_BUS_NAME}" \
+              --arg detail "${DETAIL_JSON}" \
+              '{Entries:[{Source:"mii.publication",DetailType:"ModelVersionPublished",EventBusName:$eb,Detail:$detail}]}'
+          )"
