@@ -70,7 +70,7 @@ jobs:
             MODEL_DIR=compartment/models/${{ matrix.disease_path }}/
 
   generate-artifact:
-    needs: smoke-tests
+    needs: [smoke-tests, build-image]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -137,3 +137,35 @@ jobs:
               "image": {"S": "${{ matrix.disease_path }}:${{ github.ref_name }}"},
               "artifact_hash": {"S": "${{ steps.hash.outputs.sha256 }}"}
             }'
+
+      - name: Publish model version event (EventBridge)
+        if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment' && startsWith(github.ref, 'refs/tags/')
+        env:
+          EVENT_BUS_NAME: ${{ secrets.MODEL_PUBLICATION_EVENT_BUS_NAME }}
+        run: |
+          set -euo pipefail
+          if [ -z "${EVENT_BUS_NAME}" ]; then
+            echo "MODEL_PUBLICATION_EVENT_BUS_NAME secret is not set (required for tagged releases)."
+            exit 1
+          fi
+          case "${{ matrix.disease_path }}" in
+            covid_jax_model) DISPLAY_NAME="COVID-19 (compartmental)" ;;
+            dengue_jax_model) DISPLAY_NAME="Dengue (compartmental)" ;;
+            mpox_jax_model) DISPLAY_NAME="Mpox (compartmental)" ;;
+            *) DISPLAY_NAME="${{ matrix.disease_path }}" ;;
+          esac
+          IMAGE_URI="${{ secrets.DOCKER_REGISTRY }}/pandemic-simulator-compartment/${{ matrix.disease_path }}:${{ github.ref_name }}"
+          HASH="${{ steps.hash.outputs.sha256 }}"
+          S3_KEY="${HASH}.json"
+          DETAIL_JSON=$(jq -nc \
+            --arg name "$DISPLAY_NAME" \
+            --arg semver "${{ github.ref_name }}" \
+            --arg image_uri "$IMAGE_URI" \
+            --arg artifact_hash "$HASH" \
+            --arg artifact_s3_key "$S3_KEY" \
+            '{name:$name, semver:$semver, image_uri:$image_uri, artifact_hash:$artifact_hash, artifact_s3_key:$artifact_s3_key}')
+          CLI_JSON=$(jq -nc \
+            --arg eb "$EVENT_BUS_NAME" \
+            --arg detail "$DETAIL_JSON" \
+            '{Entries:[{Source:"mii.publication",DetailType:"ModelVersionPublished",EventBusName:$eb,Detail:$detail}]}')
+          aws events put-events --cli-input-json "$CLI_JSON"
