@@ -29,7 +29,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        disease_path: [covid_jax_model, dengue_jax_model, mpox_jax_model]
+        include:
+          - disease_path: covid_jax_model
+            model_display_name: "Novel Respiratory"
+          - disease_path: dengue_jax_model
+            model_display_name: "Novel Vector-Borne"
+          - disease_path: mpox_jax_model
+            model_display_name: "Test Mpox Model"
     steps:
       - uses: actions/checkout@v4
 
@@ -70,7 +76,7 @@ jobs:
             MODEL_DIR=compartment/models/${{ matrix.disease_path }}/
 
   generate-artifact:
-    needs: smoke-tests
+    needs: [smoke-tests, build-image]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -78,7 +84,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        disease_path: [covid_jax_model, dengue_jax_model, mpox_jax_model]
+        include:
+          - disease_path: covid_jax_model
+            model_display_name: "Novel Respiratory"
+          - disease_path: dengue_jax_model
+            model_display_name: "Novel Vector-Borne"
+          - disease_path: mpox_jax_model
+            model_display_name: "Test Mpox Model"
     steps:
       - uses: actions/checkout@v4
 
@@ -137,3 +149,29 @@ jobs:
               "image": {"S": "${{ matrix.disease_path }}:${{ github.ref_name }}"},
               "artifact_hash": {"S": "${{ steps.hash.outputs.sha256 }}"}
             }'
+
+      - name: Publish model version event (EventBridge)
+        if: github.repository == 'WHO-Collaboratory/pandemic-simulator-compartment' && startsWith(github.ref, 'refs/tags/')
+        env:
+          EVENT_BUS_NAME: ${{ secrets.MODEL_PUBLICATION_EVENT_BUS_NAME }}
+          MODEL_DISPLAY_NAME: ${{ matrix.model_display_name }}
+          SEMVER: ${{ github.ref_name }}
+          IMAGE_URI: ${{ secrets.DOCKER_REGISTRY }}/pandemic-simulator-compartment/${{ matrix.disease_path }}:${{ github.ref_name }}
+          ARTIFACT_HASH: ${{ steps.hash.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          : "${EVENT_BUS_NAME:?MODEL_PUBLICATION_EVENT_BUS_NAME secret is not set}"
+          S3_KEY="${ARTIFACT_HASH}.json"
+          DETAIL_JSON=$(jq -nc \
+            --arg name "${MODEL_DISPLAY_NAME}" \
+            --arg semver "${SEMVER}" \
+            --arg image_uri "${IMAGE_URI}" \
+            --arg artifact_hash "${ARTIFACT_HASH}" \
+            --arg artifact_s3_key "${S3_KEY}" \
+            '{name:$name, semver:$semver, image_uri:$image_uri, artifact_hash:$artifact_hash, artifact_s3_key:$artifact_s3_key}')
+          aws events put-events --cli-input-json "$(
+            jq -nc \
+              --arg eb "${EVENT_BUS_NAME}" \
+              --arg detail "${DETAIL_JSON}" \
+              '{Entries:[{Source:"mii.publication",DetailType:"ModelVersionPublished",EventBusName:$eb,Detail:$detail}]}'
+          )"
