@@ -312,6 +312,50 @@ class InterventionDef:
 
 
 # ---------------------------------------------------------------------------
+# Demographic group and contact matrix definitions
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class DemographicGroupDef:
+    """
+    Defines a single demographic group (e.g. an age band).
+
+    ``default_weight`` is the percentage of the total population in this
+    group and is used to split the initial population tensor when no
+    per-zone overrides are provided.
+    """
+
+    id: str             # "age_0_17"
+    label: str          # "Children (0-17)"
+    default_weight: float  # percentage of total population (0-100)
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "label": self.label, "default_weight": self.default_weight}
+
+
+@dataclass
+class ContactOverrideDef:
+    """
+    A single (from_group, to_group) entry in the contact matrix.
+
+    The contact matrix defaults to identity (each group only contacts
+    itself).  Add overrides to model cross-demographic exposure.
+    """
+
+    from_group: str  # "age_0_17"
+    to_group: str    # "age_18_55"
+    value: float     # contact rate (replaces the identity default)
+
+    def to_dict(self) -> dict:
+        return {
+            "from_group": self.from_group,
+            "to_group": self.to_group,
+            "value": self.value,
+        }
+
+
+# ---------------------------------------------------------------------------
 # Full model parameter schema
 # ---------------------------------------------------------------------------
 
@@ -348,6 +392,11 @@ class ModelParameterSchema:
     # Shared simulation-level params (start_date, end_date, run_mode, ...)
     simulation_parameters: list[ParameterDef] = field(default_factory=list)
 
+    # Demographic groups and contact matrix (optional — models without
+    # demographics leave these empty and the framework is unaffected)
+    demographic_groups: list[DemographicGroupDef] = field(default_factory=list)
+    contact_matrix_overrides: list[ContactOverrideDef] = field(default_factory=list)
+
     # ---------------------------------------------------------------
     # Serialization helpers
     # ---------------------------------------------------------------
@@ -372,6 +421,8 @@ class ModelParameterSchema:
             "admin_zone_fields": [f.to_dict() for f in self.admin_zone_fields],
             "disease_parameters": [p.to_dict() for p in self.disease_parameters],
             "simulation_parameters": [p.to_dict() for p in self.simulation_parameters],
+            "demographic_groups": [g.to_dict() for g in self.demographic_groups],
+            "contact_matrix_overrides": [o.to_dict() for o in self.contact_matrix_overrides],
         }
         return result
 
@@ -518,6 +569,8 @@ class ParameterSchemaBuilder:
         self._admin_zone_fields: list[ParameterDef] = []
         self._disease_parameters: list[ParameterDef] = []
         self._simulation_parameters: list[ParameterDef] = []
+        self._demographic_groups: list[DemographicGroupDef] = []
+        self._contact_overrides: list[ContactOverrideDef] = []
 
     # ----- Identity --------------------------------------------------------
 
@@ -918,6 +971,62 @@ class ParameterSchemaBuilder:
             )
         )
 
+    # ----- Demographics ----------------------------------------------------
+
+    def add_demographic_group(
+        self,
+        id: str,
+        label: str,
+        default_weight: float,
+    ) -> None:
+        """
+        Declare a demographic group (e.g. an age band).
+
+        Groups are ordered by declaration order — that order defines axis 1
+        of the population tensor and the rows/columns of the contact matrix.
+
+        Args:
+            id: Machine key (e.g. ``"age_0_17"``).
+            label: Human-readable name (e.g. ``"Children (0-17)"``).
+            default_weight: Percentage of the total population in this group
+                (0-100).  Used to split the initial population tensor when
+                no per-zone override is provided.
+
+        Raises:
+            ValueError: If a group with the same *id* already exists.
+        """
+        existing_ids = {g.id for g in self._demographic_groups}
+        if id in existing_ids:
+            raise ValueError(
+                f"Duplicate demographic group id '{id}'. "
+                f"Already registered: {sorted(existing_ids)}"
+            )
+        self._demographic_groups.append(
+            DemographicGroupDef(id=id, label=label, default_weight=default_weight)
+        )
+
+    def set_contact_override(
+        self,
+        from_group: str,
+        to_group: str,
+        value: float,
+    ) -> None:
+        """
+        Set a single entry in the contact matrix.
+
+        The contact matrix defaults to identity (each group only contacts
+        itself at rate 1.0).  Call this to override any entry — including
+        the diagonal if the self-contact rate differs from 1.0.
+
+        Args:
+            from_group: ID of the group being exposed (row index).
+            to_group: ID of the group doing the infecting (column index).
+            value: Contact rate replacing the identity default.
+        """
+        self._contact_overrides.append(
+            ContactOverrideDef(from_group=from_group, to_group=to_group, value=value)
+        )
+
     # ----- Build -----------------------------------------------------------
 
     def build(self) -> ModelParameterSchema:
@@ -952,4 +1061,6 @@ class ParameterSchemaBuilder:
             admin_zone_fields=self._admin_zone_fields,
             disease_parameters=self._disease_parameters,
             simulation_parameters=self._simulation_parameters,
+            demographic_groups=self._demographic_groups,
+            contact_matrix_overrides=self._contact_overrides,
         )

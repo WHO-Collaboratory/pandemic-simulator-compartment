@@ -1,7 +1,6 @@
 import jax.numpy as np
 import logging
-import numpy as onp
-from compartment.helpers import setup_logging, prepare_covid_initial_state
+from compartment.helpers import setup_logging
 from compartment.model import Model
 from compartment.parameters import ValueType
 
@@ -173,6 +172,23 @@ class CovidJaxModel(Model):
             transmission_reduction=50.0,
         )
 
+        # ---- Demographics ----
+        schema.add_demographic_group("age_0_17",    "Children (0-17)", default_weight=33.3)
+        schema.add_demographic_group("age_18_55",   "Adults (18-55)",  default_weight=44.4)
+        schema.add_demographic_group("age_56_plus", "Elderly (56+)",   default_weight=22.3)
+
+        # Contact matrix — age-structured interaction rates (POLYMOD-derived).
+        # All 9 entries are declared; diagonal values override the identity default.
+        schema.set_contact_override("age_0_17",    "age_0_17",    5.46)
+        schema.set_contact_override("age_0_17",    "age_18_55",   5.18)
+        schema.set_contact_override("age_0_17",    "age_56_plus", 0.93)
+        schema.set_contact_override("age_18_55",   "age_0_17",    1.70)
+        schema.set_contact_override("age_18_55",   "age_18_55",   9.18)
+        schema.set_contact_override("age_18_55",   "age_56_plus", 1.68)
+        schema.set_contact_override("age_56_plus", "age_0_17",    0.83)
+        schema.set_contact_override("age_56_plus", "age_18_55",   5.90)
+        schema.set_contact_override("age_56_plus", "age_56_plus", 3.80)
+
     # ------------------------------------------------------------------
     # Model interface
     # ------------------------------------------------------------------
@@ -185,7 +201,8 @@ class CovidJaxModel(Model):
         # at runtime.  Override the schema-derived list.
         self.compartment_list = config["compartment_list"]
 
-        self.population_matrix = np.array(config["initial_population"])
+        # base __init__ sets population_matrix to jnp.array(initial_population).T
+        # which is already (K, R). No override needed.
 
         # Travel
         self.travel_matrix = np.fill_diagonal(
@@ -193,31 +210,13 @@ class CovidJaxModel(Model):
         )
         self.sigma = config["travel_volume"]["leaving"]
 
-        # Demographics & age stratification
+        # Demographic weights come from case file for population tensor construction.
+        # Group definitions and contact matrix are declared in define_parameters().
         self.demographics = config["case_file"]["demographics"]
-        self.age_stratification = list(self.demographics.values())
-        self.age_groups = list(self.demographics.keys())
-        self.interaction_matrix = np.array(
-            [[5.46, 5.18, 0.93], [1.70, 9.18, 1.68], [0.83, 5.90, 3.80]]
-        )
 
     def prepare_initial_state(self):
-        self.population_matrix, self.interaction_matrix = prepare_covid_initial_state(
-            self.population_matrix, self.interaction_matrix, self.demographics
-        )
-
-        # Add _total compartments only for active edge targets
-        active_set = set(self.compartment_list)
-        schema = type(self)._get_cached_schema()
-        for edge in schema.transmission_edges:
-            tid = edge.target_id
-            total_id = f"{tid}_total"
-            if tid in active_set and total_id not in active_set:
-                zero_row = onp.zeros((1, *self.population_matrix[0].shape))
-                self.population_matrix = onp.vstack((self.population_matrix, zero_row))
-                self.compartment_list = self.compartment_list + [total_id]
-                active_set.add(total_id)
-
+        # Expand (K, R) → (K, A, R) and append _total rows for active compartments.
+        self._prepare_demographic_state()
         return self.population_matrix, self.compartment_list
 
     def derivative(self, y, t, p):
@@ -230,7 +229,6 @@ class CovidJaxModel(Model):
         """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)
-        age_trans = self.interaction_matrix
 
         states = {comp: y[i] for i, comp in enumerate(self.compartment_list)}
         S = states[C.S]
@@ -245,7 +243,7 @@ class CovidJaxModel(Model):
         # --- Interventions (schema-driven) ---
         rates = {"beta": params["beta"]}
         prop_infective_scalar = I.sum() / N_total.sum()
-        rates, contact_matrix = self._apply_interventions(
+        rates, travel_matrix = self._apply_interventions(
             t, rates, prop_infective_scalar
         )
 
@@ -257,9 +255,9 @@ class CovidJaxModel(Model):
         # --- Standard edges via framework (skip manual FOI edge) ---
         derivs = self._compute_derivatives(states, rates, skip_edges={"beta"})
 
-        # --- Manual FOI: age-stratified contact matrix (S->E or S->I) ---
-        BETA = ((rates["beta"] * contact_matrix) @ I_frac.T).T
-        omega = age_trans @ BETA
+        # --- Manual FOI: spatial travel mixing + demographic contact matrix ---
+        BETA = ((rates["beta"] * travel_matrix) @ I_frac.T).T
+        omega = self.contact_matrix @ BETA
         flow_foi = S * omega
 
         # Route FOI to E if present, otherwise directly to I

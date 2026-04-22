@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Annotated, Literal, Optional, List
+from typing import Annotated, Literal, Optional, List, Dict, Any
 from uuid import uuid4
 from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
@@ -28,10 +28,10 @@ class AdminUnit(BaseModel):
     ParentAdminUnit: Optional["AdminUnit"] = None
 
 
-class CaseFileDemographics(BaseModel):
-    age_0_17: float = Field(default=25.0, ge=0, le=100)
-    age_18_55: float = Field(default=50.0, ge=0, le=100)
-    age_56_plus: float = Field(default=25.0, ge=0, le=100)
+# Generic demographics: any schema-declared group IDs → percentage weights.
+# Previously hardcoded three age_* fields; now any model's demographic groups
+# are accepted without changing this validation layer.
+CaseFileDemographics = Dict[str, float]
 
 
 class CaseFileAdminZone(BaseModel):
@@ -61,7 +61,7 @@ class CaseFileAdminZone(BaseModel):
 
 class CaseFile(BaseModel):
     admin_zones: List[CaseFileAdminZone]
-    demographics: CaseFileDemographics = CaseFileDemographics()
+    demographics: CaseFileDemographics = Field(default_factory=dict)
 
 
 class BaseSimulationShared(BaseModel):
@@ -96,6 +96,12 @@ class BaseSimulationShared(BaseModel):
     travel_volume: Optional[TravelVolume] = TravelVolume()
 
     case_file: CaseFile
+
+    # Demographic overrides — passed through to the model unchanged.
+    # contact_matrix_overrides: per-run contact rates between demographic groups.
+    # demographic_rate_overrides: per-group absolute transmission rates.
+    contact_matrix_overrides: Optional[Dict[str, Dict[str, float]]] = None
+    demographic_rate_overrides: Optional[Dict[str, Dict[str, Any]]] = None
 
     @field_validator("end_date")
     @classmethod
