@@ -3,6 +3,7 @@ name: container
 on:
   push:
     branches: []  # no branches → never triggers
+  workflow_dispatch: 
 
 jobs:
   noop:
