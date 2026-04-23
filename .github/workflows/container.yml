@@ -1,0 +1,12 @@
+name: container
+
+on:
+  push:
+    branches: []  # no branches → never triggers
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: unreachable step
+        run: echo "unreachable"
