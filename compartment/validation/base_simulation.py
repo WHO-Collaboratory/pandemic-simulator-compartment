@@ -65,8 +65,8 @@ class BaseSimulationShared(BaseModel):
 
     # Admin units
     admin_unit_0_id: str
-    admin_unit_1_id: str = ""
-    admin_unit_2_id: str = ""
+    admin_unit_1_id: Optional[str] = ""
+    admin_unit_2_id: Optional[str] = ""
     AdminUnit0: AdminUnit
     AdminUnit1: Optional[AdminUnit] = None
     AdminUnit2: Optional[AdminUnit] = None
