@@ -1005,7 +1005,7 @@ def prepare_covid_initial_state(
 
 def get_admin_zone_df(case_file):
     ll_pop = pd.DataFrame(
-        case_file, columns=["name", "center_lat", "center_lon", "population"]
+        case_file, columns=["id", "center_lat", "center_lon", "population"]
     )
     ll_pop["lat_long"] = list(zip(ll_pop.center_lat, ll_pop.center_lon))
     ll_pop.drop(columns=["center_lat", "center_lon"], inplace=True)
@@ -1048,13 +1048,13 @@ def create_travel_matrix(input_df, sigma):
     )
     input_df["gravity"] = input_df["gravity"].replace(np.inf, 0)
     # Calculate a rate, e.g., flow per origin
-    input_df["gravity_rate"] = input_df["gravity"] / input_df.groupby("name_origin")[
+    input_df["gravity_rate"] = input_df["gravity"] / input_df.groupby("id_origin")[
         "gravity"
     ].transform("sum")
     pivot_df = pd.pivot_table(
         input_df,
-        index="name_origin",
-        columns="name_destination",
+        index="id_origin",
+        columns="id_destination",
         values="gravity_rate",
         aggfunc="sum",
     )
