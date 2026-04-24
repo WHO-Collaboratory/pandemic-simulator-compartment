@@ -145,6 +145,18 @@ class DengueJaxModel(Model):
 
         # ---- Disease parameters ----
         schema.add_disease_parameter(
+            # FOR FUTURE IMPLEMENTATION
+            name="num_serotypes",
+            label="Number of Serotypes",
+            description="Number of dengue serotypes modelled.",
+            value_type=ValueType.INTEGER,
+            default=4,
+            default_min=4,
+            default_max=4,
+            min_value=4,
+            max_value=4,
+        )
+        schema.add_disease_parameter(
             name="immunity_period",
             label="Cross-Immunity Period",
             description="Duration of cross-serotype immunity after primary infection (days). 0 = no cross-immunity.",
@@ -155,6 +167,110 @@ class DengueJaxModel(Model):
             min_value=0,
             max_value=730,
             unit="days",
+        )
+        schema.add_disease_parameter(
+            name="latent_period",
+            label="Host Latent Period",
+            description="Mean duration of the exposed (E) period before becoming infectious (days).",
+            value_type=ValueType.FLOAT,
+            default=5.9,
+            default_min=3.0,
+            default_max=14.0,
+            min_value=1.0,
+            max_value=30.0,
+            unit="days",
+        )
+        schema.add_disease_parameter(
+            name="infectious_period",
+            label="Host Infectious Period",
+            description="Mean duration of the infectious (I) period before recovery (days).",
+            value_type=ValueType.FLOAT,
+            default=5.0,
+            default_min=2.0,
+            default_max=10.0,
+            min_value=1.0,
+            max_value=30.0,
+            unit="days",
+        )
+        schema.add_disease_parameter(
+            name="hospitalization_rate",
+            label="Hospitalization Rate",
+            description="Proportion of secondary infections that progress to hospitalization.",
+            value_type=ValueType.FLOAT,
+            default=0.01,
+            default_min=0.001,
+            default_max=0.1,
+            min_value=0.0,
+            max_value=1.0,
+        )
+        schema.add_disease_parameter(
+            name="hospital_stay",
+            label="Hospital Stay Duration",
+            description="Mean duration of hospitalization before recovery (days).",
+            value_type=ValueType.FLOAT,
+            default=4.9,
+            default_min=2.0,
+            default_max=14.0,
+            min_value=1.0,
+            max_value=30.0,
+            unit="days",
+        )
+        schema.add_disease_parameter(
+            name="vector_activation_energy",
+            label="Vector Activation Energy",
+            description="Arrhenius thermal activation energy for vector mortality rate.",
+            value_type=ValueType.FLOAT,
+            default=0.05,
+            default_min=0.01,
+            default_max=0.2,
+            min_value=0.001,
+            max_value=1.0,
+        )
+        schema.add_disease_parameter(
+            name="boltzmann_constant",
+            label="Boltzmann-Arrhenius Constant",
+            description="Boltzmann constant used in the thermal response model (eV/K).",
+            value_type=ValueType.FLOAT,
+            default=8.617e-5,
+            default_min=8.617e-5,
+            default_max=8.617e-5,
+            min_value=1e-6,
+            max_value=1e-3,
+            unit="eV/K",
+        )
+        schema.add_disease_parameter(
+            name="max_vector_capacity",
+            label="Maximum Vector Carrying Capacity",
+            description="Maximum mosquito carrying capacity as a multiple of the human population.",
+            value_type=ValueType.FLOAT,
+            default=1.5,
+            default_min=0.5,
+            default_max=5.0,
+            min_value=0.1,
+            max_value=20.0,
+        )
+        schema.add_disease_parameter(
+            name="reference_temperature",
+            label="Reference Temperature",
+            description="Baseline temperature for the Arrhenius thermal response model (°C).",
+            value_type=ValueType.FLOAT,
+            default=29.0,
+            default_min=25.0,
+            default_max=32.0,
+            min_value=15.0,
+            max_value=40.0,
+            unit="°C",
+        )
+        schema.add_disease_parameter(
+            name="vector_seed",
+            label="Vector Seed (kappa)",
+            description="Small constant added to each infectious vector compartment to prevent numerical extinction.",
+            value_type=ValueType.FLOAT,
+            default=1e-5,
+            default_min=1e-7,
+            default_max=1e-3,
+            min_value=0.0,
+            max_value=0.01,
         )
 
         # ---- Admin zone fields (dengue-specific) ----
@@ -253,23 +369,24 @@ class DengueJaxModel(Model):
         self.payload = config
 
         # ---- Dengue parameters ----
-        # Cross-immunity period → loss rate
         disease_cfg = config.get("Disease", {})
-        immunity = disease_cfg.get("immunity_period", 240)
-        if immunity is None:
-            immunity = 240
+
+        def _get(key, default):
+            v = disease_cfg.get(key, default)
+            return default if v is None else v
+
+        immunity = _get("immunity_period", 240)
         self.zeta_cross = 1.0 / immunity if immunity > 0 else 0.0
 
-        # Fixed epidemiological rates
-        self.delta_H = 1 / 5.9      # Host latent period (E→I)
-        self.eta_recovery = 1 / 5    # Host recovery rate (I→R)
-        self.theta_hosp = 0.01       # Hospitalization rate (I2→H)
-        self.omega_hosp = 1 / 4.9    # Hospital recovery rate (H→R)
-        self.E_a = 0.05        # Activation energy
-        self.k = 8.617e-5      # Boltzmann-Arrhenius constant
-        self.N_v_m = 1.5       # Maximum carrying capacity
-        self.T_0 = 29          # Reference temperature
-        self.kappa = 1e-5      # Helper population for mosquitoes
+        self.delta_H = 1.0 / _get("latent_period", 5.9)
+        self.eta_recovery = 1.0 / _get("infectious_period", 5.0)
+        self.theta_hosp = _get("hospitalization_rate", 0.01)
+        self.omega_hosp = 1.0 / _get("hospital_stay", 4.9)
+        self.E_a = _get("vector_activation_energy", 0.05)
+        self.k = _get("boltzmann_constant", 8.617e-5)
+        self.N_v_m = _get("max_vector_capacity", 1.5)
+        self.T_0 = _get("reference_temperature", 29.0)
+        self.kappa = _get("vector_seed", 1e-5)
 
     @classmethod
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
@@ -374,7 +491,7 @@ class DengueJaxModel(Model):
         vector_surviving_offspring, mu_V_T0 = calculate_surviving_offspring()
         carrying_capacity = get_carrying_capacity(
             temperature, vector_surviving_offspring, mu_V_T0,
-            self.N_v_m, self.E_a, N, T0=29, k=self.k,
+            self.N_v_m, self.E_a, N, T0=self.T_0, k=self.k,
         )
 
         I_H_total = sum([
