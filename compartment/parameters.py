@@ -641,6 +641,20 @@ class ParameterSchemaBuilder:
             )
         )
 
+    def remove_compartment(self, id: str) -> None:
+        """Remove a compartment and any edges that reference it by source or target."""
+        self._compartments = [c for c in self._compartments if c.id != id]
+        self._transmission_edges = [
+            e for e in self._transmission_edges
+            if e.source_id != id and e.target_id != id
+        ]
+
+    def remove_transmission_edge(self, variable_name: str) -> None:
+        """Remove a transmission edge by its variable name."""
+        self._transmission_edges = [
+            e for e in self._transmission_edges if e.variable_name != variable_name
+        ]
+
     # ----- Transmission edges ----------------------------------------------
 
     def _resolve_compartment_id(self, name: str) -> str:
