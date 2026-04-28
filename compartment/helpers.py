@@ -714,24 +714,6 @@ def create_initial_population_matrix(case_file, compartment_list):
     return initial_population
 
 
-def create_compartment_list(disease_nodes):
-    """Map disease nodes to compartment abbreviations"""
-    node_to_compartment = {
-        "susceptible": "S",
-        "exposed": "E",
-        "infected": "I",
-        "hospitalized": "H",
-        "deceased": "D",
-        "recovered": "R",
-    }
-    master_order = ["S", "E", "I", "H", "D", "R"]
-    compartments = [
-        node_to_compartment[node["id"]]
-        for node in disease_nodes
-        if node["id"] in node_to_compartment
-    ]
-
-    return sorted(compartments, key=lambda x: master_order.index(x))
 
 
 def create_transmission_dict(transmission_edge_items):

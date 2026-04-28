@@ -1,6 +1,6 @@
 {
     "Disease": {
-        "disease_type": "RESPIRATORY",
+        "disease_type": "COVID_SEIHDR",
         "compartment_list": ["S", "E", "I", "H", "D", "R"]
     },
     "start_date": "2025-11-01",

@@ -196,9 +196,7 @@ class CovidJaxModel(Model):
     def __init__(self, config):
         super().__init__(config)
 
-        # The schema defines full SEIHDR capability, but the config's
-        # compartment_list (from disease_nodes) defines what's active
-        # at runtime.  Override the schema-derived list.
+        # Override with the compartment list from config (may be a variant subset).
         self.compartment_list = config["compartment_list"]
 
         # base __init__ sets population_matrix to jnp.array(initial_population).T

@@ -35,31 +35,7 @@ class CovidTransmissionEdge(BaseModel):
         return values
 
 
-class CovidDiseaseNodeData(BaseModel):
-    alias: Optional[str]
-    label: str
-
-
-class CovidDiseaseNode(BaseModel):
-    type: Literal["DISEASE_STATE_NODE"]
-    data: CovidDiseaseNodeData
-    id: str
-
-
 class CovidDiseaseConfig(BaseDiseaseConfig):
     disease_type: Literal["RESPIRATORY"] = "RESPIRATORY"
     transmission_edges: Optional[List[CovidTransmissionEdge]] = None
-    disease_nodes: Optional[List[CovidDiseaseNode]] = None
     compartment_list: Optional[List[str]] = None
-
-    @model_validator(mode='after')
-    def check_compartment_source(self):
-        """
-        Ensures that either disease_nodes or compartment_list is provided.
-        """
-        if self.disease_nodes is None and (self.compartment_list is None or len(self.compartment_list) == 0):
-            raise ValueError(
-                "Either 'disease_nodes' or 'compartment_list' must be provided. "
-                "If 'disease_nodes' is not provided, 'compartment_list' is required."
-            )
-        return self
