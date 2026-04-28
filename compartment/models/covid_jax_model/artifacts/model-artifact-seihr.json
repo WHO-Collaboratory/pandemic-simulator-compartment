@@ -1,0 +1,377 @@
+{
+  "disease_type": "COVID_SEIHR",
+  "disease_label": "Novel Respiratory (SEIHR)",
+  "description": "An SEIHR compartmental model for novel respiratory diseases with age-stratified transmission",
+  "compartments": [
+    {
+      "id": "S",
+      "label": "Susceptible",
+      "description": "Population susceptible to infection",
+      "infective": false
+    },
+    {
+      "id": "E",
+      "label": "Exposed",
+      "description": "Population exposed but not yet infectious",
+      "infective": false
+    },
+    {
+      "id": "I",
+      "label": "Infected",
+      "description": "Currently infected and infectious population",
+      "infective": true
+    },
+    {
+      "id": "H",
+      "label": "Hospitalized",
+      "description": "Infected individuals requiring hospitalization",
+      "infective": false
+    },
+    {
+      "id": "R",
+      "label": "Recovered",
+      "description": "Recovered and immune population",
+      "infective": false
+    }
+  ],
+  "transmission_edges": [
+    {
+      "source": "susceptible",
+      "target": "exposed",
+      "variable_name": "beta",
+      "parameter": {
+        "name": "transmission_rate",
+        "label": "Transmission Rate (S->E)",
+        "description": "Rate at which susceptible individuals become exposed through contact with infected individuals",
+        "value_type": "rate",
+        "default": 0.25,
+        "min_value": 0.01,
+        "max_value": 2.0,
+        "default_min": 0.2,
+        "default_max": 0.3,
+        "required": true,
+        "unit": "per day"
+      },
+      "frequency_dependent": true
+    },
+    {
+      "source": "exposed",
+      "target": "infected",
+      "variable_name": "theta",
+      "parameter": {
+        "name": "transmission_rate",
+        "label": "Incubation Period (E->I)",
+        "description": "Average number of days from exposure to becoming infectious",
+        "value_type": "days",
+        "default": 5.0,
+        "min_value": 1.0,
+        "max_value": 100.0,
+        "default_min": 2.0,
+        "default_max": 14.0,
+        "required": true,
+        "unit": "days"
+      },
+      "frequency_dependent": false
+    },
+    {
+      "source": "infected",
+      "target": "hospitalized",
+      "variable_name": "zeta",
+      "parameter": {
+        "name": "transmission_rate",
+        "label": "Hospitalization Rate (I->H)",
+        "description": "Percentage of infected individuals who require hospitalization",
+        "value_type": "percentage",
+        "default": 0.04,
+        "min_value": 0.01,
+        "max_value": 1.0,
+        "default_min": 0.04,
+        "default_max": 0.4,
+        "required": true,
+        "unit": "%"
+      },
+      "frequency_dependent": false
+    },
+    {
+      "source": "infected",
+      "target": "recovered",
+      "variable_name": "gamma",
+      "parameter": {
+        "name": "transmission_rate",
+        "label": "Recovery Period (I->R)",
+        "description": "Average number of days for an infected individual to recover",
+        "value_type": "days",
+        "default": 7.14,
+        "min_value": 1.0,
+        "max_value": 100.0,
+        "default_min": 4.0,
+        "default_max": 10.0,
+        "required": true,
+        "unit": "days"
+      },
+      "frequency_dependent": false
+    },
+    {
+      "source": "hospitalized",
+      "target": "recovered",
+      "variable_name": "eta",
+      "parameter": {
+        "name": "transmission_rate",
+        "label": "Hospital Recovery Period (H->R)",
+        "description": "Average number of days for a hospitalized individual to recover",
+        "value_type": "days",
+        "default": 7.14,
+        "min_value": 1.0,
+        "max_value": 100.0,
+        "default_min": 3.0,
+        "default_max": 14.0,
+        "required": true,
+        "unit": "days"
+      },
+      "frequency_dependent": false
+    }
+  ],
+  "interventions": [
+    {
+      "id": "mask_wearing",
+      "label": "Mask Wearing",
+      "description": "Reduces transmission rate through mask usage in the population",
+      "target_rates": [
+        "beta"
+      ],
+      "modifies_travel": false,
+      "parameters": [
+        {
+          "name": "adherence_min",
+          "label": "Adherence",
+          "description": "Minimum population adherence to the intervention",
+          "value_type": "percentage",
+          "default": 20.0,
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "transmission_percentage",
+          "label": "Transmission Reduction",
+          "description": "Percentage reduction in transmission while intervention is active",
+          "value_type": "percentage",
+          "default": 35.0,
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "start_date",
+          "label": "Start Date",
+          "description": "Date the intervention begins (leave blank for threshold-based)",
+          "value_type": "date",
+          "required": false
+        },
+        {
+          "name": "end_date",
+          "label": "End Date",
+          "description": "Date the intervention ends (leave blank for threshold-based)",
+          "value_type": "date",
+          "required": false
+        },
+        {
+          "name": "start_threshold",
+          "label": "Start Threshold",
+          "description": "Proportion of infected population that triggers the intervention",
+          "value_type": "percentage",
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "end_threshold",
+          "label": "End Threshold",
+          "description": "Proportion of infected population below which the intervention stops",
+          "value_type": "percentage",
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "social_isolation",
+      "label": "Social Isolation",
+      "description": "Reduces transmission rate through social distancing and isolation measures",
+      "target_rates": [
+        "beta"
+      ],
+      "modifies_travel": false,
+      "parameters": [
+        {
+          "name": "adherence_min",
+          "label": "Adherence",
+          "description": "Minimum population adherence to the intervention",
+          "value_type": "percentage",
+          "default": 40.0,
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "transmission_percentage",
+          "label": "Transmission Reduction",
+          "description": "Percentage reduction in transmission while intervention is active",
+          "value_type": "percentage",
+          "default": 50.0,
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "start_date",
+          "label": "Start Date",
+          "description": "Date the intervention begins (leave blank for threshold-based)",
+          "value_type": "date",
+          "required": false
+        },
+        {
+          "name": "end_date",
+          "label": "End Date",
+          "description": "Date the intervention ends (leave blank for threshold-based)",
+          "value_type": "date",
+          "required": false
+        },
+        {
+          "name": "start_threshold",
+          "label": "Start Threshold",
+          "description": "Proportion of infected population that triggers the intervention",
+          "value_type": "percentage",
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        },
+        {
+          "name": "end_threshold",
+          "label": "End Threshold",
+          "description": "Proportion of infected population below which the intervention stops",
+          "value_type": "percentage",
+          "min_value": 0,
+          "max_value": 100,
+          "required": false,
+          "unit": "%"
+        }
+      ]
+    }
+  ],
+  "travel_volume": null,
+  "admin_zone_fields": [],
+  "disease_parameters": [],
+  "simulation_parameters": [
+    {
+      "name": "start_date",
+      "label": "Start Date",
+      "description": "Simulation start date",
+      "value_type": "date",
+      "required": true
+    },
+    {
+      "name": "end_date",
+      "label": "End Date",
+      "description": "Simulation end date",
+      "value_type": "date",
+      "required": true
+    },
+    {
+      "name": "run_mode",
+      "label": "Run Mode",
+      "description": "Run a single deterministic simulation or uncertainty analysis with multiple runs",
+      "value_type": "select",
+      "default": "DETERMINISTIC",
+      "required": true,
+      "options": [
+        "DETERMINISTIC",
+        "UNCERTAINTY"
+      ]
+    },
+    {
+      "name": "simulation_type",
+      "label": "Simulation Type",
+      "description": "Type of simulation engine",
+      "value_type": "select",
+      "default": "COMPARTMENTAL",
+      "required": true,
+      "options": [
+        "COMPARTMENTAL",
+        "AGENT_BASED"
+      ]
+    }
+  ],
+  "demographic_groups": [
+    {
+      "id": "age_0_17",
+      "label": "Children (0-17)",
+      "default_weight": 33.3
+    },
+    {
+      "id": "age_18_55",
+      "label": "Adults (18-55)",
+      "default_weight": 44.4
+    },
+    {
+      "id": "age_56_plus",
+      "label": "Elderly (56+)",
+      "default_weight": 22.3
+    }
+  ],
+  "contact_matrix_overrides": [
+    {
+      "from_group": "age_0_17",
+      "to_group": "age_0_17",
+      "value": 5.46
+    },
+    {
+      "from_group": "age_0_17",
+      "to_group": "age_18_55",
+      "value": 5.18
+    },
+    {
+      "from_group": "age_0_17",
+      "to_group": "age_56_plus",
+      "value": 0.93
+    },
+    {
+      "from_group": "age_18_55",
+      "to_group": "age_0_17",
+      "value": 1.7
+    },
+    {
+      "from_group": "age_18_55",
+      "to_group": "age_18_55",
+      "value": 9.18
+    },
+    {
+      "from_group": "age_18_55",
+      "to_group": "age_56_plus",
+      "value": 1.68
+    },
+    {
+      "from_group": "age_56_plus",
+      "to_group": "age_0_17",
+      "value": 0.83
+    },
+    {
+      "from_group": "age_56_plus",
+      "to_group": "age_18_55",
+      "value": 5.9
+    },
+    {
+      "from_group": "age_56_plus",
+      "to_group": "age_56_plus",
+      "value": 3.8
+    }
+  ]
+}
