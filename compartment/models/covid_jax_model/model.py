@@ -16,16 +16,16 @@ but is available for testing and experimentation in the codebase.
 class CovidJaxModel(Model):
     """SEIHDR compartmental model with age-stratified transmission and spatial mobility."""
 
-    # Schema defines all possible compartments (S-E-I-H-D-R), but the
-    # config's disease_nodes determines which are active at runtime.
-    FLEXIBLE_COMPARTMENTS = True
+    DISEASE_TYPE = "COVID_SEIHDR"
+    DISEASE_LABEL = "Novel Respiratory (SEIHDR)"
+    DISEASE_DESCRIPTION = "An SEIHDR compartmental model for novel respiratory diseases with age-stratified transmission"
 
     @classmethod
     def define_parameters(cls, schema):
         schema.set_model_info(
-            disease_type="RESPIRATORY",
-            label="Novel Respiratory (Advanced)",
-            description="An SEIHDR compartmental model for novel respiratory diseases with age-stratified transmission",
+            disease_type=cls.DISEASE_TYPE,
+            label=cls.DISEASE_LABEL,
+            description=cls.DISEASE_DESCRIPTION,
         )
 
         # ---- Compartments (S-E-I-H-D-R) ----
