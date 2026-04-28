@@ -122,6 +122,10 @@ class ValidationPostProcessor:
 
         # === MODEL REGISTRY (import model classes) ===
         from compartment.models.covid_jax_model.model import CovidJaxModel
+        from compartment.models.covid_jax_model.variants import (
+            CovidSEIRModel, CovidSIHRModel, CovidSIDRModel,
+            CovidSEIHRModel, CovidSEIDRModel, CovidSIHDRModel, CovidSIRModel,
+        )
         from compartment.models.dengue_jax_model.model import DengueJaxModel
         from compartment.models.test_dengue_2strain.model import Dengue2StrainModel
         from compartment.models.mpox_jax_model.model import MpoxJaxModel
@@ -129,7 +133,14 @@ class ValidationPostProcessor:
         from compartment.models.test_covid_sir_stochastic.model import CovidSirStochasticModel
 
         MODEL_REGISTRY = {
-            "RESPIRATORY": CovidJaxModel,
+            "COVID_SEIHDR": CovidJaxModel,
+            "COVID_SEIR": CovidSEIRModel,
+            "COVID_SIHR": CovidSIHRModel,
+            "COVID_SIDR": CovidSIDRModel,
+            "COVID_SEIHR": CovidSEIHRModel,
+            "COVID_SEIDR": CovidSEIDRModel,
+            "COVID_SIHDR": CovidSIHDRModel,
+            "COVID_SIR": CovidSIRModel,
             "VECTOR_BORNE": DengueJaxModel,
             "VECTOR_BORNE_2STRAIN": Dengue2StrainModel,
             "MONKEYPOX": MpoxJaxModel,
