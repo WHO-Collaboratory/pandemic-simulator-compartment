@@ -133,6 +133,7 @@ class ValidationPostProcessor:
 
         MODEL_REGISTRY = {
             "COVID_SEIHDR": CovidJaxModel,
+            "RESPIRATORY": CovidJaxModel,  # legacy alias — backend not yet migrated
             "COVID_SEIR": CovidSEIRModel,
             "COVID_SIHR": CovidSIHRModel,
             "COVID_SIDR": CovidSIDRModel,
