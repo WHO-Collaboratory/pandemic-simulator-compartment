@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC
-from typing import Any, Optional, List
+from typing import Optional, List
 from pydantic import BaseModel, ConfigDict
 
 
@@ -12,12 +12,8 @@ class BaseDiseaseConfig(BaseModel, ABC):
     disease_name: Optional[str] = None
     disease_type: str  # e.g., "RESPIRATORY", "VECTOR_BORNE", "MONKEYPOX"
 
-    # Disease graph nodes — defines which compartments are active at runtime.
-    # Flexible models (e.g. COVID) use this to determine the compartment list.
-    disease_nodes: Optional[List[Any]] = None
-
     # Explicit compartment list (short IDs like ["S", "I", "R"]).
-    # Takes priority over disease_nodes when present.
+    # Only used for models without a fixed COMPARTMENT_LIST on the class.
     compartment_list: Optional[List[str]] = None
     
     def get_compartments(self) -> List[str]:

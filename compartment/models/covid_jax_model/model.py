@@ -16,16 +16,16 @@ but is available for testing and experimentation in the codebase.
 class CovidJaxModel(Model):
     """SEIHDR compartmental model with age-stratified transmission and spatial mobility."""
 
-    # Schema defines all possible compartments (S-E-I-H-D-R), but the
-    # config's disease_nodes determines which are active at runtime.
-    FLEXIBLE_COMPARTMENTS = True
+    DISEASE_TYPE = "COVID_SEIHDR"
+    DISEASE_LABEL = "Novel Respiratory (SEIHDR)"
+    DISEASE_DESCRIPTION = "An SEIHDR compartmental model for novel respiratory diseases with age-stratified transmission"
 
     @classmethod
     def define_parameters(cls, schema):
         schema.set_model_info(
-            disease_type="RESPIRATORY",
-            label="Novel Respiratory (Advanced)",
-            description="An SEIHDR compartmental model for novel respiratory diseases with age-stratified transmission",
+            disease_type=cls.DISEASE_TYPE,
+            label=cls.DISEASE_LABEL,
+            description=cls.DISEASE_DESCRIPTION,
         )
 
         # ---- Compartments (S-E-I-H-D-R) ----
@@ -196,9 +196,7 @@ class CovidJaxModel(Model):
     def __init__(self, config):
         super().__init__(config)
 
-        # The schema defines full SEIHDR capability, but the config's
-        # compartment_list (from disease_nodes) defines what's active
-        # at runtime.  Override the schema-derived list.
+        # Override with the compartment list from config (may be a variant subset).
         self.compartment_list = config["compartment_list"]
 
         # base __init__ sets population_matrix to jnp.array(initial_population).T

@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, ConfigDict
 from compartment.validation.simulation_config import SimulationConfig
 from compartment.helpers import (
     create_initial_population_matrix,
-    create_compartment_list,
     create_transmission_dict,
     extract_admin_units,
     create_intervention_dict,
@@ -122,6 +121,10 @@ class ValidationPostProcessor:
 
         # === MODEL REGISTRY (import model classes) ===
         from compartment.models.covid_jax_model.model import CovidJaxModel
+        from compartment.models.covid_jax_model.variants import (
+            CovidSEIRModel, CovidSIHRModel, CovidSIDRModel,
+            CovidSEIHRModel, CovidSEIDRModel, CovidSIHDRModel, CovidSIRModel,
+        )
         from compartment.models.dengue_jax_model.model import DengueJaxModel
         from compartment.models.test_dengue_2strain.model import Dengue2StrainModel
         from compartment.models.mpox_jax_model.model import MpoxJaxModel
@@ -129,7 +132,15 @@ class ValidationPostProcessor:
         from compartment.models.test_covid_sir_stochastic.model import CovidSirStochasticModel
 
         MODEL_REGISTRY = {
-            "RESPIRATORY": CovidJaxModel,
+            "COVID_SEIHDR": CovidJaxModel,
+            "RESPIRATORY": CovidJaxModel,  # legacy alias — backend not yet migrated
+            "COVID_SEIR": CovidSEIRModel,
+            "COVID_SIHR": CovidSIHRModel,
+            "COVID_SIDR": CovidSIDRModel,
+            "COVID_SEIHR": CovidSEIHRModel,
+            "COVID_SEIDR": CovidSEIDRModel,
+            "COVID_SIHDR": CovidSIHDRModel,
+            "COVID_SIR": CovidSIRModel,
             "VECTOR_BORNE": DengueJaxModel,
             "VECTOR_BORNE_2STRAIN": Dengue2StrainModel,
             "MONKEYPOX": MpoxJaxModel,
@@ -140,28 +151,16 @@ class ValidationPostProcessor:
         model_class = MODEL_REGISTRY.get(disease_type)
 
         # === COMPARTMENT LIST ===
-        # Models with FLEXIBLE_COMPARTMENTS = True (e.g. COVID) derive
-        # their active compartments from the config (disease_nodes or
-        # compartment_list).  Models with fixed compartments (e.g. dengue)
-        # use their schema-derived COMPARTMENT_LIST regardless of what
-        # the frontend sends in disease_nodes.
-        use_config_compartments = (
-            model_class and getattr(model_class, "FLEXIBLE_COMPARTMENTS", False)
-        )
-
-        if use_config_compartments and disease_dict.get("disease_nodes"):
-            compartment_list = create_compartment_list(disease_dict["disease_nodes"])
-        elif use_config_compartments and disease_dict.get("compartment_list"):
-            compartment_list = disease_dict["compartment_list"]
-        elif model_class and hasattr(model_class, "COMPARTMENT_LIST"):
+        # All models define their compartments via COMPARTMENT_LIST on the class.
+        # The config's compartment_list is a fallback for models that don't.
+        if model_class and hasattr(model_class, "COMPARTMENT_LIST"):
             compartment_list = model_class.COMPARTMENT_LIST
-        elif disease_dict.get("disease_nodes"):
-            compartment_list = create_compartment_list(disease_dict["disease_nodes"])
         elif disease_dict.get("compartment_list"):
             compartment_list = disease_dict["compartment_list"]
         else:
             raise ValueError(
-                "Either 'disease_nodes' or 'compartment_list' must be provided in Disease config. "
+                "'compartment_list' must be provided in Disease config for models "
+                "without a fixed COMPARTMENT_LIST."
             )
 
         # === INITIAL POPULATION (use Model class methods) ===

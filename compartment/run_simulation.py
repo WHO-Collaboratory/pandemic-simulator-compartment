@@ -84,8 +84,12 @@ def run_simulation(
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
-    # Validate and create config object
+    # Normalize legacy disease type aliases from the backend
+    _LEGACY_ALIASES = {"RESPIRATORY": "COVID_SEIHDR"}
     disease_type = config["data"]["getSimulationJob"]["Disease"]["disease_type"]
+    if disease_type in _LEGACY_ALIASES:
+        disease_type = _LEGACY_ALIASES[disease_type]
+        config["data"]["getSimulationJob"]["Disease"]["disease_type"] = disease_type
     validation_success, cleaned_config = record_and_upload_validation(
         simulation_job_id,
         config,
