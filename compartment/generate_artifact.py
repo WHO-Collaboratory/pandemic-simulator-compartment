@@ -67,91 +67,25 @@ def _discover_models_from_dir(model_dir: str) -> list:
 
 
 def _get_model_class(disease_type: str):
-    """Lazy-import model class by disease type."""
-    registry = {}
-
-    # Only import what's needed to keep startup fast
-    if disease_type == "MONKEYPOX":
-        from compartment.models.mpox_jax_model.model import MpoxJaxModel
-
-        registry["MONKEYPOX"] = MpoxJaxModel
-    elif disease_type == "COVID_SEIHDR":
-        from compartment.models.covid_jax_model.model import CovidJaxModel
-        registry["COVID_SEIHDR"] = CovidJaxModel
-    elif disease_type == "COVID_SEIR":
-        from compartment.models.covid_jax_model.variants import CovidSEIRModel
-        registry["COVID_SEIR"] = CovidSEIRModel
-    elif disease_type == "COVID_SIHR":
-        from compartment.models.covid_jax_model.variants import CovidSIHRModel
-        registry["COVID_SIHR"] = CovidSIHRModel
-    elif disease_type == "COVID_SIDR":
-        from compartment.models.covid_jax_model.variants import CovidSIDRModel
-        registry["COVID_SIDR"] = CovidSIDRModel
-    elif disease_type == "COVID_SEIHR":
-        from compartment.models.covid_jax_model.variants import CovidSEIHRModel
-        registry["COVID_SEIHR"] = CovidSEIHRModel
-    elif disease_type == "COVID_SEIDR":
-        from compartment.models.covid_jax_model.variants import CovidSEIDRModel
-        registry["COVID_SEIDR"] = CovidSEIDRModel
-    elif disease_type == "COVID_SIHDR":
-        from compartment.models.covid_jax_model.variants import CovidSIHDRModel
-        registry["COVID_SIHDR"] = CovidSIHDRModel
-    elif disease_type == "COVID_SIR":
-        from compartment.models.covid_jax_model.variants import CovidSIRModel
-        registry["COVID_SIR"] = CovidSIRModel
-    elif disease_type == "VECTOR_BORNE":
-        from compartment.models.dengue_jax_model.model import DengueJaxModel
-
-        registry["VECTOR_BORNE"] = DengueJaxModel
-    elif disease_type == "VECTOR_BORNE_2STRAIN":
-        from compartment.models.test_dengue_2strain.model import Dengue2StrainModel
-
-        registry["VECTOR_BORNE_2STRAIN"] = Dengue2StrainModel
-    elif disease_type == "KLEBSIELLA_AMR":
-        from compartment.models.test_klebsiella_amr_model.model import KlebsiellaAmrModel
-
-        registry["KLEBSIELLA_AMR"] = KlebsiellaAmrModel
-    elif disease_type == "COVID_SIR_STOCHASTIC":
-        from compartment.models.test_covid_sir_stochastic.model import CovidSirStochasticModel
-
-        registry["COVID_SIR_STOCHASTIC"] = CovidSirStochasticModel
-
-    if disease_type not in registry:
+    """Return the model class for a disease type via the central registry."""
+    from compartment.registry import MODEL_REGISTRY
+    model_class = MODEL_REGISTRY.get(disease_type)
+    if model_class is None:
+        available = sorted(MODEL_REGISTRY.keys())
         print(f"Error: Unknown disease type '{disease_type}'", file=sys.stderr)
-        print(
-            "Available types: MONKEYPOX, COVID_SIR, COVID_SEIR, COVID_SIHR, COVID_SIDR, "
-            "COVID_SEIHR, COVID_SEIDR, COVID_SIHDR, COVID_SEIHDR, "
-            "VECTOR_BORNE, VECTOR_BORNE_2STRAIN, KLEBSIELLA_AMR, COVID_SIR_STOCHASTIC",
-            file=sys.stderr,
-        )
+        print(f"Available types: {', '.join(available)}", file=sys.stderr)
         sys.exit(1)
-
-    return registry[disease_type]
+    return model_class
 
 
 def _list_available() -> list[str]:
     """Return disease types that have implemented define_parameters()."""
+    from compartment.registry import MODEL_REGISTRY
     from compartment.schema_generator import has_parameter_schema
 
-    types_to_check = [
-        "MONKEYPOX",
-        "COVID_SIR",
-        "COVID_SEIR",
-        "COVID_SIHR",
-        "COVID_SIDR",
-        "COVID_SEIHR",
-        "COVID_SEIDR",
-        "COVID_SIHDR",
-        "COVID_SEIHDR",
-        "VECTOR_BORNE",
-        "VECTOR_BORNE_2STRAIN",
-        "KLEBSIELLA_AMR",
-        "COVID_SIR_STOCHASTIC",
-    ]
     available = []
-    for dt in types_to_check:
+    for dt, model_class in MODEL_REGISTRY.items():
         try:
-            model_class = _get_model_class(dt)
             if has_parameter_schema(model_class):
                 available.append(dt)
         except Exception:

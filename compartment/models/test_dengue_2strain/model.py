@@ -14,7 +14,9 @@ but is available for testing and experimentation in the codebase.
 """
 
 class Dengue2StrainModel(Model):
-    
+
+    DISEASE_TYPE = "VECTOR_BORNE_2STRAIN"
+
     # Fixed compartment structure for 2-strain dengue model
     COMPARTMENT_LIST = ['S', 'I1', 'I2', 'R1', 'R2', 'S1', 'S2', 'I12', 'I21', 'R']
     

@@ -25,6 +25,8 @@ class DengueJaxModel(Model):
     transmission edges, interventions, and the immunity period.
     """
 
+    DISEASE_TYPE = "VECTOR_BORNE"
+
     @classmethod
     def _add_total_compartments(cls, schema):
         # Suppress framework auto-generation of per-edge _total
