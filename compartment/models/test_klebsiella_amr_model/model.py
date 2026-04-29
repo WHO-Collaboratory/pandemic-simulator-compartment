@@ -36,8 +36,6 @@ class KlebsiellaAmrModel(Model):
     27 core compartments + 2 cumulative tracking compartments.
     """
 
-    DISEASE_TYPE = "KLEBSIELLA_AMR"
-
     # Compartment group look-ups for clean iteration in derivative().
     # Keys: (strain, setting) -> (untreated, drug_a, drug_b) compartment IDs
     _GROUPS = {

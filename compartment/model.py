@@ -86,6 +86,10 @@ class Model(ABC):
             # Keep COMPARTMENT_LIST as a plain list for backward compat
             # with the post-processor and other downstream code.
             cls.COMPARTMENT_LIST = list(cls.COMPARTMENTS)
+            # Auto-set DISEASE_TYPE from define_parameters() so models
+            # only declare disease_type once (in set_model_info).
+            if "DISEASE_TYPE" not in cls.__dict__ and schema.disease_type:
+                cls.DISEASE_TYPE = schema.disease_type
         except (NotImplementedError, Exception):
             # Non-migrated model — leave everything as-is.
             pass

@@ -25,7 +25,6 @@ class CovidSirStochasticModel(Model):
     Euler integration instead of the adaptive ODE solver.
     """
 
-    DISEASE_TYPE = "COVID_SIR_STOCHASTIC"
     STOCHASTIC = True
 
     @classmethod

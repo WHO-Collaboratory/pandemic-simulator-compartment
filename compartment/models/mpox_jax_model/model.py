@@ -18,8 +18,6 @@ but is available for testing and experimentation in the codebase.
 class MpoxJaxModel(Model):
     """A simple SIRS compartmental model for MPOX with spatial mobility"""
 
-    DISEASE_TYPE = "MONKEYPOX"
-
     # ------------------------------------------------------------------
     # Declarative parameter schema (single source of truth)
     #
