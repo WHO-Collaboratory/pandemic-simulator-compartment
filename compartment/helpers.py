@@ -249,18 +249,6 @@ def compute_multi_run_compartment_deltas(
     return avg_deltas
 
 
-def _get_intervention_model_registry() -> dict:
-    """Lazy-import model registry for infective compartment lookup."""
-    from compartment.models.mpox_jax_model.model import MpoxJaxModel
-    from compartment.models.test_klebsiella_amr_model.model import KlebsiellaAmrModel
-    from compartment.models.test_covid_sir_stochastic.model import CovidSirStochasticModel
-
-    return {
-        "MONKEYPOX": MpoxJaxModel,
-        "KLEBSIELLA_AMR": KlebsiellaAmrModel,
-        "COVID_SIR_STOCHASTIC": CovidSirStochasticModel,
-    }
-
 
 def create_jax_intervention_results(
     population_matrix: np.ndarray,
@@ -316,8 +304,8 @@ def create_jax_intervention_results(
 
         # Use schema-declared infective compartments when available;
         # fall back to "I" for legacy models.
-        model_registry = _get_intervention_model_registry()
-        model_class = model_registry.get(disease_type)
+        from compartment.registry import MODEL_REGISTRY
+        model_class = MODEL_REGISTRY.get(disease_type)
         if model_class and hasattr(model_class, "COMPARTMENTS") and hasattr(model_class.COMPARTMENTS, "infective_ids"):
             infective_comps = list(model_class.COMPARTMENTS.infective_ids)
             infective_idx = [

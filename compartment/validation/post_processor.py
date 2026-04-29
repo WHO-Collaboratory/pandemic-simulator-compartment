@@ -119,36 +119,8 @@ class ValidationPostProcessor:
                 i.model_dump() for i in config.Interventions.items
             ]
 
-        # === MODEL REGISTRY (import model classes) ===
-        from compartment.models.covid_jax_model.model import CovidJaxModel
-        from compartment.models.covid_jax_model.variants import (
-            CovidSEIRModel, CovidSIHRModel, CovidSIDRModel,
-            CovidSEIHRModel, CovidSEIDRModel, CovidSIHDRModel, CovidSIRModel,
-        )
-        from compartment.models.dengue_jax_model.model import DengueJaxModel
-        from compartment.models.test_dengue_2strain.model import Dengue2StrainModel
-        from compartment.models.mpox_jax_model.model import MpoxJaxModel
-        from compartment.models.test_klebsiella_amr_model.model import KlebsiellaAmrModel
-        from compartment.models.test_covid_sir_stochastic.model import CovidSirStochasticModel
-
-        MODEL_REGISTRY = {
-            "COVID_SEIHDR": CovidJaxModel,
-            "RESPIRATORY": CovidJaxModel,  # legacy alias — backend not yet migrated
-            "COVID_SEIR": CovidSEIRModel,
-            "COVID_SIHR": CovidSIHRModel,
-            "COVID_SIDR": CovidSIDRModel,
-            "COVID_SEIHR": CovidSEIHRModel,
-            "COVID_SEIDR": CovidSEIDRModel,
-            "COVID_SIHDR": CovidSIHDRModel,
-            "COVID_SIR": CovidSIRModel,
-            "VECTOR_BORNE": DengueJaxModel,
-            "VECTOR_BORNE_2STRAIN": Dengue2StrainModel,
-            "MONKEYPOX": MpoxJaxModel,
-            "KLEBSIELLA_AMR": KlebsiellaAmrModel,
-            "COVID_SIR_STOCHASTIC": CovidSirStochasticModel,
-        }
-
-        model_class = MODEL_REGISTRY.get(disease_type)
+        from compartment.registry import resolve
+        model_class = resolve(disease_type)
 
         # === COMPARTMENT LIST ===
         # All models define their compartments via COMPARTMENT_LIST on the class.

@@ -74,33 +74,10 @@ logger = logging.getLogger("compartment.validation")
 
 
 def _get_model_registry() -> dict:
-    from compartment.models.covid_jax_model.model import CovidJaxModel
-    from compartment.models.covid_jax_model.variants import (
-        CovidSEIRModel, CovidSIHRModel, CovidSIDRModel,
-        CovidSEIHRModel, CovidSEIDRModel, CovidSIHDRModel, CovidSIRModel,
-    )
-    from compartment.models.dengue_jax_model.model import DengueJaxModel
-    from compartment.models.test_dengue_2strain.model import Dengue2StrainModel
-    from compartment.models.mpox_jax_model.model import MpoxJaxModel
-    from compartment.models.test_klebsiella_amr_model.model import KlebsiellaAmrModel
-    from compartment.models.test_covid_sir_stochastic.model import CovidSirStochasticModel
-
-    return {
-        "COVID_SEIHDR": CovidJaxModel,
-        "RESPIRATORY": CovidJaxModel,  # legacy alias — backend not yet migrated
-        "COVID_SEIR": CovidSEIRModel,
-        "COVID_SIHR": CovidSIHRModel,
-        "COVID_SIDR": CovidSIDRModel,
-        "COVID_SEIHR": CovidSEIHRModel,
-        "COVID_SEIDR": CovidSEIDRModel,
-        "COVID_SIHDR": CovidSIHDRModel,
-        "COVID_SIR": CovidSIRModel,
-        "VECTOR_BORNE": DengueJaxModel,
-        "VECTOR_BORNE_2STRAIN": Dengue2StrainModel,
-        "MONKEYPOX": MpoxJaxModel,
-        "KLEBSIELLA_AMR": KlebsiellaAmrModel,
-        "COVID_SIR_STOCHASTIC": CovidSirStochasticModel,
-    }
+    from compartment.registry import MODEL_REGISTRY, DISEASE_TYPE_ALIASES
+    return {**MODEL_REGISTRY, **{alias: MODEL_REGISTRY[canonical]
+                                  for alias, canonical in DISEASE_TYPE_ALIASES.items()
+                                  if canonical in MODEL_REGISTRY}}
 
 
 # ---------------------------------------------------------------------------
