@@ -47,6 +47,14 @@ def _build_registry() -> dict:
                     and cls.__module__ == module_name
                     and hasattr(cls, "DISEASE_TYPE")
                 ):
+                    if cls.DISEASE_TYPE in registry:
+                        if registry[cls.DISEASE_TYPE] is cls:
+                            continue
+                        raise RuntimeError(
+                            f"Duplicate DISEASE_TYPE '{cls.DISEASE_TYPE}': "
+                            f"'{registry[cls.DISEASE_TYPE].__name__}' and '{cls.__name__}' "
+                            f"both claim the same disease type."
+                        )
                     registry[cls.DISEASE_TYPE] = cls
 
     return registry
