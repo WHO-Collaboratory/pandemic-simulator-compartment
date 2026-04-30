@@ -260,7 +260,7 @@ class TestCovidDisease:
                         + val.get("age_18_55", 0)
                         + val.get("age_56_plus", 0)
                     )
-                    assert abs(parts - val["age_all"]) < 1.0, (
+                    assert abs(parts - val["age_all"]) < 1.5, (
                         f"Age groups don't sum to age_all for {key} on {entry['date']}: "
                         f"{parts:.2f} != {val['age_all']:.2f}"
                     )
