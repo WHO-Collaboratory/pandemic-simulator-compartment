@@ -42,8 +42,8 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Unit tests
-        run: uv run python -m pytest tests/test_smoke.py -v -m "not integration"
-
       - name: Smoke test ${{ matrix.model }}
         run: uv run python -m pytest tests/test_smoke.py -v -m integration -k "${{ matrix.model }}"
+
+      - name: Disease and unit tests
+        run: uv run python -m pytest tests/ -v --ignore=tests/test_smoke.py
