@@ -7,7 +7,7 @@ from compartment.run_simulation import run_simulation
 MODELS_DIR = pathlib.Path(__file__).resolve().parent.parent / "compartment" / "models"
 
 
-def _discover_models() -> dict[str, tuple[str, str, pathlib.Path]]:
+def discover_models() -> dict[str, tuple[str, str, pathlib.Path]]:
     """Scan compartment/models/ for directories with model.py + example-config.json."""
     import importlib
     import inspect
@@ -43,10 +43,10 @@ def _discover_models() -> dict[str, tuple[str, str, pathlib.Path]]:
     return found
 
 
-MODEL_CONFIGS = _discover_models()
+MODEL_CONFIGS = discover_models()
 
 
-def _import_class(dotted_path: str):
+def import_class(dotted_path: str):
     """Import a class from a dotted module path."""
     import importlib
     module_path, class_name = dotted_path.rsplit(".", 1)
@@ -54,7 +54,7 @@ def _import_class(dotted_path: str):
     return getattr(module, class_name)
 
 
-def _run_model(model_class, config_path: pathlib.Path) -> list[dict]:
+def run_model(model_class, config_path: pathlib.Path) -> list[dict]:
     """Run a model and return the JSON results."""
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
         output_path = f.name

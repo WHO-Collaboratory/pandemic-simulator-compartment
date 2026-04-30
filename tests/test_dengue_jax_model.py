@@ -11,7 +11,7 @@ import json
 import pathlib
 import tempfile
 import pytest
-from helpers import _run_model, MODELS_DIR
+from helpers import run_model, MODELS_DIR
 
 
 def _get_dengue_val(entry, comp):
@@ -30,7 +30,7 @@ class TestDengueDisease:
         """Mosquito population should grow from 0 via temperature dynamics."""
         from compartment.models.dengue_jax_model.model import DengueJaxModel
 
-        results = _run_model(
+        results = run_model(
             DengueJaxModel,
             MODELS_DIR / "dengue_jax_model" / "example-config.json",
         )
@@ -48,7 +48,7 @@ class TestDengueDisease:
         """I2 (secondary infections) should be non-zero by end of a multi-year run."""
         from compartment.models.dengue_jax_model.model import DengueJaxModel
 
-        results = _run_model(
+        results = run_model(
             DengueJaxModel,
             MODELS_DIR / "dengue_jax_model" / "example-config.json",
         )
@@ -115,8 +115,8 @@ class TestDengueDisease:
             json.dump(config_no_immunity, f)
             path_without = f.name
 
-        results_with = _run_model(DengueJaxModel, pathlib.Path(path_with))
-        results_without = _run_model(DengueJaxModel, pathlib.Path(path_without))
+        results_with = run_model(DengueJaxModel, pathlib.Path(path_with))
+        results_without = run_model(DengueJaxModel, pathlib.Path(path_without))
 
         ts_with = results_with[0]["parent_admin_total"]["time_series"]
         ts_without = results_without[0]["parent_admin_total"]["time_series"]
@@ -133,7 +133,7 @@ class TestDengueDisease:
         """Bite reduction intervention should reduce cumulative infections vs control."""
         from compartment.models.dengue_jax_model.model import DengueJaxModel
 
-        results = _run_model(
+        results = run_model(
             DengueJaxModel,
             MODELS_DIR / "dengue_jax_model" / "example-config.json",
         )
@@ -155,7 +155,7 @@ class TestDengueDisease:
         """Dengue should always use its fixed strain-specific compartments."""
         from compartment.models.dengue_jax_model.model import DengueJaxModel
 
-        results = _run_model(
+        results = run_model(
             DengueJaxModel,
             MODELS_DIR / "dengue_jax_model" / "example-config.json",
         )
@@ -218,7 +218,7 @@ class TestDengueUncertainty:
             json.dump(config, f)
             config_path = f.name
 
-        results = _run_model(DengueJaxModel, pathlib.Path(config_path))
+        results = run_model(DengueJaxModel, pathlib.Path(config_path))
 
         assert len(results) == 2
 

@@ -13,7 +13,7 @@ import math
 import pathlib
 import tempfile
 import pytest
-from helpers import _run_model, MODELS_DIR
+from helpers import run_model, MODELS_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ class TestFlexibleCompartments:
             json.dump(config, f)
             config_path = f.name
 
-        results = _run_model(CovidSIRModel, pathlib.Path(config_path))
+        results = run_model(CovidSIRModel, pathlib.Path(config_path))
         ts = results[0]["parent_admin_total"]["time_series"]
         compartments = {k for k in ts[0].keys() if k != "date"}
         assert "S" in compartments
@@ -118,7 +118,7 @@ class TestFlexibleCompartments:
             json.dump(config, f)
             config_path = f.name
 
-        results = _run_model(CovidSEIRModel, pathlib.Path(config_path))
+        results = run_model(CovidSEIRModel, pathlib.Path(config_path))
         ts = results[0]["parent_admin_total"]["time_series"]
         compartments = {k for k in ts[0].keys() if k != "date"}
         assert "E" in compartments
@@ -135,7 +135,7 @@ class TestFlexibleCompartments:
             json.dump(config, f)
             config_path = f.name
 
-        results = _run_model(CovidJaxModel, pathlib.Path(config_path))
+        results = run_model(CovidJaxModel, pathlib.Path(config_path))
         ts = results[0]["parent_admin_total"]["time_series"]
         compartments = [k for k in ts[0].keys() if k != "date"]
 
@@ -171,7 +171,7 @@ class TestCovidDisease:
         """Full SEIHDR run with all 6 compartments should succeed."""
         from compartment.models.covid_jax_model.model import CovidJaxModel
 
-        results = _run_model(
+        results = run_model(
             CovidJaxModel,
             MODELS_DIR / "covid_jax_model" / "example-config.json",
         )
@@ -185,7 +185,7 @@ class TestCovidDisease:
         """With-interventions run should differ from control at epidemic peak."""
         from compartment.models.covid_jax_model.model import CovidJaxModel
 
-        results = _run_model(
+        results = run_model(
             CovidJaxModel,
             MODELS_DIR / "covid_jax_model" / "example-config.json",
         )
@@ -231,7 +231,7 @@ class TestCovidDisease:
             json.dump(config, f)
             config_path = f.name
 
-        results = _run_model(CovidSIRModel, pathlib.Path(config_path))
+        results = run_model(CovidSIRModel, pathlib.Path(config_path))
 
         zones = results[0]["admin_zones"]
         zone_b_ts = zones[1]["time_series"]
@@ -245,7 +245,7 @@ class TestCovidDisease:
         """age_0_17 + age_18_55 + age_56_plus should equal age_all."""
         from compartment.models.covid_jax_model.model import CovidJaxModel
 
-        results = _run_model(
+        results = run_model(
             CovidJaxModel,
             MODELS_DIR / "covid_jax_model" / "example-config.json",
         )
@@ -327,7 +327,7 @@ class TestCovidDisease:
             json.dump(config, f)
             config_path = f.name
 
-        results = _run_model(CovidJaxModel, pathlib.Path(config_path))
+        results = run_model(CovidJaxModel, pathlib.Path(config_path))
         ts = results[0]["parent_admin_total"]["time_series"]
         final = ts[-1]
 
@@ -472,7 +472,7 @@ class TestCovidVariantRuns:
         ])
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config, f)
-        results = _run_model(CovidSIRModel, pathlib.Path(f.name))
+        results = run_model(CovidSIRModel, pathlib.Path(f.name))
         comps = {k for k in results[0]["parent_admin_total"]["time_series"][0] if k != "date"}
         for c in ["S", "I", "R"]:
             assert c in comps, f"SIR missing {c}"
@@ -489,7 +489,7 @@ class TestCovidVariantRuns:
         ])
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config, f)
-        results = _run_model(CovidSEIRModel, pathlib.Path(f.name))
+        results = run_model(CovidSEIRModel, pathlib.Path(f.name))
         comps = {k for k in results[0]["parent_admin_total"]["time_series"][0] if k != "date"}
         for c in ["S", "E", "I", "R"]:
             assert c in comps, f"SEIR missing {c}"
@@ -507,7 +507,7 @@ class TestCovidVariantRuns:
         ])
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config, f)
-        results = _run_model(CovidSIHRModel, pathlib.Path(f.name))
+        results = run_model(CovidSIHRModel, pathlib.Path(f.name))
         comps = {k for k in results[0]["parent_admin_total"]["time_series"][0] if k != "date"}
         for c in ["S", "I", "H", "R"]:
             assert c in comps, f"SIHR missing {c}"
@@ -524,7 +524,7 @@ class TestCovidVariantRuns:
         ])
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config, f)
-        results = _run_model(CovidSIDRModel, pathlib.Path(f.name))
+        results = run_model(CovidSIDRModel, pathlib.Path(f.name))
         comps = {k for k in results[0]["parent_admin_total"]["time_series"][0] if k != "date"}
         for c in ["S", "I", "D", "R"]:
             assert c in comps, f"SIDR missing {c}"
@@ -543,7 +543,7 @@ class TestCovidVariantRuns:
         ])
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config, f)
-        results = _run_model(CovidSEIHRModel, pathlib.Path(f.name))
+        results = run_model(CovidSEIHRModel, pathlib.Path(f.name))
         comps = {k for k in results[0]["parent_admin_total"]["time_series"][0] if k != "date"}
         for c in ["S", "E", "I", "H", "R"]:
             assert c in comps, f"SEIHR missing {c}"
@@ -560,7 +560,7 @@ class TestCovidVariantRuns:
         ])
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config, f)
-        results = _run_model(CovidSEIDRModel, pathlib.Path(f.name))
+        results = run_model(CovidSEIDRModel, pathlib.Path(f.name))
         comps = {k for k in results[0]["parent_admin_total"]["time_series"][0] if k != "date"}
         for c in ["S", "E", "I", "D", "R"]:
             assert c in comps, f"SEIDR missing {c}"
@@ -579,7 +579,7 @@ class TestCovidVariantRuns:
         ])
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config, f)
-        results = _run_model(CovidSIHDRModel, pathlib.Path(f.name))
+        results = run_model(CovidSIHDRModel, pathlib.Path(f.name))
         comps = {k for k in results[0]["parent_admin_total"]["time_series"][0] if k != "date"}
         for c in ["S", "I", "H", "D", "R"]:
             assert c in comps, f"SIHDR missing {c}"
@@ -588,7 +588,7 @@ class TestCovidVariantRuns:
     @pytest.mark.integration
     def test_covid_seihdr(self):
         from compartment.models.covid_jax_model.model import CovidJaxModel
-        results = _run_model(
+        results = run_model(
             CovidJaxModel,
             MODELS_DIR / "covid_jax_model" / "example-config.json",
         )
@@ -606,7 +606,7 @@ class TestCovidVariantRuns:
         ])
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config, f)
-        results = _run_model(CovidSIRModel, pathlib.Path(f.name))
+        results = run_model(CovidSIRModel, pathlib.Path(f.name))
         ts = results[0]["parent_admin_total"]["time_series"]
         compartments = [k for k in ts[0] if k != "date"]
 
@@ -680,7 +680,7 @@ class TestCovidUncertainty:
             json.dump(config, f)
             config_path = f.name
 
-        results = _run_model(CovidJaxModel, pathlib.Path(config_path))
+        results = run_model(CovidJaxModel, pathlib.Path(config_path))
 
         assert len(results) == 2
         for run in results:
@@ -742,7 +742,7 @@ class TestCovidUncertainty:
             json.dump(config, f)
             config_path = f.name
 
-        results = _run_model(CovidJaxModel, pathlib.Path(config_path))
+        results = run_model(CovidJaxModel, pathlib.Path(config_path))
 
         for run in results:
             ts = run["parent_admin_total"]["time_series"]
@@ -798,7 +798,7 @@ class TestCovidUncertainty:
             json.dump(config, f)
             config_path = f.name
 
-        results = _run_model(CovidJaxModel, pathlib.Path(config_path))
+        results = run_model(CovidJaxModel, pathlib.Path(config_path))
 
         for run in results:
             ts = run["parent_admin_total"]["time_series"]

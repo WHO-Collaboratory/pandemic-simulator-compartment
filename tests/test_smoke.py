@@ -16,7 +16,7 @@ Run just one model:
 
 import math
 import pytest
-from helpers import MODEL_CONFIGS, _import_class, _run_model
+from helpers import MODEL_CONFIGS, import_class, run_model
 
 
 @pytest.mark.integration
@@ -27,8 +27,8 @@ class TestModelSmoke:
     def model_run(self, request):
         """Run a model and return (model_id, results)."""
         model_id, class_path, config_path = MODEL_CONFIGS[request.param]
-        model_class = _import_class(class_path)
-        results = _run_model(model_class, config_path)
+        model_class = import_class(class_path)
+        results = run_model(model_class, config_path)
         return model_id, results
 
     def test_returns_two_runs(self, model_run):
