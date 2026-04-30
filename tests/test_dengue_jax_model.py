@@ -149,3 +149,73 @@ class TestDengueDisease:
             f"Intervention run has MORE recoveries ({r_with:.0f}) than "
             f"control ({r_ctrl:.0f}). Intervention may be broken."
         )
+
+
+# ---------------------------------------------------------------------------
+# Uncertainty (LHS) runs
+# ---------------------------------------------------------------------------
+
+
+class TestDengueUncertainty:
+    """Test Dengue uncertainty (LHS) runs produce valid confidence intervals."""
+
+    @pytest.mark.integration
+    def test_uncertainty_varying_interventions(self):
+        """Uncertainty run with variance on intervention adherence."""
+        from compartment.models.dengue_jax_model.model import DengueJaxModel
+
+        config = {
+            "Disease": {
+                "disease_type": "VECTOR_BORNE",
+                "immunity_period": 240,
+            },
+            "start_date": "2025-01-01",
+            "end_date": "2025-07-01",
+            "run_mode": "UNCERTAINTY",
+            "admin_zones": [
+                {"name": "Zone A", "center_lat": 2.0, "center_lon": 45.0, "population": 500000, "infected_population": 5, "seroprevalence": 30, "temp_min": 20, "temp_max": 35, "temp_mean": 28},
+            ],
+            "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
+            "travel_volume": {"leaving": 20},
+            "Interventions": {
+                "items": [
+                    {
+                        "Intervention": {"name": "PHYSICAL", "display_name": "Bite Reduction"},
+                        "adherence_min": 50.0,
+                        "transmission_percentage": 50.0,
+                        "start_date": "2025-01-01",
+                        "end_date": "2025-07-01",
+                        "FieldConfigs": {
+                            "items": [{
+                                "field_key": "adherence_min",
+                                "has_variance": True,
+                                "distribution_type": "UNIFORM",
+                                "min": 20.0,
+                                "max": 80.0,
+                            }]
+                        },
+                    }
+                ]
+            },
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(config, f)
+            config_path = f.name
+
+        results = _run_model(DengueJaxModel, pathlib.Path(config_path))
+
+        assert len(results) == 2
+
+        with_run = next(r for r in results if not r["control_run"])
+        ts = with_run["parent_admin_total"]["time_series"]
+        assert len(ts) > 0
+
+        mid_point = ts[len(ts) // 2]
+        sample_comp = [k for k in mid_point if k != "date"][0]
+        val = mid_point[sample_comp]
+        assert "mean" in val, f"Expected uncertainty format for {sample_comp}, got {val}"
+
+        ctrl_run = next(r for r in results if r["control_run"])
+        ctrl_ts = ctrl_run["parent_admin_total"]["time_series"]
+        assert len(ctrl_ts) > 0
