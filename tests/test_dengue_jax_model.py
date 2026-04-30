@@ -150,6 +150,21 @@ class TestDengueDisease:
             f"control ({r_ctrl:.0f}). Intervention may be broken."
         )
 
+    @pytest.mark.integration
+    def test_uses_fixed_compartments(self):
+        """Dengue should always use its fixed strain-specific compartments."""
+        from compartment.models.dengue_jax_model.model import DengueJaxModel
+
+        results = _run_model(
+            DengueJaxModel,
+            MODELS_DIR / "dengue_jax_model" / "example-config.json",
+        )
+        ts = results[0]["parent_admin_total"]["time_series"]
+        compartments = {k for k in ts[0].keys() if k != "date"}
+        assert "S0" in compartments or "SV" in compartments, (
+            f"Expected dengue-specific compartments, got {compartments}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Uncertainty (LHS) runs

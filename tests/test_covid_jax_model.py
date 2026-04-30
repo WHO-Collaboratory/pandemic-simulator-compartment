@@ -9,6 +9,7 @@ Run:
 """
 
 import json
+import math
 import pathlib
 import tempfile
 import pytest
@@ -155,20 +156,6 @@ class TestFlexibleCompartments:
             f"drift={abs(pop_start - pop_end):.1f} ({abs(pop_start - pop_end) / pop_start * 100:.4f}%)"
         )
 
-    @pytest.mark.integration
-    def test_dengue_uses_fixed_compartments(self):
-        """Dengue should always use its fixed strain-specific compartments."""
-        from compartment.models.dengue_jax_model.model import DengueJaxModel
-
-        results = _run_model(
-            DengueJaxModel,
-            MODELS_DIR / "dengue_jax_model" / "example-config.json",
-        )
-        ts = results[0]["parent_admin_total"]["time_series"]
-        compartments = {k for k in ts[0].keys() if k != "date"}
-        assert "S0" in compartments or "SV" in compartments, (
-            f"Expected dengue-specific compartments, got {compartments}"
-        )
 
 
 # ---------------------------------------------------------------------------
