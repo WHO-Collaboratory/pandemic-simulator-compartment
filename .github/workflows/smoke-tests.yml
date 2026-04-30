@@ -46,4 +46,10 @@ jobs:
         run: uv run python -m pytest tests/test_smoke.py -v -m integration -k "${{ matrix.model }}"
 
       - name: Disease and unit tests
-        run: uv run python -m pytest tests/ -v --ignore=tests/test_smoke.py
+        run: |
+          TEST_FILE="tests/test_${{ matrix.model }}.py"
+          if [ -f "$TEST_FILE" ]; then
+            uv run python -m pytest "$TEST_FILE" tests/test_uncertainty.py tests/test_artifact.py -v
+          else
+            uv run python -m pytest tests/test_uncertainty.py tests/test_artifact.py -v
+          fi
