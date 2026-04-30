@@ -49,7 +49,24 @@ jobs:
         run: |
           TEST_FILE="tests/test_${{ matrix.model }}.py"
           if [ -f "$TEST_FILE" ]; then
-            uv run python -m pytest "$TEST_FILE" tests/test_artifact.py -v
-          else
-            uv run python -m pytest tests/test_artifact.py -v
+            uv run python -m pytest "$TEST_FILE" -v
           fi
+
+  artifact-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Artifact and registry tests
+        run: uv run python -m pytest tests/test_artifact.py -v
