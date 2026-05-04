@@ -17,7 +17,7 @@ implementation details -- model authors never need to import or construct them.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
@@ -33,8 +33,8 @@ class ValueType(str, Enum):
     BOOLEAN = "boolean"  # e.g., has_variance: true
     TEXT = "text"  # e.g., name: "New York"
     SELECT = "select"  # e.g., run_mode: one of [...]
-    FLOAT = "float"  # generic float
-    INTEGER = "integer"  # generic integer
+    FLOAT = "float"  # generic float  (mapped → NUMBER in artifact)
+    INTEGER = "integer"  # generic integer  (mapped → NUMBER in artifact)
     COORDINATE = "coordinate"  # lat/lon
 
 
@@ -70,9 +70,49 @@ class ParameterDef:
     options: Optional[list[str]] = None  # for SELECT type
 
     def to_dict(self) -> dict:
-        """Serialize to a plain dict (None values omitted)."""
-        d = asdict(self)
-        d["value_type"] = self.value_type.value
+        """Serialize to a plain dict (None values omitted).
+
+        Field names are mapped to match the GraphQL ``FieldMetadata`` type
+        used by the pandemic-simulator DB schema:
+
+        - ``default`` → ``default_value``
+        - ``min_value`` → ``min``
+        - ``max_value`` → ``max``
+        - ``options`` → ``enum``
+        - ``value_type`` is emitted UPPERCASE to match the GraphQL
+          ``ValueType`` enum (``RATE``, ``DAYS``, ``PERCENTAGE``, …).
+        - ``FLOAT`` and ``INTEGER`` are mapped to ``NUMBER`` because the
+          GraphQL ``ValueType`` enum does not have those variants; the
+          ``min`` / ``max`` validation already distinguishes them.
+
+        Extra runtime fields (``name``, ``required``, ``unit``) are
+        preserved for UI/runtime consumers but are not part of
+        ``FieldMetadata``.
+        """
+        # Map modeler-friendly types to the GraphQL ValueType enum values
+        _ARTIFACT_VALUE_TYPE_MAP = {
+            "FLOAT": "NUMBER",
+            "INTEGER": "NUMBER",
+        }
+        raw_vt = self.value_type.value.upper()
+        mapped_vt = _ARTIFACT_VALUE_TYPE_MAP.get(raw_vt, raw_vt)
+
+        d = {
+            # FieldMetadata fields
+            "label": self.label,
+            "description": self.description,
+            "value_type": mapped_vt,
+            "default_value": self.default,
+            "default_min": self.default_min,
+            "default_max": self.default_max,
+            "min": self.min_value,
+            "max": self.max_value,
+            "enum": self.options,
+            # Extra runtime fields (not in FieldMetadata)
+            "name": self.name,
+            "required": self.required,
+            "unit": self.unit,
+        }
         return {k: v for k, v in d.items() if v is not None}
 
 
@@ -195,13 +235,30 @@ class TransmissionEdgeDef:
     parameter: ParameterDef  # metadata for the rate on this edge
     frequency_dependent: bool = False  # use FOI formula instead of simple rate
 
-    def to_dict(self) -> dict:
+    def to_dict(self, order: int | None = None) -> dict:
+        """Serialize to a dict matching the ``TransmissionEdge`` DB schema.
+
+        The nested ``parameter`` is emitted as ``metadata`` with
+        ``FieldMetadata``-compatible keys.  ``value_type`` is also
+        hoisted to the edge level (UPPERCASE) so consumers can read it
+        without digging into ``metadata``.  The optional *order*
+        argument is injected into ``metadata.order``.
+        """
+        _ARTIFACT_VALUE_TYPE_MAP = {"FLOAT": "NUMBER", "INTEGER": "NUMBER"}
+        raw_vt = self.parameter.value_type.value.upper()
+        mapped_vt = _ARTIFACT_VALUE_TYPE_MAP.get(raw_vt, raw_vt)
+
+        metadata = self.parameter.to_dict()
+        if order is not None:
+            metadata["order"] = order
         return {
+            "variable_name": self.variable_name,
+            "value_type": mapped_vt,
+            "description": self.parameter.description,
             "source": self.source,
             "target": self.target,
-            "variable_name": self.variable_name,
-            "parameter": self.parameter.to_dict(),
             "frequency_dependent": self.frequency_dependent,
+            "metadata": metadata,
         }
 
 
@@ -301,13 +358,38 @@ class InterventionDef:
     )
 
     def to_dict(self) -> dict:
+        """Serialize to a dict matching the ``Intervention`` DB schema.
+
+        Key mappings:
+        - ``id`` → ``name``  (machine key, replaces the legacy enum)
+        - ``label`` → ``display_name``  (human-readable name)
+        - A top-level ``metadata`` object is added for the intervention
+          itself (used by the ``FieldMetadata`` column on ``Intervention``).
+        - Each entry in ``parameters`` is wrapped as
+          ``{"name": …, "metadata": {…}}`` with auto-assigned ``order``.
+        """
+        params = []
+        for idx, p in enumerate(self.parameters, start=1):
+            meta = p.to_dict()
+            meta["order"] = idx
+            params.append(
+                {
+                    "name": p.name,
+                    "metadata": meta,
+                }
+            )
+
         return {
-            "id": self.id,
-            "label": self.label,
+            "name": self.id,
+            "display_name": self.label,
             "description": self.description,
             "target_rates": self.target_rates,
             "modifies_travel": self.modifies_travel,
-            "parameters": [p.to_dict() for p in self.parameters],
+            "metadata": {
+                "label": self.label,
+                "description": self.description,
+            },
+            "parameters": params,
         }
 
 
@@ -326,12 +408,16 @@ class DemographicGroupDef:
     per-zone overrides are provided.
     """
 
-    id: str             # "age_0_17"
-    label: str          # "Children (0-17)"
+    id: str  # "age_0_17"
+    label: str  # "Children (0-17)"
     default_weight: float  # percentage of total population (0-100)
 
     def to_dict(self) -> dict:
-        return {"id": self.id, "label": self.label, "default_weight": self.default_weight}
+        return {
+            "id": self.id,
+            "label": self.label,
+            "default_weight": self.default_weight,
+        }
 
 
 @dataclass
@@ -344,8 +430,8 @@ class ContactOverrideDef:
     """
 
     from_group: str  # "age_0_17"
-    to_group: str    # "age_18_55"
-    value: float     # contact rate (replaces the identity default)
+    to_group: str  # "age_18_55"
+    value: float  # contact rate (replaces the identity default)
 
     def to_dict(self) -> dict:
         return {
@@ -401,28 +487,86 @@ class ModelParameterSchema:
     # Serialization helpers
     # ---------------------------------------------------------------
 
+    @staticmethod
+    def _wrap_parameter(param: ParameterDef, order: int) -> dict:
+        """Wrap a ``ParameterDef`` as ``{"name": …, "metadata": {…}}``."""
+        meta = param.to_dict()
+        meta["order"] = order
+        return {"name": param.name, "metadata": meta}
+
     def to_artifact_dict(self) -> dict:
         """
         Generate the artifact JSON structure consumed by the UI layer,
         database seeding, and downstream Zod schema generation.
+
+        The output is shaped so that each section maps directly to the
+        corresponding DynamoDB / GraphQL table in pandemic-simulator:
+
+        - Top-level ``name`` / ``definition`` → ``ModelArtifact`` table.
+        - ``transmission_edges[].metadata`` → ``TransmissionEdge.metadata``
+          (``FieldMetadata``).
+        - ``interventions[].metadata`` → ``Intervention.metadata``.
+        - ``custom_fields`` → ``CustomField`` records with a ``category``
+          tag (``admin_zone`` or ``disease_parameter``).
+        - ``simulation_parameters`` → shared simulation-level fields
+          (start_date, end_date, run_mode, travel volume, …).
         """
+
+        # -- Transmission edges with auto-assigned order --------------------
+        edges = [
+            e.to_dict(order=idx)
+            for idx, e in enumerate(self.transmission_edges, start=1)
+        ]
+
+        # -- Custom fields (model-specific bespoke inputs) ------------------
+        # admin_zone and disease_parameter fields are merged into a single
+        # ``custom_fields`` array with a ``category`` tag.  Consumers
+        # filter by category when they need a specific subset.
+        admin_zone = [
+            self._wrap_parameter(f, idx)
+            for idx, f in enumerate(self.admin_zone_fields, start=1)
+        ]
+        disease_params = [
+            self._wrap_parameter(p, idx)
+            for idx, p in enumerate(self.disease_parameters, start=1)
+        ]
+
+        custom_fields: list[dict[str, Any]] = []
+        for entry in admin_zone:
+            custom_fields.append({**entry, "category": "admin_zone"})
+        for entry in disease_params:
+            custom_fields.append({**entry, "category": "disease_parameter"})
+
+        # -- Simulation parameters (shared across all models) ---------------
+        # These are non-negotiable baseline fields every simulation gets.
+        # Travel volume parameters are appended here as well.
+        sim_params = [
+            self._wrap_parameter(p, idx)
+            for idx, p in enumerate(self.simulation_parameters, start=1)
+        ]
+        if self.travel_volume:
+            for _key, param in self.travel_volume.items():
+                sim_params.append(self._wrap_parameter(param, len(sim_params) + 1))
+
+        # -- Assemble -------------------------------------------------------
         result: dict[str, Any] = {
-            "disease_type": self.disease_type,
-            "disease_label": self.disease_label,
-            "description": self.description,
+            # ModelArtifact identity
+            "name": self.disease_label,
+            "definition": self.description,
+            # Compartment graph
             "compartments": [c.to_dict() for c in self.compartments],
-            "transmission_edges": [e.to_dict() for e in self.transmission_edges],
+            "transmission_edges": edges,
+            # Interventions
             "interventions": [i.to_dict() for i in self.interventions],
-            "travel_volume": (
-                {k: v.to_dict() for k, v in self.travel_volume.items()}
-                if self.travel_volume
-                else None
-            ),
-            "admin_zone_fields": [f.to_dict() for f in self.admin_zone_fields],
-            "disease_parameters": [p.to_dict() for p in self.disease_parameters],
-            "simulation_parameters": [p.to_dict() for p in self.simulation_parameters],
+            # Model-specific custom fields (admin_zone + disease_parameter)
+            "custom_fields": custom_fields,
+            # Shared simulation parameters (+ travel volume)
+            "simulation_parameters": sim_params,
+            # Demographics (optional)
             "demographic_groups": [g.to_dict() for g in self.demographic_groups],
-            "contact_matrix_overrides": [o.to_dict() for o in self.contact_matrix_overrides],
+            "contact_matrix_overrides": [
+                o.to_dict() for o in self.contact_matrix_overrides
+            ],
         }
         return result
 
@@ -645,7 +789,8 @@ class ParameterSchemaBuilder:
         """Remove a compartment and any edges that reference it by source or target."""
         self._compartments = [c for c in self._compartments if c.id != id]
         self._transmission_edges = [
-            e for e in self._transmission_edges
+            e
+            for e in self._transmission_edges
             if e.source_id != id and e.target_id != id
         ]
 
