@@ -1,0 +1,60 @@
+{
+    "start_date": "2026-05-04",
+    "end_date": "2026-08-02",
+    "Disease": {
+        "disease_type": "EBOLA",
+        "transmission_edges": [
+            {
+                "source": "susceptible",
+                "target": "E1",
+                "data": {
+                    "transmission_rate": 0.125
+                }
+            },
+            {
+                "source": "E1",
+                "target": "I1",
+                "data": {
+                    "transmission_rate": 5.0
+                }
+            },
+            {
+                "source": "I1",
+                "target": "F",
+                "data": {
+                    "transmission_rate": 12.0
+                }
+            }
+        ],
+        "prop_community": 90.0,
+        "etu_risk": 70.0,
+        "funeral_risk": 50.0
+    },
+    "admin_unit_id": "USA",
+    "AdminUnit": {
+        "id": "USA",
+        "center_lat": 37.0902
+    },
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": { "name": "social_distancing", "display_name": "Social Distancing" },
+                "adherence_min": 50.0,
+                "transmission_percentage": 40.0,
+                "start_date": "2026-05-25",
+                "end_date": "2026-08-02"
+            }
+        ]
+    },
+    "case_file": {
+        "admin_zones": [
+            {
+                "center_lat": 40.7128,
+                "center_lon": -74.006,
+                "name": "Example Zone",
+                "population": 1000000,
+                "infected_population": 1
+            }
+        ]
+    }
+}
