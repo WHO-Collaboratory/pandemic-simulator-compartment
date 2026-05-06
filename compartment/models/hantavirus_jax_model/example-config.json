@@ -1,0 +1,57 @@
+{
+    "start_date": "2026-05-06",
+    "end_date": "2031-05-06",
+    "Disease": {
+        "disease_type": "HANTAVIRUS",
+        "transmission_edges": [
+            { "source": "Em", "target": "Im", "data": { "transmission_rate": 15.0 } },
+            { "source": "Im", "target": "Rm", "data": { "transmission_rate": 120.0 } },
+            { "source": "Ef", "target": "If", "data": { "transmission_rate": 15.0 } },
+            { "source": "If", "target": "Rf", "data": { "transmission_rate": 60.0 } }
+        ],
+        "beta_mm": 0.000167,
+        "beta_mf": 8.3e-05,
+        "beta_f": 3.3e-05,
+        "birth_rate": 0.0667,
+        "death_baseline": 0.000167,
+        "density_death_coeff": 3.32e-05,
+        "male_fraction": 50.0
+    },
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": { "source": "Em", "target": "Im", "value_type": "DAYS" },
+                "value": 0.0667,
+                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "DELTA_M", "min": 0, "max": 0 }] }
+            },
+            {
+                "transmission_edge": { "source": "Im", "target": "Rm", "value_type": "DAYS" },
+                "value": 0.00833,
+                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "GAMMA_M", "min": 0, "max": 0 }] }
+            },
+            {
+                "transmission_edge": { "source": "Ef", "target": "If", "value_type": "DAYS" },
+                "value": 0.0667,
+                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "DELTA_F", "min": 0, "max": 0 }] }
+            },
+            {
+                "transmission_edge": { "source": "If", "target": "Rf", "value_type": "DAYS" },
+                "value": 0.01667,
+                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "GAMMA_F", "min": 0, "max": 0 }] }
+            }
+        ]
+    },
+    "admin_unit_id": "USA",
+    "AdminUnit": { "id": "USA", "center_lat": 37.0902 },
+    "case_file": {
+        "admin_zones": [
+            {
+                "name": "Habitat A",
+                "center_lat": 30.0,
+                "center_lon": -95.0,
+                "population": 1000,
+                "infected_population": 1.0
+            }
+        ]
+    }
+}
