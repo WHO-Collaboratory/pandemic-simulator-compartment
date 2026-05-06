@@ -86,6 +86,14 @@ class MyModel(Model):
         #    `frequency_dependent=True` makes the framework compute
         #       flow = source * rate * sum(infective) / N_total
         #    instead of the default mass-action form.
+        #
+        #    Rule of thumb: declare an edge for every compartment-to-compartment
+        #    movement whose flow has the form `rate * source` (mass action) or
+        #    `source * rate * sum(infective) / N` (frequency-dependent). The
+        #    framework then handles intervention scaling, uncertainty sampling,
+        #    and _total accumulation for free. Flows that do NOT fit that shape
+        #    (multi-rate FOI, demographic births, density-dependent deaths) are
+        #    handled manually — see "Flows without an edge" below.
         schema.add_transmission_edge(
             source="susceptible", target="infected",
             variable_name="beta",
@@ -193,6 +201,22 @@ def derivative(self, y, t, p):
 ```
 
 `_compute_derivatives()` reads `frequency_dependent` and `infective` flags from your schema, automatically accumulates flow into `_total` compartments, and skips edges whose source/target compartments aren't active in the current run (which is what makes the COVID variants work via `schema.remove_compartment()`).
+
+### Flows without an edge
+
+Some compartment-to-compartment movements can't be expressed as a single schema edge because the flow rate isn't a single tunable scalar. Examples seen in this repo:
+
+- **Multi-rate force of infection.** When several rates contribute to the same S→E (or S→I) flow with different infectious sources, e.g. hantavirus's `Sm → Em` driven by `β_mm·Im + β_f·If`. No single rate exists to put on the edge.
+- **Demographic births.** Inflow into a compartment from outside the modelled population (e.g. dengue's birth term `μ·N`, hantavirus's harmonic-mean births).
+- **Density-dependent deaths.** Outflow from every compartment with rate `a + c·N` — the rate depends on aggregate state, not just the source compartment.
+- **Spatial coupling.** Mpox's S→I uses a travel-matrix-weighted FOI; the rate that the framework would multiply by `S` doesn't capture the coupling.
+
+For these, the pattern is:
+1. Declare the underlying constants via `schema.add_disease_parameter()` so they show up in the artifact and the validated config.
+2. Skip the corresponding edge in `_compute_derivatives()` (or just don't declare it) and apply the flow manually with `self._apply_flow(derivs, source_id, target_id, flow)`.
+3. **Declare the target's `*_total` compartment by hand** with `schema.add_compartment("X_total", ...)` if you want cumulative tracking. The framework only auto-generates `*_total` for compartments that are the target of at least one declared edge — flows applied via `_apply_flow()` will populate the `_total` counter, but only if it exists.
+
+Hantavirus is the canonical example here: `Em` and `Ef` are not edge targets, the three β rates are `disease_parameter`s, and `Em_total` / `Ef_total` are declared manually. See [hantavirus_jax_model/model.py](../compartment/models/hantavirus_jax_model/model.py).
 
 ### Cumulative `_total` compartments
 
@@ -348,6 +372,7 @@ There's also [tests/test_artifact.py](../tests/test_artifact.py) for artifact ge
 ## Quality checklist before opening a PR
 
 - `define_parameters()` calls `set_model_info()` and adds at least one compartment. Every transmission edge's `source`/`target` matches a declared compartment id or label (case-insensitive).
+- Every compartment-to-compartment movement in your dynamics is either a declared edge (preferred) **or** intentionally a manual flow because the rate isn't a single tunable scalar (multi-rate FOI, demographic births, density-dependent deaths). For each manual flow the underlying rates are exposed as `add_disease_parameter()` and the target's `*_total` compartment is declared by hand if you need cumulative tracking.
 - The compartments your `derivative()` indexes are spelled the same as `self.COMPARTMENTS.X` — typos raise `AttributeError` with a helpful list.
 - `derivative()` returns `jnp.stack([...])` in `self.compartment_list` order, including any `_total` rows.
 - `prepare_initial_state()` sets `self.travel_matrix` (use `np.eye(R)` if you don't model travel).
@@ -363,6 +388,7 @@ There's also [tests/test_artifact.py](../tests/test_artifact.py) for artifact ge
 - Minimal SIR: [mpox_jax_model](../compartment/models/mpox_jax_model/model.py).
 - Age-stratified respiratory with variants: [covid_jax_model](../compartment/models/covid_jax_model/model.py) + [variants.py](../compartment/models/covid_jax_model/variants.py).
 - Vector-borne with custom totals & disease-specific params: [dengue_jax_model](../compartment/models/dengue_jax_model/model.py).
+- Multi-rate FOI / demographic births / density-dependent deaths (flows without an edge): [hantavirus_jax_model](../compartment/models/hantavirus_jax_model/model.py).
 - Stochastic / Euler-integrated: [test_covid_sir_stochastic](../compartment/models/test_covid_sir_stochastic/model.py).
 - Multi-axis structure (settings × strains × treatment): [test_klebsiella_amr_model](../compartment/models/test_klebsiella_amr_model/model.py).
 

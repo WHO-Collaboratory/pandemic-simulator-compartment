@@ -35,6 +35,13 @@ CaseFileDemographics = Dict[str, float]
 
 
 class CaseFileAdminZone(BaseModel):
+    # Allow disease-specific admin-zone fields declared via
+    # `schema.add_admin_zone_field()` to survive validation. Without
+    # `extra="allow"` Pydantic silently drops unknown fields, which
+    # caused custom seeding fields (e.g. hantavirus's per-sector rodent
+    # counts) to be invisible to `get_initial_population`.
+    model_config = ConfigDict(extra="allow")
+
     id: str = Field(default_factory=lambda: str(uuid4()))
     # admin_code: Optional[str] = None
     # admin_iso_code: Optional[str] = None
