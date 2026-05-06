@@ -36,6 +36,8 @@ jobs:
             model_display_name: "Novel Vector-Borne"
           - disease_path: mpox_jax_model
             model_display_name: "Test Mpox Model"
+          - disease_path: ebola_jax_model
+            model_display_name: "Test Ebola Model"
     steps:
       - uses: actions/checkout@v4
 
@@ -91,6 +93,8 @@ jobs:
             model_display_name: "Novel Vector-Borne"
           - disease_path: mpox_jax_model
             model_display_name: "Test Mpox Model"
+          - disease_path: ebola_jax_model
+            model_display_name: "Test Ebola Model"
     steps:
       - uses: actions/checkout@v4
 
