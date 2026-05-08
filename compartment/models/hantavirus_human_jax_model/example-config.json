@@ -1,0 +1,105 @@
+{
+    "start_date": "2026-05-08",
+    "end_date": "2029-05-08",
+    "Disease": {
+        "disease_type": "HANTAVIRUS_HUMAN_TRANSMISSION",
+        "transmission_edges": [
+            { "source": "E_h", "target": "I_h", "data": { "transmission_rate": 21.0 } },
+            { "source": "I_h", "target": "R_h", "data": { "transmission_rate": 3.0 } },
+            { "source": "E_m", "target": "I_m", "data": { "transmission_rate": 18.0 } },
+            { "source": "I_m", "target": "R_m", "data": { "transmission_rate": 30.0 } },
+            { "source": "S_h", "target": "S_h", "data": { "transmission_rate": 1.0 } }
+        ],
+        "beta_star": 0.00427,
+        "beta_h_star": 0.5,
+        "beta_m": 0.048,
+        "cfr": 25.7,
+        "cfr_max": 50.0,
+        "hospital_capacity": 0.003,
+        "seasonal_amplitude": 0.6,
+        "seasonal_peak_day": 150,
+        "b_h": 0.0001243,
+        "d_h": 0.0001243,
+        "b_m": 0.00139,
+        "d_m": 0.00139,
+        "P_star": 0.5,
+        "lambda_1": 0.065,
+        "lambda_2": 0.5
+    },
+    "travel_volume": { "leaving": 0.05 },
+    "admin_unit_id": "USA",
+    "AdminUnit": {
+        "id": "USA",
+        "center_lat": 39.5
+    },
+    "interventions": [
+        {
+            "id": "case_isolation",
+            "adherence_min": 70.0,
+            "transmission_percentage": 55.0,
+            "start_date": "2026-07-01",
+            "end_date": null,
+            "start_threshold": null,
+            "end_threshold": null
+        }
+    ],
+    "case_file": {
+        "admin_zones": [
+            {
+                "name": "Southwest (AZ, NM, TX)",
+                "center_lat": 34.0,
+                "center_lon": -111.0,
+                "population": 22000000,
+                "infected_population": 12,
+                "rodent_population": 5000,
+                "infected_rodent_count": 50,
+                "exposed_fraction": 10.0,
+                "initial_risk_perception": 10.0
+            },
+            {
+                "name": "Mountain (CO, UT, WY, MT, ID)",
+                "center_lat": 43.0,
+                "center_lon": -110.0,
+                "population": 11000000,
+                "infected_population": 10,
+                "rodent_population": 8000,
+                "infected_rodent_count": 80,
+                "exposed_fraction": 12.0,
+                "initial_risk_perception": 10.0
+            },
+            {
+                "name": "Pacific (CA, OR, WA)",
+                "center_lat": 37.0,
+                "center_lon": -120.0,
+                "population": 53000000,
+                "infected_population": 5,
+                "rodent_population": 3000,
+                "infected_rodent_count": 20,
+                "exposed_fraction": 3.0,
+                "initial_risk_perception": 10.0
+            },
+            {
+                "name": "Great Plains (KS, NE, SD, ND, OK)",
+                "center_lat": 41.0,
+                "center_lon": -99.0,
+                "population": 10000000,
+                "infected_population": 2,
+                "rodent_population": 6000,
+                "infected_rodent_count": 40,
+                "exposed_fraction": 10.0,
+                "initial_risk_perception": 10.0
+            },
+            {
+                "name": "East (all other states)",
+                "center_lat": 38.0,
+                "center_lon": -80.0,
+                "population": 240000000,
+                "infected_population": 1,
+                "rodent_population": 1000,
+                "infected_rodent_count": 5,
+                "exposed_fraction": 1.0,
+                "initial_risk_perception": 10.0
+            }
+        ]
+    }
+}
