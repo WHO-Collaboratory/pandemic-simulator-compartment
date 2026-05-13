@@ -43,6 +43,10 @@ logger = logging.getLogger(__name__)
 _HUMAN_LIVE = ("S_h", "E_h", "I_h", "R_h")
 _RODENT_LIVE = ("S_m", "E_m", "I_m", "R_m")
 
+""" 
+WARNING: This model is not currently supported in the pandemic simulator app, 
+but is available for testing and experimentation in the codebase. 
+"""
 
 class HantavirusHumanJaxModel(Model):
     """SEIR hantavirus model with person-to-person transmission and an

@@ -44,6 +44,10 @@ _RODENT_COMPS = (
     "M_afS", "M_afE", "M_afI", "M_afR",
 )
 
+""" 
+WARNING: This model is not currently supported in the pandemic simulator app, 
+but is available for testing and experimentation in the codebase. 
+"""
 
 class HantavirusJaxModel(Model):
     """Spatial rodent-to-human hantavirus spillover (urban / rural-pop /
