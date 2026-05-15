@@ -406,17 +406,25 @@ class DemographicGroupDef:
     ``default_weight`` is the percentage of the total population in this
     group and is used to split the initial population tensor when no
     per-zone overrides are provided.
+
+    ``age_range`` is optional: when every group in a schema declares one,
+    the framework will auto-load a country-specific contact matrix (Prem
+    2021 synthetic matrices) and aggregate it to the declared bands.  When
+    any group is missing ``age_range``, the contact matrix falls back to
+    identity + explicit ``set_contact_override`` calls.
     """
 
     id: str  # "age_0_17"
     label: str  # "Children (0-17)"
     default_weight: float  # percentage of total population (0-100)
+    age_range: Optional[tuple[int, int]] = None  # inclusive (low, high), e.g. (0, 17)
 
     def to_dict(self) -> dict:
         return {
             "id": self.id,
             "label": self.label,
             "default_weight": self.default_weight,
+            "age_range": list(self.age_range) if self.age_range else None,
         }
 
 
@@ -1137,6 +1145,7 @@ class ParameterSchemaBuilder:
         id: str,
         label: str,
         default_weight: float,
+        age_range: Optional[tuple[int, int]] = None,
     ) -> None:
         """
         Declare a demographic group (e.g. an age band).
@@ -1150,9 +1159,16 @@ class ParameterSchemaBuilder:
             default_weight: Percentage of the total population in this group
                 (0-100).  Used to split the initial population tensor when
                 no per-zone override is provided.
+            age_range: Optional inclusive (low, high) age tuple, e.g. ``(0, 17)``.
+                When every group in the schema declares one, the framework
+                auto-loads the country's Prem 2021 contact matrix and
+                aggregates it to these bands.  Ranges must be non-overlapping
+                across groups (enforced at :meth:`build`).
 
         Raises:
-            ValueError: If a group with the same *id* already exists.
+            ValueError: If a group with the same *id* already exists, or if
+                ``age_range`` is not a 2-tuple of ints with
+                ``0 <= low <= high <= 120``.
         """
         existing_ids = {g.id for g in self._demographic_groups}
         if id in existing_ids:
@@ -1160,8 +1176,28 @@ class ParameterSchemaBuilder:
                 f"Duplicate demographic group id '{id}'. "
                 f"Already registered: {sorted(existing_ids)}"
             )
+        if age_range is not None:
+            if (
+                not isinstance(age_range, tuple)
+                or len(age_range) != 2
+                or not all(isinstance(v, int) for v in age_range)
+            ):
+                raise ValueError(
+                    f"age_range for '{id}' must be a 2-tuple of ints, got {age_range!r}"
+                )
+            low, high = age_range
+            if not (0 <= low <= high <= 120):
+                raise ValueError(
+                    f"age_range for '{id}' must satisfy 0 <= low <= high <= 120, "
+                    f"got ({low}, {high})"
+                )
         self._demographic_groups.append(
-            DemographicGroupDef(id=id, label=label, default_weight=default_weight)
+            DemographicGroupDef(
+                id=id,
+                label=label,
+                default_weight=default_weight,
+                age_range=age_range,
+            )
         )
 
     def set_contact_override(
@@ -1208,6 +1244,21 @@ class ParameterSchemaBuilder:
             raise ValueError(
                 "At least one compartment must be added via add_compartment()"
             )
+
+        # Validate age_range non-overlap among groups that declare one.
+        # Overlapping ranges would double-count contacts during aggregation
+        # from a synthetic source matrix (e.g. Prem 2021).
+        ranged = [g for g in self._demographic_groups if g.age_range is not None]
+        for i in range(len(ranged)):
+            for j in range(i + 1, len(ranged)):
+                a_lo, a_hi = ranged[i].age_range
+                b_lo, b_hi = ranged[j].age_range
+                if a_lo <= b_hi and b_lo <= a_hi:
+                    raise ValueError(
+                        f"Demographic groups '{ranged[i].id}' ({a_lo}-{a_hi}) and "
+                        f"'{ranged[j].id}' ({b_lo}-{b_hi}) have overlapping age_ranges. "
+                        f"Age ranges must be non-overlapping."
+                    )
 
         return ModelParameterSchema(
             disease_type=self._disease_type,

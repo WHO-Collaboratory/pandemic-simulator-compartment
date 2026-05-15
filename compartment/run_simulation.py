@@ -84,11 +84,9 @@ def run_simulation(
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
-    from compartment.registry import DISEASE_TYPE_ALIASES
-    disease_type = config["data"]["getSimulationJob"]["Disease"]["disease_type"]
-    if disease_type in DISEASE_TYPE_ALIASES:
-        disease_type = DISEASE_TYPE_ALIASES[disease_type]
-        config["data"]["getSimulationJob"]["Disease"]["disease_type"] = disease_type
+    disease_type = model_class.DISEASE_TYPE
+    config["data"]["getSimulationJob"]["Disease"]["disease_type"] = disease_type
+
     validation_success, cleaned_config = record_and_upload_validation(
         simulation_job_id,
         config,

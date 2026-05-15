@@ -173,9 +173,14 @@ class CovidJaxModel(Model):
         )
 
         # ---- Demographics ----
-        schema.add_demographic_group("age_0_17",    "Children (0-17)", default_weight=33.3)
-        schema.add_demographic_group("age_18_55",   "Adults (18-55)",  default_weight=44.4)
-        schema.add_demographic_group("age_56_plus", "Elderly (56+)",   default_weight=22.3)
+        # age_range enables auto-loading of the country's Prem 2021 contact
+        # matrix (aggregated to these bands) when no explicit overrides are
+        # declared.  The explicit overrides below still take precedence; the
+        # age_range tags are forward-compatible for when the overrides are
+        # removed in favor of country-aware defaults.
+        schema.add_demographic_group("age_0_17",    "Children (0-17)", default_weight=33.3, age_range=(0, 17))
+        schema.add_demographic_group("age_18_55",   "Adults (18-55)",  default_weight=44.4, age_range=(18, 55))
+        schema.add_demographic_group("age_56_plus", "Elderly (56+)",   default_weight=22.3, age_range=(56, 120))
 
         # Contact matrix — age-structured interaction rates (POLYMOD-derived).
         # All 9 entries are declared; diagonal values override the identity default.

@@ -91,7 +91,6 @@ GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
         transmission_edge {
           id
           value_type
-          disease_type
           description
           source
           target

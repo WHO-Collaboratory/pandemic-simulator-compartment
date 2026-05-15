@@ -8,55 +8,64 @@ import pytest
 
 
 # ---------------------------------------------------------------------------
-# Unit tests for _discover_model_from_dir
+# Unit tests for _discover_models_from_dir
 # ---------------------------------------------------------------------------
 
 
-def test_discover_model_from_dir_mpox():
-    from compartment.generate_artifact import _discover_model_from_dir
+def test_discover_models_from_dir_mpox():
+    from compartment.generate_artifact import _discover_models_from_dir
     from compartment.models.mpox_jax_model.model import MpoxJaxModel
 
-    result = _discover_model_from_dir("compartment/models/mpox_jax_model")
-    assert result is MpoxJaxModel
+    result = _discover_models_from_dir("compartment/models/mpox_jax_model")
+    assert result == [MpoxJaxModel]
 
 
-def test_discover_model_from_dir_trailing_slash():
-    from compartment.generate_artifact import _discover_model_from_dir
+def test_discover_models_from_dir_trailing_slash():
+    from compartment.generate_artifact import _discover_models_from_dir
     from compartment.models.mpox_jax_model.model import MpoxJaxModel
 
-    result = _discover_model_from_dir("compartment/models/mpox_jax_model/")
-    assert result is MpoxJaxModel
+    result = _discover_models_from_dir("compartment/models/mpox_jax_model/")
+    assert result == [MpoxJaxModel]
 
 
-def test_discover_model_from_dir_resolves_disease_type():
-    from compartment.generate_artifact import _discover_model_from_dir
+def test_discover_models_from_dir_resolves_disease_type():
+    from compartment.generate_artifact import _discover_models_from_dir
 
-    model_class = _discover_model_from_dir("compartment/models/mpox_jax_model")
-    schema = model_class._build_parameter_schema()
+    classes = _discover_models_from_dir("compartment/models/mpox_jax_model")
+    schema = classes[0]._build_parameter_schema()
     assert schema.disease_type == "MONKEYPOX"
 
 
-def test_discover_model_from_dir_invalid_path(capsys):
-    from compartment.generate_artifact import _discover_model_from_dir
+def test_discover_models_from_dir_invalid_path(capsys):
+    from compartment.generate_artifact import _discover_models_from_dir
 
     with pytest.raises(SystemExit):
-        _discover_model_from_dir("compartment/models/nonexistent_model")
+        _discover_models_from_dir("compartment/models/nonexistent_model")
 
 
-def test_discover_model_from_dir_covid():
-    from compartment.generate_artifact import _discover_model_from_dir
+def test_discover_models_from_dir_covid_includes_base_and_variants():
+    from compartment.generate_artifact import _discover_models_from_dir
     from compartment.models.covid_jax_model.model import CovidJaxModel
+    from compartment.models.covid_jax_model.variants import (
+        CovidSEIRModel, CovidSIRModel, CovidSIHRModel, CovidSIDRModel,
+        CovidSEIHRModel, CovidSEIDRModel, CovidSIHDRModel,
+    )
 
-    result = _discover_model_from_dir("compartment/models/covid_jax_model")
-    assert result is CovidJaxModel
+    result = _discover_models_from_dir("compartment/models/covid_jax_model")
+    assert CovidJaxModel in result
+    for variant in (
+        CovidSEIRModel, CovidSIRModel, CovidSIHRModel, CovidSIDRModel,
+        CovidSEIHRModel, CovidSEIDRModel, CovidSIHDRModel,
+    ):
+        assert variant in result
 
 
-def test_discover_model_from_dir_dengue():
-    from compartment.generate_artifact import _discover_model_from_dir
+def test_discover_models_from_dir_dengue():
+    from compartment.generate_artifact import _discover_models_from_dir
     from compartment.models.dengue_jax_model.model import DengueJaxModel
 
-    result = _discover_model_from_dir("compartment/models/dengue_jax_model")
-    assert result is DengueJaxModel
+    result = _discover_models_from_dir("compartment/models/dengue_jax_model")
+    assert result == [DengueJaxModel]
 
 
 # ---------------------------------------------------------------------------
