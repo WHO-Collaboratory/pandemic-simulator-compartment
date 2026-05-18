@@ -149,7 +149,7 @@ def run_simulation(
             results_with = future_with.result()
             results_without = future_without.result()
     else:
-        n_sims = 30
+        n_sims = getattr(cleaned_config, "n_simulations", None) or 30
         ci = 0.95
 
         # Extract normalized TransmissionEdges and Interventions for uncertainty
