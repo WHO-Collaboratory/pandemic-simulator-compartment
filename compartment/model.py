@@ -186,6 +186,24 @@ class Model(ABC):
             intv_def.id: False for intv_def in schema.interventions
         }
 
+        # Demographics: prefer config-supplied weights; otherwise fall back to
+        # the schema's declared default_weight values for each demographic group.
+        # Downstream consumers (post-processor, output formatter) read
+        # ``self.demographics`` to derive age-group labels and weights, so it
+        # must always be populated when the schema declares groups.
+        config_demo = {}
+        case_file = config.get("case_file")
+        if isinstance(case_file, dict):
+            config_demo = case_file.get("demographics") or {}
+        if config_demo:
+            self.demographics = dict(config_demo)
+        elif schema.demographic_groups:
+            self.demographics = {
+                g.id: g.default_weight for g in schema.demographic_groups
+            }
+        else:
+            self.demographics = {}
+
         self.contact_matrix = self._build_contact_matrix(config)
         self._rate_vectors = self._build_rate_vectors(config)
 
@@ -560,15 +578,23 @@ class Model(ABC):
             )
 
         # Schema-level contact overrides (only applied when schema IDs match)
-        if effective_ids == schema_ids:
+        if effective_ids == schema_ids and schema.contact_matrix_overrides:
+            applied = []
             for override in schema.contact_matrix_overrides:
                 if override.from_group in effective_ids and override.to_group in effective_ids:
                     i = effective_ids.index(override.from_group)
                     j = effective_ids.index(override.to_group)
                     matrix[i, j] = override.value
+                    applied.append(f"{override.from_group}->{override.to_group}")
+            if applied:
+                log.info(
+                    "Applied %d schema contact override(s) (Prem suppressed): %s.",
+                    len(applied), ", ".join(applied),
+                )
 
         # Config-level overrides always applied (keys match whatever the config declared)
         if config:
+            config_applied = []
             for from_group, targets in (config.get("contact_matrix_overrides") or {}).items():
                 if from_group not in effective_ids:
                     continue
@@ -576,6 +602,12 @@ class Model(ABC):
                 for to_group, value in targets.items():
                     if to_group in effective_ids:
                         matrix[i, effective_ids.index(to_group)] = value
+                        config_applied.append(f"{from_group}->{to_group}")
+            if config_applied:
+                log.info(
+                    "Applied %d config contact_matrix_override(s): %s.",
+                    len(config_applied), ", ".join(config_applied),
+                )
 
         return xp.array(matrix)
 
