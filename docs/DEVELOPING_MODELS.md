@@ -437,6 +437,8 @@ python -m compartment.models.your_model.main \
 
 `run_simulation` runs your model **twice in parallel** — once with interventions and once without (the "control run") — and writes both into the output JSON. In `UNCERTAINTY` mode (set `run_mode` in the config) it draws Latin Hypercube samples over edge variances and produces median + CI bands.
 
+> **📚 For comprehensive documentation on uncertainty quantification**, see **[UNCERTAINTY_QUANTIFICATION.md](./UNCERTAINTY_QUANTIFICATION.md)** — detailed guide to parameter uncertainty, Latin Hypercube Sampling, supported distributions, and interpreting results.
+
 ## Tests
 
 Smoke tests in [tests/test_smoke.py](../tests/test_smoke.py) automatically discover any model directory that contains both a `model.py` and an `example-config.json`. Adding your model to the test sweep requires nothing beyond those two files — the suite picks it up on the next run:

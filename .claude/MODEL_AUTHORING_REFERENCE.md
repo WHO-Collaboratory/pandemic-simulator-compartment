@@ -28,6 +28,8 @@ This file is for me (Claude) when the user asks for help adding or modifying a d
 | Gravity model implementation code | [compartment/helpers.py](../compartment/helpers.py) `gravity_model()`, `get_gravity_model_travel_matrix()` |
 | **Interventions: declaration, configuration, and application** | [docs/INTERVENTIONS.md](../docs/INTERVENTIONS.md) — comprehensive guide |
 | Intervention implementation code | [compartment/runtime.py](../compartment/runtime.py) `Intervention` class, [compartment/model.py](../compartment/model.py) `_apply_interventions()` |
+| **Uncertainty quantification: LHS, distributions, and CI interpretation** | [docs/UNCERTAINTY_QUANTIFICATION.md](../docs/UNCERTAINTY_QUANTIFICATION.md) — comprehensive guide |
+| UQ implementation code | [compartment/run_simulation.py](../compartment/run_simulation.py) orchestration, [compartment/helpers.py](../compartment/helpers.py) `generate_LHS_samples()` |
 
 When in doubt, *read the file* — the framework changes faster than this reference.
 
