@@ -22,6 +22,10 @@ This file is for me (Claude) when the user asks for help adding or modifying a d
 | CLI driver wrapper | [compartment/driver.py](../compartment/driver.py) |
 | Artifact generation CLI | [compartment/generate_artifact.py](../compartment/generate_artifact.py) |
 | Smoke test sweep that auto-discovers new models | [tests/test_smoke.py](../tests/test_smoke.py) + [tests/helpers.py](../tests/helpers.py) |
+| **Contact matrices: loading, aggregation, and usage** | [docs/CONTACT_MATRICES.md](../docs/CONTACT_MATRICES.md) — comprehensive guide |
+| Contact matrix implementation code | [compartment/contact_matrices/](../compartment/contact_matrices/) — loader, aggregator, Prem data |
+| **Gravity models: spatial mobility and travel matrices** | [docs/GRAVITY_MODEL.md](../docs/GRAVITY_MODEL.md) — comprehensive guide |
+| Gravity model implementation code | [compartment/helpers.py](../compartment/helpers.py) `gravity_model()`, `get_gravity_model_travel_matrix()` |
 
 When in doubt, *read the file* — the framework changes faster than this reference.
 
