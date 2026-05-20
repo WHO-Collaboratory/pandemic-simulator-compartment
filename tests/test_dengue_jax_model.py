@@ -187,6 +187,7 @@ class TestDengueUncertainty:
             "start_date": "2025-01-01",
             "end_date": "2025-07-01",
             "run_mode": "UNCERTAINTY",
+            "n_simulations": 5,
             "admin_zones": [
                 {"name": "Zone A", "center_lat": 2.0, "center_lon": 45.0, "population": 500000, "infected_population": 5, "seroprevalence": 30, "temp_min": 20, "temp_max": 35, "temp_mean": 28},
             ],

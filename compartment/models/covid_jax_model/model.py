@@ -173,21 +173,26 @@ class CovidJaxModel(Model):
         )
 
         # ---- Demographics ----
-        schema.add_demographic_group("age_0_17",    "Children (0-17)", default_weight=33.3)
-        schema.add_demographic_group("age_18_55",   "Adults (18-55)",  default_weight=44.4)
-        schema.add_demographic_group("age_56_plus", "Elderly (56+)",   default_weight=22.3)
+        # age_range enables auto-loading of the country's Prem 2021 contact
+        # matrix (aggregated to these bands) when no explicit overrides are
+        # declared.  The explicit overrides below still take precedence; the
+        # age_range tags are forward-compatible for when the overrides are
+        # removed in favor of country-aware defaults.
+        schema.add_demographic_group("age_0_17",    "Children (0-17)", default_weight=33.3, age_range=(0, 17))
+        schema.add_demographic_group("age_18_55",   "Adults (18-55)",  default_weight=44.4, age_range=(18, 55))
+        schema.add_demographic_group("age_56_plus", "Elderly (56+)",   default_weight=22.3, age_range=(56, 120))
 
         # Contact matrix — age-structured interaction rates (POLYMOD-derived).
         # All 9 entries are declared; diagonal values override the identity default.
-        schema.set_contact_override("age_0_17",    "age_0_17",    5.46)
-        schema.set_contact_override("age_0_17",    "age_18_55",   5.18)
-        schema.set_contact_override("age_0_17",    "age_56_plus", 0.93)
-        schema.set_contact_override("age_18_55",   "age_0_17",    1.70)
-        schema.set_contact_override("age_18_55",   "age_18_55",   9.18)
-        schema.set_contact_override("age_18_55",   "age_56_plus", 1.68)
-        schema.set_contact_override("age_56_plus", "age_0_17",    0.83)
-        schema.set_contact_override("age_56_plus", "age_18_55",   5.90)
-        schema.set_contact_override("age_56_plus", "age_56_plus", 3.80)
+        # schema.set_contact_override("age_0_17",    "age_0_17",    5.46)
+        # schema.set_contact_override("age_0_17",    "age_18_55",   5.18)
+        # schema.set_contact_override("age_0_17",    "age_56_plus", 0.93)
+        # schema.set_contact_override("age_18_55",   "age_0_17",    1.70)
+        # schema.set_contact_override("age_18_55",   "age_18_55",   9.18)
+        # schema.set_contact_override("age_18_55",   "age_56_plus", 1.68)
+        # schema.set_contact_override("age_56_plus", "age_0_17",    0.83)
+        # schema.set_contact_override("age_56_plus", "age_18_55",   5.90)
+        # schema.set_contact_override("age_56_plus", "age_56_plus", 3.80)
 
     # ------------------------------------------------------------------
     # Model interface
@@ -208,9 +213,9 @@ class CovidJaxModel(Model):
         )
         self.sigma = config["travel_volume"]["leaving"]
 
-        # Demographic weights come from case file for population tensor construction.
-        # Group definitions and contact matrix are declared in define_parameters().
-        self.demographics = config["case_file"]["demographics"]
+        # Demographics are populated by Model.__init__ — config weights when
+        # supplied, schema default_weight values otherwise.  Group definitions
+        # and the contact matrix are declared in define_parameters().
 
     def prepare_initial_state(self):
         # Expand (K, R) → (K, A, R) and append _total rows for active compartments.

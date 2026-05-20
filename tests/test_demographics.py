@@ -18,12 +18,22 @@ from unittest.mock import MagicMock, patch
 # ---------------------------------------------------------------------------
 
 def _make_schema(groups=None, overrides=None, edges=None):
-    """Build a minimal mock ModelParameterSchema."""
+    """Build a minimal mock ModelParameterSchema.
+
+    Each entry in ``groups`` is a tuple of (id, label, default_weight) or
+    (id, label, default_weight, age_range). The age_range slot is optional
+    and defaults to None.
+    """
     from compartment.parameters import DemographicGroupDef, ContactOverrideDef
 
     schema = MagicMock()
     schema.demographic_groups = [
-        DemographicGroupDef(id=g[0], label=g[1], default_weight=g[2])
+        DemographicGroupDef(
+            id=g[0],
+            label=g[1],
+            default_weight=g[2],
+            age_range=g[3] if len(g) > 3 else None,
+        )
         for g in (groups or [])
     ]
     schema.contact_matrix_overrides = [
@@ -143,6 +153,127 @@ class TestBuildContactMatrix:
         model = self._model(groups=groups, pm=np.zeros((1, 2)))
         result = model._build_contact_matrix(config={})
         assert type(result).__module__ == "numpy"
+
+
+# ---------------------------------------------------------------------------
+# _build_contact_matrix — Prem 2021 country-aware auto-load
+# ---------------------------------------------------------------------------
+
+class TestBuildContactMatrixPrem:
+    """When every demographic group declares age_range and no overrides exist,
+    the framework auto-loads a country-specific Prem matrix and aggregates it."""
+
+    def _aged_model(self, overrides=None, pm=None):
+        groups = [
+            ("age_0_17",    "Children", 33.3, (0, 17)),
+            ("age_18_55",   "Adults",   44.4, (18, 55)),
+            ("age_56_plus", "Elderly",  22.3, (56, 120)),
+        ]
+        schema = _make_schema(groups=groups, overrides=overrides or [])
+        return _make_model_with_schema(schema, pm)
+
+    def test_known_country_loads_and_aggregates_prem(self):
+        from compartment.contact_matrices import (
+            aggregate_to_bands, load_country_matrix,
+        )
+        model = self._aged_model()
+        result = np.array(model._build_contact_matrix(
+            config={"admin_unit_id": "USA.6.1_1"}
+        ))
+        expected = aggregate_to_bands(
+            load_country_matrix("USA"),
+            [(0, 17), (18, 55), (56, 120)],
+        )
+        np.testing.assert_allclose(result, expected, rtol=1e-12)
+
+    def test_unknown_country_falls_back_to_default_matrix(self):
+        from compartment.contact_matrices import (
+            aggregate_to_bands, default_matrix,
+        )
+        model = self._aged_model()
+        result = np.array(model._build_contact_matrix(
+            config={"admin_unit_id": "XYZ.1.1"}
+        ))
+        expected = aggregate_to_bands(
+            default_matrix(),
+            [(0, 17), (18, 55), (56, 120)],
+        )
+        np.testing.assert_allclose(result, expected, rtol=1e-12)
+
+    def test_local_admin_unit_id_falls_back_to_default(self):
+        from compartment.contact_matrices import (
+            aggregate_to_bands, default_matrix,
+        )
+        model = self._aged_model()
+        result = np.array(model._build_contact_matrix(
+            config={"admin_unit_id": "LOCAL"}
+        ))
+        expected = aggregate_to_bands(
+            default_matrix(),
+            [(0, 17), (18, 55), (56, 120)],
+        )
+        np.testing.assert_allclose(result, expected, rtol=1e-12)
+
+    def test_missing_admin_unit_id_falls_back_to_default(self):
+        from compartment.contact_matrices import (
+            aggregate_to_bands, default_matrix,
+        )
+        model = self._aged_model()
+        result = np.array(model._build_contact_matrix(config={}))
+        expected = aggregate_to_bands(
+            default_matrix(),
+            [(0, 17), (18, 55), (56, 120)],
+        )
+        np.testing.assert_allclose(result, expected, rtol=1e-12)
+
+    def test_schema_override_beats_prem(self):
+        """Existing schema-level overrides still win — preserves covid behavior."""
+        overrides = [
+            ("age_0_17",    "age_0_17",    5.46),
+            ("age_0_17",    "age_18_55",   5.18),
+            ("age_0_17",    "age_56_plus", 0.93),
+            ("age_18_55",   "age_0_17",    1.70),
+            ("age_18_55",   "age_18_55",   9.18),
+            ("age_18_55",   "age_56_plus", 1.68),
+            ("age_56_plus", "age_0_17",    0.83),
+            ("age_56_plus", "age_18_55",   5.90),
+            ("age_56_plus", "age_56_plus", 3.80),
+        ]
+        model = self._aged_model(overrides=overrides)
+        result = np.array(model._build_contact_matrix(
+            config={"admin_unit_id": "USA.6.1_1"}
+        ))
+        expected = np.array([
+            [5.46, 5.18, 0.93],
+            [1.70, 9.18, 1.68],
+            [0.83, 5.90, 3.80],
+        ])
+        np.testing.assert_allclose(result, expected)
+
+    def test_config_override_beats_prem(self):
+        model = self._aged_model()
+        result = np.array(model._build_contact_matrix(
+            config={
+                "admin_unit_id": "USA.6.1_1",
+                "contact_matrix_overrides": {
+                    "age_0_17": {"age_18_55": 9.9},
+                },
+            }
+        ))
+        assert result[0, 1] == pytest.approx(9.9)
+
+    def test_age_range_missing_falls_back_to_identity_with_warning(self, caplog):
+        # No age_range on any group -> Prem path not taken, identity warning fires
+        groups = [("g0", "G0", 50.0), ("g1", "G1", 50.0)]
+        schema = _make_schema(groups=groups)
+        model = _make_model_with_schema(schema)
+        with caplog.at_level("WARNING", logger="compartment.model"):
+            result = np.array(model._build_contact_matrix(
+                config={"admin_unit_id": "USA.6.1_1",
+                        "case_file": {"demographics": {"g0": 50, "g1": 50}}}
+            ))
+        np.testing.assert_allclose(result, np.eye(2))
+        assert any("defaults to identity" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------
@@ -354,3 +485,56 @@ class TestCovidDemographicEndToEnd:
         for comp, val in comp_entries.items():
             assert isinstance(val, dict), f"Expected dict for {comp}, got {type(val)}"
             assert "age_all" in val, f"'age_all' missing from {comp} entry"
+
+
+# ---------------------------------------------------------------------------
+# add_demographic_group age_range validation
+# ---------------------------------------------------------------------------
+
+class TestAgeRangeValidation:
+    def _builder(self):
+        from compartment.parameters import ParameterSchemaBuilder
+        b = ParameterSchemaBuilder()
+        b.set_model_info(disease_type="TEST", label="Test", description="t")
+        b.add_compartment("S", "Susceptible", "")
+        return b
+
+    def test_valid_age_range_accepted(self):
+        b = self._builder()
+        b.add_demographic_group("a", "A", default_weight=50.0, age_range=(0, 17))
+        b.add_demographic_group("b", "B", default_weight=50.0, age_range=(18, 120))
+        schema = b.build()
+        assert schema.demographic_groups[0].age_range == (0, 17)
+        assert schema.demographic_groups[1].age_range == (18, 120)
+
+    def test_age_range_none_is_default(self):
+        b = self._builder()
+        b.add_demographic_group("a", "A", default_weight=100.0)
+        schema = b.build()
+        assert schema.demographic_groups[0].age_range is None
+
+    def test_overlap_rejected_at_build(self):
+        b = self._builder()
+        b.add_demographic_group("a", "A", default_weight=50.0, age_range=(0, 17))
+        b.add_demographic_group("b", "B", default_weight=50.0, age_range=(15, 30))
+        with pytest.raises(ValueError, match="overlapping age_ranges"):
+            b.build()
+
+    def test_invalid_tuple_rejected(self):
+        b = self._builder()
+        with pytest.raises(ValueError, match="must be a 2-tuple of ints"):
+            b.add_demographic_group("a", "A", default_weight=50.0, age_range=(0,))
+        with pytest.raises(ValueError, match="must be a 2-tuple of ints"):
+            b.add_demographic_group("a", "A", default_weight=50.0, age_range=(0.5, 17))
+
+    def test_inverted_range_rejected(self):
+        b = self._builder()
+        with pytest.raises(ValueError, match="0 <= low <= high <= 120"):
+            b.add_demographic_group("a", "A", default_weight=50.0, age_range=(17, 0))
+
+    def test_out_of_bounds_rejected(self):
+        b = self._builder()
+        with pytest.raises(ValueError, match="0 <= low <= high <= 120"):
+            b.add_demographic_group("a", "A", default_weight=50.0, age_range=(-1, 17))
+        with pytest.raises(ValueError, match="0 <= low <= high <= 120"):
+            b.add_demographic_group("a", "A", default_weight=50.0, age_range=(0, 200))

@@ -84,11 +84,9 @@ def run_simulation(
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
-    from compartment.registry import DISEASE_TYPE_ALIASES
-    disease_type = config["data"]["getSimulationJob"]["Disease"]["disease_type"]
-    if disease_type in DISEASE_TYPE_ALIASES:
-        disease_type = DISEASE_TYPE_ALIASES[disease_type]
-        config["data"]["getSimulationJob"]["Disease"]["disease_type"] = disease_type
+    disease_type = model_class.DISEASE_TYPE
+    config["data"]["getSimulationJob"]["Disease"]["disease_type"] = disease_type
+
     validation_success, cleaned_config = record_and_upload_validation(
         simulation_job_id,
         config,
@@ -151,7 +149,7 @@ def run_simulation(
             results_with = future_with.result()
             results_without = future_without.result()
     else:
-        n_sims = 30
+        n_sims = getattr(cleaned_config, "n_simulations", None) or 30
         ci = 0.95
 
         # Extract normalized TransmissionEdges and Interventions for uncertainty

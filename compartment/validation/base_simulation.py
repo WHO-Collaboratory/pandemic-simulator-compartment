@@ -104,6 +104,9 @@ class BaseSimulationShared(BaseModel):
 
     case_file: CaseFile
 
+    # Uncertainty run settings
+    n_simulations: Optional[int] = Field(default=None, gt=0, le=30)
+
     # Demographic overrides — passed through to the model unchanged.
     # contact_matrix_overrides: per-run contact rates between demographic groups.
     # demographic_rate_overrides: per-group absolute transmission rates.

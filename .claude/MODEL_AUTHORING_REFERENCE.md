@@ -78,8 +78,8 @@ schema.add_intervention(id, label, description,
                         target_rates=[...], modifies_travel=False,
                         adherence=..., transmission_reduction=...)
 schema.set_travel_volume(leaving_default=0.2, ...)
-schema.add_demographic_group(id, label, default_weight)
-schema.set_contact_override(from_group, to_group, value)
+schema.add_demographic_group(id, label, default_weight, age_range=(low, high))  # age_range optional
+schema.set_contact_override(from_group, to_group, value)                         # bespoke values — beats Prem auto-load
 schema.add_admin_zone_field(name, label, description, value_type, default, ...)
 schema.add_disease_parameter(name, label, description, value_type, default, ...)
 ```
@@ -122,6 +122,18 @@ def derivative(self, y, t, p):
 - Auto-accumulates flow into `<target>_total` if that compartment exists.
 - Uses `frequency_dependent` / `infective` flags to pick the FOI formula.
 - Applies per-demographic absolute rate vectors from `self._rate_vectors` when present.
+
+## Contact matrices
+
+Three precedence layers, latest wins:
+
+1. **Prem 2021 auto-load** when every demographic group declares `age_range=(low, high)` AND no schema/config overrides exist. ISO3 is parsed from `config["admin_unit_id"]` (split on `.`, take `[0]`, upper). Unknown ISO3 / `"LOCAL"` / missing → global average across all 177 Prem countries. Source 16×16 in 5-year bands → aggregated to NxN via fractional-year overlap: mean across rows, sum across columns (preserves "total contacts per person" semantic; aggregating Prem to its own bands is exact). Code: [compartment/contact_matrices/](../compartment/contact_matrices/) (`loader.py`, `aggregator.py`).
+2. **Schema overrides** via `schema.set_contact_override(...)`. Any schema override disables the Prem path entirely — the model is asserting bespoke values (e.g. POLYMOD). Mixing Prem and overrides isn't supported.
+3. **Per-run config overrides** via `config["contact_matrix_overrides"]` — narrowest scope, always wins.
+
+`schema.build()` rejects overlapping `age_range`s. If demographics are declared with no `age_range` and no overrides anywhere, the matrix is identity and the framework warns. Bundled data is from [kieshaprem/synthetic-contact-matrices](https://github.com/kieshaprem/synthetic-contact-matrices) (Prem et al. 2021, CC-BY).
+
+The covid model currently keeps its hardcoded 9-cell POLYMOD overrides for backward compatibility — they take precedence over Prem. Removing them is a known follow-up.
 
 ## Pitfalls I keep tripping on
 

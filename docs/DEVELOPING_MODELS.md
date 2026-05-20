@@ -126,8 +126,19 @@ class MyModel(Model):
         # 5. (optional) Travel — declares the case-file `travel_volume` block
         schema.set_travel_volume(leaving_default=0.2)
 
-        # 6. (optional) Demographic groups + contact matrix — see CovidJaxModel
-        # schema.add_demographic_group("age_0_17", "Children", default_weight=33.3)
+        # 6. (optional) Demographic groups + contact matrix — see CovidJaxModel.
+        # Declare each group with an inclusive (low, high) age range to opt in
+        # to country-aware contact matrices (Prem 2021 synthetic matrices,
+        # 177 countries, 5-year bands, aggregated to your declared bands).
+        # The country is read from the run's top-level `admin_unit_id`
+        # (e.g. "MDG.1.3_1" -> "MDG"); unknown countries fall back to a
+        # global average across all 177 source matrices.
+        # schema.add_demographic_group("age_0_17",  "Children", default_weight=33.3, age_range=(0, 17))
+        # schema.add_demographic_group("age_18_55", "Adults",   default_weight=44.4, age_range=(18, 55))
+        #
+        # `set_contact_override` still works and takes precedence over the
+        # Prem default — useful when a model has bespoke (e.g. POLYMOD-derived)
+        # values that should not be replaced by country aggregation:
         # schema.set_contact_override("age_0_17", "age_18_55", 5.18)
 
         # 7. (optional) Bespoke admin-zone fields — e.g. seroprevalence
@@ -226,6 +237,36 @@ The framework appends a `<target>_total` compartment for every edge target the f
 - Are used to compute correct compartment deltas (the delta key is the bare name, e.g. `I`, even though the underlying counter is `I_total`).
 
 If you want different aggregation (e.g. one `_total` per group of compartments instead of per-edge), override `_add_total_compartments()` as a no-op and declare your own (see [DengueJaxModel](../compartment/models/dengue_jax_model/model.py)).
+
+### Contact matrices
+
+Age-stratified models need an NxN contact matrix where N is the number of demographic groups. The framework supports three ways of supplying one, in order of precedence (later wins over earlier):
+
+1. **Country-aware Prem 2021 default** (recommended). Declare an inclusive `age_range=(low, high)` on every demographic group. At model instantiation the framework reads the run's `admin_unit_id`, takes the ISO3 prefix (split on `.`), and looks up that country's synthetic 16×16 contact matrix from a bundled dataset of 177 countries (Prem 2021). It then aggregates the matrix down to your declared bands using fractional age-year membership: row direction mean-averages (the contactor is a typical person sampled from the band), column direction sums (total contacts with everyone in the band). Aggregating Prem back to its own 16 bands is an exact identity. If the ISO3 isn't in the bundle, the framework falls back to the mean across all 177 country matrices (`default_matrix()`). Code lives in [compartment/contact_matrices/](../compartment/contact_matrices/).
+
+   ```python
+   schema.add_demographic_group("age_0_17",    "Children", default_weight=33.3, age_range=(0, 17))
+   schema.add_demographic_group("age_18_55",   "Adults",   default_weight=44.4, age_range=(18, 55))
+   schema.add_demographic_group("age_56_plus", "Elderly",  default_weight=22.3, age_range=(56, 120))
+   # No set_contact_override calls needed.
+   ```
+
+   Age ranges must be non-overlapping across groups; `schema.build()` raises `ValueError` if they overlap.
+
+2. **Schema-level overrides** via `schema.set_contact_override(from_group, to_group, value)`. When the schema declares any contact override, the framework uses those values for the cells they cover and **does not** load the Prem matrix at all. Use this when a model has bespoke contact values (e.g. POLYMOD-derived rates baked into the model) that should be used regardless of country.
+
+3. **Per-run config overrides** via `contact_matrix_overrides` in the simulation config. These beat both schema overrides and the Prem default for the cells they specify. Useful for sensitivity analyses or sweeping non-default mixing scenarios without modifying the model.
+
+   ```jsonc
+   "contact_matrix_overrides": {
+       "age_0_17":  { "age_18_55": 3.0 },
+       "age_56_plus": { "age_56_plus": 2.5 }
+   }
+   ```
+
+If a model declares demographic groups but supplies neither `age_range` nor any `set_contact_override` calls, and the config provides no `contact_matrix_overrides`, the matrix defaults to identity (no cross-group mixing) and the framework emits a warning — that's almost always a bug.
+
+**Data attribution.** The bundled synthetic contact matrices are derived from [kieshaprem/synthetic-contact-matrices](https://github.com/kieshaprem/synthetic-contact-matrices), which accompanies Prem et al. 2021, *"Projecting contact matrices in 177 geographical regions: an update and comparison with empirical data for the COVID-19 era"* (PLOS Computational Biology). The dataset is released under CC-BY. Bands are 5-year (0-4, 5-9, …, 70-74, 75+), ISO3 keyed.
 
 ### Compartment delta grouping
 

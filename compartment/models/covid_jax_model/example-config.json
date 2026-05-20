@@ -34,6 +34,7 @@
             }
         ]
     },
+    "admin_unit_id": "MDG",
     "admin_zones": [
         { "name": "Antananarivo", "center_lat": -18.94, "center_lon": 46.80, "population": 7982937, "infected_population": 0.05 },
         { "name": "Antsiranana", "center_lat": -13.87, "center_lon": 49.41, "population": 2127141, "infected_population": 0.04 },
@@ -42,6 +43,5 @@
         { "name": "Toamasina", "center_lat": -17.82, "center_lon": 48.75, "population": 3693480, "infected_population": 0.07 },
         { "name": "Toliary", "center_lat": -22.60, "center_lon": 45.02, "population": 4621930, "infected_population": 0.01 }
     ],
-    "demographics": { "age_0_17": 10.0, "age_18_55": 55.0, "age_56_plus": 35.0 },
     "travel_volume": { "leaving": 20.0 }
 }

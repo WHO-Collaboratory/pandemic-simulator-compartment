@@ -186,6 +186,24 @@ class Model(ABC):
             intv_def.id: False for intv_def in schema.interventions
         }
 
+        # Demographics: prefer config-supplied weights; otherwise fall back to
+        # the schema's declared default_weight values for each demographic group.
+        # Downstream consumers (post-processor, output formatter) read
+        # ``self.demographics`` to derive age-group labels and weights, so it
+        # must always be populated when the schema declares groups.
+        config_demo = {}
+        case_file = config.get("case_file")
+        if isinstance(case_file, dict):
+            config_demo = case_file.get("demographics") or {}
+        if config_demo:
+            self.demographics = dict(config_demo)
+        elif schema.demographic_groups:
+            self.demographics = {
+                g.id: g.default_weight for g in schema.demographic_groups
+            }
+        else:
+            self.demographics = {}
+
         self.contact_matrix = self._build_contact_matrix(config)
         self._rate_vectors = self._build_rate_vectors(config)
 
@@ -487,35 +505,96 @@ class Model(ABC):
             effective_ids = [g.id for g in schema.demographic_groups]
         A = len(effective_ids)
 
-        # Warn when demographics are provided but no contact matrix overrides.
-        # Without overrides the matrix defaults to identity — each group only
-        # contacts itself, so cross-group transmission is zero.  This is almost
-        # never intentional and produces misleading results silently.
         config_contact_overrides = (config.get("contact_matrix_overrides") or {}) if config else {}
         schema_ids = [g.id for g in schema.demographic_groups]
         schema_has_overrides = bool(schema.contact_matrix_overrides) and effective_ids == schema_ids
-        if config_demo and not config_contact_overrides and not schema_has_overrides:
-            import logging
-            logging.getLogger(__name__).warning(
-                "Demographics provided (%s) but no contact_matrix_overrides found. "
-                "The contact matrix defaults to identity, meaning demographic groups "
-                "do not mix — each group can only infect its own members. "
-                "Provide contact_matrix_overrides to model realistic cross-group transmission.",
-                ", ".join(effective_ids),
-            )
 
         matrix = np.eye(A)
 
+        # Auto-load a country-aware Prem 2021 contact matrix when:
+        #   - the model's declared groups are in use (effective == schema), so we
+        #     know each group's age_range from the schema;
+        #   - every group has an age_range declared;
+        #   - no schema- or config-level overrides are present.
+        # This is the recommended path — model authors only need to declare
+        # age_range on each demographic group and the framework supplies a
+        # sensible country-specific matrix.  Explicit overrides still win.
+        import logging
+        log = logging.getLogger(__name__)
+        prem_applied = False
+        if (
+            effective_ids == schema_ids
+            and not schema_has_overrides
+            and not config_contact_overrides
+            and all(g.age_range is not None for g in schema.demographic_groups)
+        ):
+            from compartment.contact_matrices import (
+                load_country_matrix,
+                default_matrix,
+                aggregate_to_bands,
+            )
+
+            iso3 = self._resolve_iso3_for_run(config)
+            source = load_country_matrix(iso3)
+            if source is None:
+                source = default_matrix()
+                if iso3:
+                    log.info(
+                        "Country '%s' not in Prem bundle; using global-average "
+                        "contact matrix aggregated to %d bands.",
+                        iso3, A,
+                    )
+                else:
+                    log.info(
+                        "No admin_unit_id resolvable; using global-average "
+                        "contact matrix aggregated to %d bands.",
+                        A,
+                    )
+            else:
+                log.info(
+                    "Loaded Prem contact matrix for '%s', aggregated to %d bands.",
+                    iso3, A,
+                )
+            age_ranges = [g.age_range for g in schema.demographic_groups]
+            matrix = aggregate_to_bands(source, age_ranges)
+            prem_applied = True
+
+        # Warn when demographics are provided but the matrix is still identity
+        # (no Prem aggregation, no schema overrides, no config overrides).
+        # Without anything, each group only contacts itself — almost always a bug.
+        if (
+            config_demo
+            and not config_contact_overrides
+            and not schema_has_overrides
+            and not prem_applied
+        ):
+            log.warning(
+                "Demographics provided (%s) but no contact_matrix_overrides found "
+                "and age_range is not declared on every group. The contact matrix "
+                "defaults to identity, meaning demographic groups do not mix. "
+                "Declare age_range on every demographic group to auto-load Prem 2021 "
+                "country matrices, or supply contact_matrix_overrides.",
+                ", ".join(effective_ids),
+            )
+
         # Schema-level contact overrides (only applied when schema IDs match)
-        if effective_ids == schema_ids:
+        if effective_ids == schema_ids and schema.contact_matrix_overrides:
+            applied = []
             for override in schema.contact_matrix_overrides:
                 if override.from_group in effective_ids and override.to_group in effective_ids:
                     i = effective_ids.index(override.from_group)
                     j = effective_ids.index(override.to_group)
                     matrix[i, j] = override.value
+                    applied.append(f"{override.from_group}->{override.to_group}")
+            if applied:
+                log.info(
+                    "Applied %d schema contact override(s) (Prem suppressed): %s.",
+                    len(applied), ", ".join(applied),
+                )
 
         # Config-level overrides always applied (keys match whatever the config declared)
         if config:
+            config_applied = []
             for from_group, targets in (config.get("contact_matrix_overrides") or {}).items():
                 if from_group not in effective_ids:
                     continue
@@ -523,8 +602,30 @@ class Model(ABC):
                 for to_group, value in targets.items():
                     if to_group in effective_ids:
                         matrix[i, effective_ids.index(to_group)] = value
+                        config_applied.append(f"{from_group}->{to_group}")
+            if config_applied:
+                log.info(
+                    "Applied %d config contact_matrix_override(s): %s.",
+                    len(config_applied), ", ".join(config_applied),
+                )
 
         return xp.array(matrix)
+
+    def _resolve_iso3_for_run(self, config: dict | None) -> str | None:
+        """Extract ISO3 country code from the job's ``admin_unit_id``.
+
+        The simulation config carries a single top-level ``admin_unit_id``
+        like ``"MDG.1.3_1"`` or just ``"MDG"``.  The ISO3 is the first
+        period-separated segment, uppercased.  Returns ``None`` when no
+        admin_unit_id is set or the value is the placeholder ``"LOCAL"``,
+        which triggers the global-average fallback in the caller.
+        """
+        if not config:
+            return None
+        admin_unit_id = config.get("admin_unit_id")
+        if not admin_unit_id or admin_unit_id == "LOCAL":
+            return None
+        return admin_unit_id.split(".", 1)[0].upper()
 
     def _build_rate_vectors(self, config: dict) -> dict | None:
         """

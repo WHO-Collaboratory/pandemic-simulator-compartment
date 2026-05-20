@@ -24,6 +24,8 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["compartment"]
+# Include bundled reference data (Prem 2021 synthetic contact matrices).
+include = ["compartment/contact_matrices/data/*.npz"]
 
 [dependency-groups]
 dev = [
