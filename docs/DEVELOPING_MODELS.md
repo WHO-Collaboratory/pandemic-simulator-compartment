@@ -115,6 +115,7 @@ class MyModel(Model):
         )
 
         # 4. (optional) Interventions — target_rates lists the edges they reduce.
+        # See INTERVENTIONS.md for comprehensive documentation on declaring and configuring interventions
         schema.add_intervention(
             id="social_isolation",
             label="Social Isolation",
