@@ -22,6 +22,14 @@ This file is for me (Claude) when the user asks for help adding or modifying a d
 | CLI driver wrapper | [compartment/driver.py](../compartment/driver.py) |
 | Artifact generation CLI | [compartment/generate_artifact.py](../compartment/generate_artifact.py) |
 | Smoke test sweep that auto-discovers new models | [tests/test_smoke.py](../tests/test_smoke.py) + [tests/helpers.py](../tests/helpers.py) |
+| **Contact matrices: loading, aggregation, and usage** | [docs/CONTACT_MATRICES.md](../docs/CONTACT_MATRICES.md) — comprehensive guide |
+| Contact matrix implementation code | [compartment/contact_matrices/](../compartment/contact_matrices/) — loader, aggregator, Prem data |
+| **Gravity models: spatial mobility and travel matrices** | [docs/GRAVITY_MODEL.md](../docs/GRAVITY_MODEL.md) — comprehensive guide |
+| Gravity model implementation code | [compartment/helpers.py](../compartment/helpers.py) `gravity_model()`, `get_gravity_model_travel_matrix()` |
+| **Interventions: declaration, configuration, and application** | [docs/INTERVENTIONS.md](../docs/INTERVENTIONS.md) — comprehensive guide |
+| Intervention implementation code | [compartment/runtime.py](../compartment/runtime.py) `Intervention` class, [compartment/model.py](../compartment/model.py) `_apply_interventions()` |
+| **Uncertainty quantification: LHS, distributions, and CI interpretation** | [docs/UNCERTAINTY_QUANTIFICATION.md](../docs/UNCERTAINTY_QUANTIFICATION.md) — comprehensive guide |
+| UQ implementation code | [compartment/run_simulation.py](../compartment/run_simulation.py) orchestration, [compartment/helpers.py](../compartment/helpers.py) `generate_LHS_samples()` |
 
 When in doubt, *read the file* — the framework changes faster than this reference.
 

@@ -115,6 +115,7 @@ class MyModel(Model):
         )
 
         # 4. (optional) Interventions — target_rates lists the edges they reduce.
+        # See INTERVENTIONS.md for comprehensive documentation on declaring and configuring interventions
         schema.add_intervention(
             id="social_isolation",
             label="Social Isolation",
@@ -124,6 +125,7 @@ class MyModel(Model):
         )
 
         # 5. (optional) Travel — declares the case-file `travel_volume` block
+        # See GRAVITY_MODEL.md for comprehensive documentation on spatial mobility
         schema.set_travel_volume(leaving_default=0.2)
 
         # 6. (optional) Demographic groups + contact matrix — see CovidJaxModel.
@@ -240,7 +242,9 @@ If you want different aggregation (e.g. one `_total` per group of compartments i
 
 ### Contact matrices
 
-Age-stratified models need an NxN contact matrix where N is the number of demographic groups. The framework supports three ways of supplying one, in order of precedence (later wins over earlier):
+Age-stratified models need an NxN contact matrix where N is the number of demographic groups. The framework supports three ways of supplying one, in order of precedence (later wins over earlier).
+
+> **📚 For a comprehensive guide to contact matrices**, see **[CONTACT_MATRICES.md](./CONTACT_MATRICES.md)** — detailed documentation on how contact matrices are loaded, aggregated, and used in the platform.
 
 1. **Country-aware Prem 2021 default** (recommended). Declare an inclusive `age_range=(low, high)` on every demographic group. At model instantiation the framework reads the run's `admin_unit_id`, takes the ISO3 prefix (split on `.`), and looks up that country's synthetic 16×16 contact matrix from a bundled dataset of 177 countries (Prem 2021). It then aggregates the matrix down to your declared bands using fractional age-year membership: row direction mean-averages (the contactor is a typical person sampled from the band), column direction sums (total contacts with everyone in the band). Aggregating Prem back to its own 16 bands is an exact identity. If the ISO3 isn't in the bundle, the framework falls back to the mean across all 177 country matrices (`default_matrix()`). Code lives in [compartment/contact_matrices/](../compartment/contact_matrices/).
 
@@ -267,6 +271,39 @@ Age-stratified models need an NxN contact matrix where N is the number of demogr
 If a model declares demographic groups but supplies neither `age_range` nor any `set_contact_override` calls, and the config provides no `contact_matrix_overrides`, the matrix defaults to identity (no cross-group mixing) and the framework emits a warning — that's almost always a bug.
 
 **Data attribution.** The bundled synthetic contact matrices are derived from [kieshaprem/synthetic-contact-matrices](https://github.com/kieshaprem/synthetic-contact-matrices), which accompanies Prem et al. 2021, *"Projecting contact matrices in 177 geographical regions: an update and comparison with empirical data for the COVID-19 era"* (PLOS Computational Biology). The dataset is released under CC-BY. Bands are 5-year (0-4, 5-9, …, 70-74, 75+), ISO3 keyed.
+
+### Spatial mobility and travel matrices
+
+Multi-region models use **gravity models** to generate travel matrices describing population flows between administrative zones. The travel matrix `T[i,j]` represents the fraction of region i's population present in region j.
+
+> **📚 For comprehensive documentation on gravity models**, see **[GRAVITY_MODEL.md](./GRAVITY_MODEL.md)** — detailed explanation of spatial mobility, distance-decay functions, and how travel matrices work in disease models.
+
+**Quick overview:**
+
+The framework provides automatic gravity-model travel matrices when `travel_volume.leaving` is specified in the config:
+
+```jsonc
+"travel_volume": {
+    "leaving": 0.2  // 20% of each region's population travels
+}
+```
+
+The default implementation uses the classic inverse-square gravity model: attraction from region i to j is proportional to `(pop_i * pop_j) / distance²`. Models can override this with custom mobility functions (exponential decay, power-law with custom exponent, etc.) by defining their own mobility methods.
+
+**Spatial + demographic mixing:** When your model has both multiple regions and age groups, the force of infection combines spatial travel mixing with demographic contact mixing:
+
+```python
+# Step 1: Spatial mixing via travel matrix
+BETA = ((beta * travel_matrix) @ I_frac.T).T  # (R, A)
+
+# Step 2: Age mixing via contact matrix  
+omega = contact_matrix @ BETA  # (R, A)
+
+# Force of infection
+foi = S * omega
+```
+
+See [GRAVITY_MODEL.md](./GRAVITY_MODEL.md) for detailed mathematical explanation and usage patterns.
 
 ### Compartment delta grouping
 
@@ -399,6 +436,8 @@ python -m compartment.models.your_model.main \
 ```
 
 `run_simulation` runs your model **twice in parallel** — once with interventions and once without (the "control run") — and writes both into the output JSON. In `UNCERTAINTY` mode (set `run_mode` in the config) it draws Latin Hypercube samples over edge variances and produces median + CI bands.
+
+> **📚 For comprehensive documentation on uncertainty quantification**, see **[UNCERTAINTY_QUANTIFICATION.md](./UNCERTAINTY_QUANTIFICATION.md)** — detailed guide to parameter uncertainty, Latin Hypercube Sampling, supported distributions, and interpreting results.
 
 ## Tests
 
