@@ -158,6 +158,70 @@ ADMIN_UNITS_BY_SIM_JOB_QUERY = """query SimulationJobAdminUnitsBySimulationJobId
       temp_min
       temp_max
       temp_mean
+      custom_field_values
+    }
+    nextToken
+  }
+}"""
+
+CUSTOM_FIELDS_BY_SIM_JOB_QUERY = """query SimulationJobCustomFieldsBySimulationJobId(
+  $simulation_job_id: ID!
+  $limit: Int
+  $nextToken: String
+) {
+  simulationJobCustomFieldBySimulationJobId(
+    simulation_job_id: $simulation_job_id
+    limit: $limit
+    nextToken: $nextToken
+  ) {
+    items {
+      id
+      custom_field_id
+      value
+      CustomField {
+        name
+        category
+        metadata {
+          value_type
+          default_value
+        }
+      }
+      FieldConfig {
+        items {
+          id
+          field_key
+          has_variance
+          distribution_type
+          min
+          max
+        }
+      }
+    }
+    nextToken
+  }
+}"""
+
+DEMOGRAPHIC_GROUPS_BY_SIM_JOB_QUERY = """query SimulationJobDemographicGroupsBySimulationJobId(
+  $simulation_job_id: ID!
+  $limit: Int
+  $nextToken: String
+) {
+  simulationJobDemographicGroupBySimulationJobId(
+    simulation_job_id: $simulation_job_id
+    limit: $limit
+    nextToken: $nextToken
+  ) {
+    items {
+      id
+      demographic_group_id
+      value
+      DemographicGroup {
+        name
+        display_name
+        metadata {
+          order
+        }
+      }
     }
     nextToken
   }

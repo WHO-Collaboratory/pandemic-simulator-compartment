@@ -1,3 +1,4 @@
+import json
 import requests
 import logging
 from compartment.helpers import setup_logging
@@ -14,13 +15,50 @@ logger = logging.getLogger(__name__)
 GRAPHQL_QUERY = "query GetSimulationJobById($id: ID!) {\n  getSimulationJob(id: $id) {\n    id\n    admin_unit_id\n    createdAt\n    disease_id\n    end_date\n    owner\n    selected_infected_population\n    selected_population\n    simulation_name\n    simulation_type\n    start_date\n    tag_id\n    time_steps\n    updatedAt\n    AdminUnit {\n      id\n      center_lat\n      admin_level\n      ParentAdminUnit {\n        id\n        center_lat\n        admin_level\n        ParentAdminUnit {\n          id\n          center_lat\n          admin_level\n        }\n      }\n    }\n    Disease {\n      id\n      createdAt\n      disease_name\n      disease_nodes {\n        type\n        data {\n          alias\n          label\n        }\n        id\n      }\n      immunity_period\n      interactions_per_period\n      intervention_nodes {\n        data {\n          adherence_max\n          adherence_min\n          alias\n          end_date\n          end_threshold\n          end_threshold_node_id\n          label\n          start_date\n          start_threshold\n          start_threshold_node_id\n        }\n        id\n        type\n      }\n      model_type\n      transmission_edges {\n        data {\n          transmission_rate\n        }\n        id\n        source\n        target\n        type\n      }\n      updatedAt\n    }\n    interventions {\n      adherence_max\n      adherence_min\n      end_date\n      end_threshold\n      end_threshold_node_id\n      id\n      label\n      start_date\n      start_threshold\n      start_threshold_node_id\n      type\n      transmission_percentage\n      hour_reduction\n    }\n    case_file {\n      admin_zones {\n        id\n        admin_code\n        admin_level\n        center_lat\n        center_lon\n        infected_population\n        name\n        osm_id\n        population\n        viz_name\n      }\n      demographics {\n        age_0_17\n        age_18_55\n        age_56_plus\n      }\n    }\n  }\n}"
 
 
+def _cast_custom_field_value(value: str, value_type: str):
+    """Cast a custom field string value to the appropriate Python type.
+
+    SimulationJobCustomField stores all values as strings.  The CustomField
+    metadata carries the ``value_type`` which tells us how to interpret it.
+
+    Args:
+        value: The raw string value from the database.
+        value_type: One of the ValueType enum strings (RATE, DAYS, PERCENTAGE,
+            NUMBER, COUNT, BOOLEAN, DATE, TEXT, SELECT, FLOAT, INTEGER, COORDINATE).
+
+    Returns:
+        The value cast to the correct Python type.
+    """
+    if value is None:
+        return None
+
+    int_types = {"DAYS", "COUNT", "INTEGER"}
+    float_types = {"RATE", "PERCENTAGE", "NUMBER", "FLOAT", "COORDINATE"}
+
+    if value_type in int_types:
+        try:
+            return int(float(value))
+        except (ValueError, TypeError):
+            return None
+    elif value_type in float_types:
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+    elif value_type == "BOOLEAN":
+        return value.lower() in ("true", "1", "yes")
+    else:
+        # DATE, TEXT, SELECT — keep as string
+        return value
+
+
 def get_simulation_job(job_params: dict, graphql_query: str) -> dict:
     """Fetch and assemble the complete simulation job config.
 
-    Hits the main getSimulationJob query, then enriches case_file.admin_zones
-    with user-set values from SimulationJobAdminUnits (population,
-    infected_population, seroprevalence, temps) joined with geo data
-    from AdminUnit references.
+    Hits the main getSimulationJob query, then enriches the config with:
+    - SimulationJobAdminUnits (population, temps, custom_field_values)
+    - SimulationJobCustomFields (disease parameters injected into Disease dict)
+    - SimulationJobDemographicGroups (injected into case_file.demographics)
 
     Args:
         job_params: Dict with SIMULATION_JOB_ID, GRAPHQL_APIKEY, GRAPHQL_ENDPOINT.
@@ -54,6 +92,23 @@ def get_simulation_job(job_params: dict, graphql_query: str) -> dict:
             zone = {"id": admin_unit_id, **ref, **unit}
             # Remove join-table metadata that isn't part of the zone
             zone.pop("admin_unit_id", None)
+
+            # Unpack admin-zone custom field values (stored as AWSJSON)
+            # so they become top-level keys on the zone dict, accessible
+            # to CaseFileAdminZone (which has extra="allow").
+            raw_cfv = zone.pop("custom_field_values", None)
+            if raw_cfv:
+                try:
+                    parsed = (
+                        json.loads(raw_cfv) if isinstance(raw_cfv, str) else raw_cfv
+                    )
+                    if isinstance(parsed, dict):
+                        zone.update(parsed)
+                except (json.JSONDecodeError, TypeError):
+                    logger.warning(
+                        f"Failed to parse custom_field_values for admin unit {admin_unit_id}"
+                    )
+
             admin_zones.append(zone)
 
         config["data"]["getSimulationJob"]["case_file"]["admin_zones"] = admin_zones
@@ -62,7 +117,86 @@ def get_simulation_job(job_params: dict, graphql_query: str) -> dict:
             "No SimulationJobAdminUnits found, using embedded case_file.admin_zones"
         )
 
+    # 3. Fetch SimulationJobCustomFields and merge into config
+    sim_job_custom_fields = get_simulation_job_custom_fields(
+        job_params, simulation_job_id
+    )
+    disease_param_field_configs = []
+    if sim_job_custom_fields:
+        disease_dict = config["data"]["getSimulationJob"].setdefault("Disease", {})
+
+        for cf in sim_job_custom_fields:
+            custom_field = cf.get("CustomField") or {}
+            category = custom_field.get("category")
+            field_name = custom_field.get("name")
+            raw_value = cf.get("value")
+
+            if not field_name:
+                continue
+
+            metadata = custom_field.get("metadata") or {}
+            value_type = metadata.get("value_type", "TEXT")
+            typed_value = _cast_custom_field_value(raw_value, value_type)
+
+            if category == "disease_parameter":
+                # Inject into Disease dict so the auto-generated Pydantic
+                # disease config picks it up by field name.
+                disease_dict[field_name] = typed_value
+                logger.debug(
+                    f"Injected disease parameter '{field_name}' = {typed_value}"
+                )
+
+                # Preserve FieldConfig entries for uncertainty sampling.
+                fc_section = cf.get("FieldConfig") or {}
+                fc_items = fc_section.get("items", []) if fc_section else []
+                for fc in fc_items:
+                    if fc.get("has_variance"):
+                        disease_param_field_configs.append(
+                            {
+                                "param": field_name,
+                                "dist": (
+                                    fc.get("distribution_type") or "uniform"
+                                ).lower(),
+                                "min": fc.get("min", 0),
+                                "max": fc.get("max", 0),
+                            }
+                        )
+
+        logger.info(
+            f"Processed {len(sim_job_custom_fields)} custom field(s) for job {simulation_job_id}"
+        )
+
+    # Store disease parameter variance configs for uncertainty runs.
+    # run_simulation.py reads this before validation (which ignores extra keys).
+    if disease_param_field_configs:
+        config["_disease_param_field_configs"] = disease_param_field_configs
+        logger.info(
+            f"Collected {len(disease_param_field_configs)} disease parameter variance config(s)"
+        )
+
+    # 4. Fetch SimulationJobDemographicGroups and merge into case_file.demographics
+    sim_job_demo_groups = get_simulation_job_demographic_groups(
+        job_params, simulation_job_id
+    )
+    if sim_job_demo_groups:
+        demographics = {}
+        for dg in sim_job_demo_groups:
+            demo_group = dg.get("DemographicGroup") or {}
+            group_name = demo_group.get("name")
+            value = dg.get("value")
+            if group_name is not None and value is not None:
+                demographics[group_name] = float(value)
+
+        if demographics:
+            config["data"]["getSimulationJob"].setdefault("case_file", {})[
+                "demographics"
+            ] = demographics
+            logger.info(
+                f"Injected {len(demographics)} demographic group(s) into case_file.demographics"
+            )
+
     return config
+
 
 def write_to_gql(job_params, results):
     """Write results of model to GraphQL and return responses"""
@@ -157,6 +291,7 @@ def parallel_write(job_params, inputs, query, max_workers=8):
                 responses[idx] = {"error": str(e)}
     return responses
 
+
 def _gql_query(job_params: dict, query: str, variables: dict) -> dict:
     """Execute a GraphQL query and return the parsed response data."""
     headers = {"Content-Type": "application/json"}
@@ -176,7 +311,8 @@ def _gql_query(job_params: dict, query: str, variables: dict) -> dict:
         return response.json()
     except Exception as e:
         raise ValueError(f"GraphQL query failed: {str(e)}") from e
-    
+
+
 def get_simulation_job_admin_units(job_params: dict, simulation_job_id: str) -> list:
     """
     Fetch all SimulationJobAdminUnit records for a simulation job.
@@ -218,6 +354,101 @@ def get_simulation_job_admin_units(job_params: dict, simulation_job_id: str) -> 
         f"Fetched {len(all_items)} SimulationJobAdminUnit records for job {simulation_job_id}"
     )
     return all_items
+
+
+def get_simulation_job_custom_fields(job_params: dict, simulation_job_id: str) -> list:
+    """
+    Fetch all SimulationJobCustomField records for a simulation job.
+
+    Handles pagination via nextToken to ensure all records are returned.
+    Each item includes the linked CustomField template (name, category,
+    metadata) and any FieldConfig records (for variance/uncertainty).
+
+    Args:
+        job_params: Dict with GRAPHQL_APIKEY and GRAPHQL_ENDPOINT.
+        simulation_job_id: The simulation job ID to query by.
+
+    Returns:
+        List of SimulationJobCustomField dicts, or empty list if none found.
+    """
+    from compartment.cloud_helpers.graphql_queries import CUSTOM_FIELDS_BY_SIM_JOB_QUERY
+
+    all_items = []
+    next_token = None
+
+    while True:
+        variables = {
+            "simulation_job_id": simulation_job_id,
+            "limit": 1000,
+        }
+        if next_token:
+            variables["nextToken"] = next_token
+
+        data = _gql_query(job_params, CUSTOM_FIELDS_BY_SIM_JOB_QUERY, variables)
+        result = data.get("data", {}).get(
+            "simulationJobCustomFieldBySimulationJobId", {}
+        )
+        items = result.get("items", [])
+        all_items.extend(items)
+
+        next_token = result.get("nextToken")
+        if not next_token:
+            break
+
+    logger.info(
+        f"Fetched {len(all_items)} SimulationJobCustomField records for job {simulation_job_id}"
+    )
+    return all_items
+
+
+def get_simulation_job_demographic_groups(
+    job_params: dict, simulation_job_id: str
+) -> list:
+    """
+    Fetch all SimulationJobDemographicGroup records for a simulation job.
+
+    Handles pagination via nextToken to ensure all records are returned.
+    Each item includes the linked DemographicGroup template (name,
+    display_name, metadata).
+
+    Args:
+        job_params: Dict with GRAPHQL_APIKEY and GRAPHQL_ENDPOINT.
+        simulation_job_id: The simulation job ID to query by.
+
+    Returns:
+        List of SimulationJobDemographicGroup dicts, or empty list if none found.
+    """
+    from compartment.cloud_helpers.graphql_queries import (
+        DEMOGRAPHIC_GROUPS_BY_SIM_JOB_QUERY,
+    )
+
+    all_items = []
+    next_token = None
+
+    while True:
+        variables = {
+            "simulation_job_id": simulation_job_id,
+            "limit": 1000,
+        }
+        if next_token:
+            variables["nextToken"] = next_token
+
+        data = _gql_query(job_params, DEMOGRAPHIC_GROUPS_BY_SIM_JOB_QUERY, variables)
+        result = data.get("data", {}).get(
+            "simulationJobDemographicGroupBySimulationJobId", {}
+        )
+        items = result.get("items", [])
+        all_items.extend(items)
+
+        next_token = result.get("nextToken")
+        if not next_token:
+            break
+
+    logger.info(
+        f"Fetched {len(all_items)} SimulationJobDemographicGroup records for job {simulation_job_id}"
+    )
+    return all_items
+
 
 def get_admin_unit_references(job_params: dict, admin_unit_ids: list) -> dict:
     """
