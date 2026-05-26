@@ -551,8 +551,12 @@ class Model(ABC):
 
         log = logging.getLogger(__name__)
         prem_applied = False
+        schema_group_by_id = {g.id: g for g in schema.demographic_groups}
+        # Use set comparison so the Prem auto-load is not blocked by ordering
+        # differences between the schema and the cloud API (which may return
+        # demographic groups in a different order than they were declared).
         if (
-            effective_ids == schema_ids
+            set(effective_ids) == set(schema_ids)
             and not schema_has_overrides
             and not config_contact_overrides
             and all(g.age_range is not None for g in schema.demographic_groups)
@@ -586,7 +590,9 @@ class Model(ABC):
                     iso3,
                     A,
                 )
-            age_ranges = [g.age_range for g in schema.demographic_groups]
+            # Build age_ranges in effective_ids order so the aggregated matrix
+            # rows/cols align with the state array's demographic dimension.
+            age_ranges = [schema_group_by_id[gid].age_range for gid in effective_ids]
             matrix = aggregate_to_bands(source, age_ranges)
             prem_applied = True
 
