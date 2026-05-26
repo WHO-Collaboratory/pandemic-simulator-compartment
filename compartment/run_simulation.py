@@ -61,6 +61,8 @@ def run_simulation(
 ):
     logger.info("Starting the simulation...")
 
+    disease_param_field_configs = []
+
     if mode == "local":
         logger.info("Running in LOCAL mode")
         # Load config from local JSON file
@@ -75,12 +77,16 @@ def run_simulation(
             raise ValueError("simulation_params is required for cloud mode")
         simulation_job_id = simulation_params.get("SIMULATION_JOB_ID")
         logger.info(f"simulation_job_id: {simulation_job_id}")
-        logger.info(f"graphql_endpoint: {
-                    simulation_params.get('GRAPHQL_ENDPOINT')}")
+        logger.info(f"graphql_endpoint: {simulation_params.get('GRAPHQL_ENDPOINT')}")
         # Grab simulation job config from GraphQL
         config = get_simulation_job(simulation_params, GRAPHQL_QUERY)
 
         owner = config["data"]["getSimulationJob"].get("owner")
+
+        # Extract disease parameter variance configs (if any) before
+        # validation strips them.  These are appended to uncertainty_params
+        # for UNCERTAINTY runs so LHS sampling covers disease custom fields.
+        disease_param_field_configs = config.pop("_disease_param_field_configs", [])
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
@@ -97,8 +103,7 @@ def run_simulation(
         mode=mode,
     )
     if not validation_success:
-        logger.error(
-            "Halting due to validation failure. See S3 logs for details.")
+        logger.error("Halting due to validation failure. See S3 logs for details.")
         return None
 
     run_metadata = {
@@ -120,10 +125,8 @@ def run_simulation(
 
     # Validate that model_class is a subclass of Model
     if not issubclass(model_class, Model):
-        logger.error(
-            f"model_class must be a subclass of Model, got {model_class}")
-        raise ValueError(
-            f"model_class must be a subclass of Model, got {model_class}")
+        logger.error(f"model_class must be a subclass of Model, got {model_class}")
+        raise ValueError(f"model_class must be a subclass of Model, got {model_class}")
 
     run_mode = cleaned_config.run_mode
     logger.info(f"run_mode: {run_mode}")
@@ -144,8 +147,7 @@ def run_simulation(
     if run_mode == "DETERMINISTIC":
         with ExecutorClass(max_workers=top_level_workers) as executor:
             future_with = executor.submit(simulate_and_postprocess, model_with)
-            future_without = executor.submit(
-                simulate_and_postprocess, model_without)
+            future_without = executor.submit(simulate_and_postprocess, model_without)
             results_with = future_with.result()
             results_without = future_without.result()
     else:
@@ -161,7 +163,9 @@ def run_simulation(
             if isinstance(transmission_edges_section, dict):
                 transmission_edge_items = transmission_edges_section.get("items", [])
             else:
-                transmission_edge_items = getattr(transmission_edges_section, "items", [])
+                transmission_edge_items = getattr(
+                    transmission_edges_section, "items", []
+                )
 
         interventions_section = getattr(cleaned_config, "Interventions", None)
         if interventions_section:
@@ -177,6 +181,15 @@ def run_simulation(
         uncertainty_params = build_uncertainty_params(
             transmission_edge_dicts, intervention_dicts
         )
+
+        # Append disease parameter custom field variance configs (if any).
+        # These were collected by get_simulation_job() from FieldConfig
+        # records on SimulationJobCustomField entries.
+        if disease_param_field_configs:
+            uncertainty_params.extend(disease_param_field_configs)
+            logger.info(
+                f"Added {len(disease_param_field_configs)} disease parameter variance config(s) to uncertainty params"
+            )
 
         logger.info(f"Number of simulations: {n_sims}")
         logger.info(f"Confidence interval: {ci}")
@@ -224,8 +237,7 @@ def run_simulation(
         # Cloud mode: write to GQL and S3, invoke lambda
         s3_results = deepcopy(results)
         s3_client = boto3.client("s3", region_name="us-east-1")
-        bucket_name = f"compartmental-results-{
-            simulation_params.get('ENVIRONMENT')}"
+        bucket_name = f"compartmental-results-{simulation_params.get('ENVIRONMENT')}"
 
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -255,8 +267,7 @@ def run_simulation(
                 try:
                     out = fut.result()
                 except Exception as e:
-                    logger.exception("Write failed", extra={
-                                     "i": i, "kind": kind})
+                    logger.exception("Write failed", extra={"i": i, "kind": kind})
                     out = {"status": "error", "error": str(e)}
 
                 if kind == "gql":
@@ -273,8 +284,7 @@ def run_simulation(
         payload_data = {"simulation_job_id": simulation_job_id}
         payload = json.dumps(payload_data).encode("utf-8")
         lambda_client.invoke(
-            FunctionName=f"get-ai-summary-{
-                simulation_params.get('ENVIRONMENT')}",
+            FunctionName=f"get-ai-summary-{simulation_params.get('ENVIRONMENT')}",
             InvocationType="Event",
             Payload=payload,
         )

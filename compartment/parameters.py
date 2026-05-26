@@ -210,6 +210,171 @@ class CompartmentRegistry:
 
 
 # ---------------------------------------------------------------------------
+# Custom field registries (disease parameters & admin zone fields)
+# ---------------------------------------------------------------------------
+
+
+class DiseaseParamRegistry:
+    """
+    Attribute-style access to disease parameter names, auto-populated
+    from the parameter schema.
+
+    Set as ``cls.DISEASE_PARAMS`` on migrated model classes by
+    ``Model.__init_subclass__``.
+
+    Usage::
+
+        # Named access (returns the string name)
+        cls.DISEASE_PARAMS.immunity_period   # → "immunity_period"
+        cls.DISEASE_PARAMS.latent_period     # → "latent_period"
+
+        # Iterable
+        list(cls.DISEASE_PARAMS)                    # → ["immunity_period", ...]
+        len(cls.DISEASE_PARAMS)                     # → 5
+        "immunity_period" in cls.DISEASE_PARAMS     # → True
+
+        # Full definition lookup
+        cls.DISEASE_PARAMS.get_def("immunity_period")  # → ParameterDef(...)
+    """
+
+    def __init__(self, param_defs: list[ParameterDef]) -> None:
+        self._defs = param_defs
+        self._names = [p.name for p in param_defs]
+        self._def_map: dict[str, ParameterDef] = {p.name: p for p in param_defs}
+        for p in param_defs:
+            setattr(self, p.name, p.name)
+
+    def get_def(self, name: str) -> ParameterDef:
+        """Look up the full :class:`ParameterDef` by its name."""
+        return self._def_map[name]
+
+    def __iter__(self):
+        return iter(self._names)
+
+    def __len__(self):
+        return len(self._names)
+
+    def __contains__(self, item):
+        return item in self._names
+
+    def __getattr__(self, name: str) -> str:
+        if name.startswith("_"):
+            raise AttributeError(name)
+        names = self.__dict__.get("_names", [])
+        raise AttributeError(f"No disease parameter '{name}'. Available: {names}")
+
+    def __repr__(self):
+        return f"DiseaseParamRegistry({self._names})"
+
+
+class AdminZoneFieldRegistry:
+    """
+    Attribute-style access to admin zone field names, auto-populated
+    from the parameter schema.
+
+    Set as ``cls.ADMIN_ZONE_FIELDS`` on migrated model classes by
+    ``Model.__init_subclass__``.
+
+    Admin zone fields are per-zone values (e.g. seroprevalence,
+    vector_population) so this registry provides **name references
+    only** — actual values live on each zone dict in the case file.
+
+    Usage::
+
+        # Named access (returns the string name — avoids magic strings)
+        cls.ADMIN_ZONE_FIELDS.seroprevalence   # → "seroprevalence"
+
+        # In get_initial_population():
+        sero = zone.get(cls.ADMIN_ZONE_FIELDS.seroprevalence, 0)
+
+        # Iterable
+        list(cls.ADMIN_ZONE_FIELDS)                       # → ["seroprevalence", ...]
+        "seroprevalence" in cls.ADMIN_ZONE_FIELDS         # → True
+
+        # Full definition lookup
+        cls.ADMIN_ZONE_FIELDS.get_def("seroprevalence")   # → ParameterDef(...)
+    """
+
+    def __init__(self, field_defs: list[ParameterDef]) -> None:
+        self._defs = field_defs
+        self._names = [f.name for f in field_defs]
+        self._def_map: dict[str, ParameterDef] = {f.name: f for f in field_defs}
+        for f in field_defs:
+            setattr(self, f.name, f.name)
+
+    def get_def(self, name: str) -> ParameterDef:
+        """Look up the full :class:`ParameterDef` by its name."""
+        return self._def_map[name]
+
+    def __iter__(self):
+        return iter(self._names)
+
+    def __len__(self):
+        return len(self._names)
+
+    def __contains__(self, item):
+        return item in self._names
+
+    def __getattr__(self, name: str) -> str:
+        if name.startswith("_"):
+            raise AttributeError(name)
+        names = self.__dict__.get("_names", [])
+        raise AttributeError(f"No admin zone field '{name}'. Available: {names}")
+
+    def __repr__(self):
+        return f"AdminZoneFieldRegistry({self._names})"
+
+
+class DiseaseParamValues:
+    """
+    Attribute-style access to disease parameter *values* from config.
+
+    Created at instance time in ``Model.__init__`` from the schema's
+    disease parameter definitions combined with the config's Disease dict.
+
+    Provides typed values with schema defaults as fallbacks::
+
+        self.disease_params.immunity_period  # → 240 (int, from config or default)
+        self.disease_params.latent_period    # → 5.9 (float)
+
+    Iterable over parameter names::
+
+        for name in self.disease_params:
+            print(name, getattr(self.disease_params, name))
+    """
+
+    def __init__(self, param_defs: list[ParameterDef], disease_dict: dict) -> None:
+        self._names: list[str] = []
+        for p in param_defs:
+            raw = disease_dict.get(p.name, p.default)
+            setattr(self, p.name, raw)
+            self._names.append(p.name)
+
+    def __iter__(self):
+        return iter(self._names)
+
+    def __len__(self):
+        return len(self._names)
+
+    def __contains__(self, item):
+        return item in self._names
+
+    def __getattr__(self, name: str):
+        # Guard against recursion during deepcopy / pickle reconstruction:
+        # when Python reconstructs the object, _names doesn't exist yet
+        # and __getattr__ would recurse trying to access it.
+        if name.startswith("_"):
+            raise AttributeError(name)
+        # Avoid accessing self._names if it hasn't been set yet
+        names = self.__dict__.get("_names", [])
+        raise AttributeError(f"No disease parameter value '{name}'. Available: {names}")
+
+    def __repr__(self):
+        vals = {n: getattr(self, n) for n in self._names}
+        return f"DiseaseParamValues({vals})"
+
+
+# ---------------------------------------------------------------------------
 # Transmission edge definition
 # ---------------------------------------------------------------------------
 

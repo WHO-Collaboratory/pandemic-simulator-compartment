@@ -9,8 +9,11 @@ import numpy as np
 import jax.numpy as jnp
 
 from compartment.parameters import (
+    AdminZoneFieldRegistry,
     CompartmentDef,
     CompartmentRegistry,
+    DiseaseParamRegistry,
+    DiseaseParamValues,
     ModelParameterSchema,
     ParameterDef,
     ParameterSchemaBuilder,
@@ -90,6 +93,11 @@ class Model(ABC):
             # only declare disease_type once (in set_model_info).
             if "DISEASE_TYPE" not in cls.__dict__ and schema.disease_type:
                 cls.DISEASE_TYPE = schema.disease_type
+
+            # Custom field registries: attribute-style access to
+            # disease parameter and admin zone field names.
+            cls.DISEASE_PARAMS = DiseaseParamRegistry(schema.disease_parameters)
+            cls.ADMIN_ZONE_FIELDS = AdminZoneFieldRegistry(schema.admin_zone_fields)
         except (NotImplementedError, Exception):
             # Non-migrated model — leave everything as-is.
             pass
@@ -136,6 +144,10 @@ class Model(ABC):
         - ``start_date``, ``start_date_ordinal``, ``n_timesteps``
         - ``admin_units``, ``payload``
         - Transmission params (``self.beta``, ``self.gamma``, etc.)
+        - ``disease_params`` — :class:`DiseaseParamValues` with
+          attribute access (e.g. ``self.disease_params.immunity_period``)
+        - Top-level aliases for each disease parameter
+          (e.g. ``self.immunity_period``) for uncertainty compatibility
         - ``intervention_dict`` (kept for post-processing compat)
         - ``interventions`` — list of :class:`Intervention` runtime objects
         - ``intervention_statuses`` — auto-generated from schema
@@ -167,6 +179,18 @@ class Model(ABC):
 
         # Transmission params: self.beta, self.gamma, etc.
         self._load_transmission_params(config.get("transmission_dict", {}))
+
+        # -- Disease parameters --
+        # Auto-unpack from the Disease dict using schema declarations.
+        # Values are accessible via self.disease_params.<name> and also
+        # as top-level aliases (self.<name>) for uncertainty compatibility
+        # (BatchSimulationManager._single_run uses setattr(model, key, val)).
+        disease_dict = config.get("Disease", {}) or {}
+        self.disease_params = DiseaseParamValues(
+            schema.disease_parameters, disease_dict
+        )
+        for p in schema.disease_parameters:
+            setattr(self, p.name, getattr(self.disease_params, p.name))
 
         # -- Interventions --
         self.intervention_dict = config.get("intervention_dict", {})
@@ -505,9 +529,13 @@ class Model(ABC):
             effective_ids = [g.id for g in schema.demographic_groups]
         A = len(effective_ids)
 
-        config_contact_overrides = (config.get("contact_matrix_overrides") or {}) if config else {}
+        config_contact_overrides = (
+            (config.get("contact_matrix_overrides") or {}) if config else {}
+        )
         schema_ids = [g.id for g in schema.demographic_groups]
-        schema_has_overrides = bool(schema.contact_matrix_overrides) and effective_ids == schema_ids
+        schema_has_overrides = (
+            bool(schema.contact_matrix_overrides) and effective_ids == schema_ids
+        )
 
         matrix = np.eye(A)
 
@@ -520,6 +548,7 @@ class Model(ABC):
         # age_range on each demographic group and the framework supplies a
         # sensible country-specific matrix.  Explicit overrides still win.
         import logging
+
         log = logging.getLogger(__name__)
         prem_applied = False
         if (
@@ -542,7 +571,8 @@ class Model(ABC):
                     log.info(
                         "Country '%s' not in Prem bundle; using global-average "
                         "contact matrix aggregated to %d bands.",
-                        iso3, A,
+                        iso3,
+                        A,
                     )
                 else:
                     log.info(
@@ -553,7 +583,8 @@ class Model(ABC):
             else:
                 log.info(
                     "Loaded Prem contact matrix for '%s', aggregated to %d bands.",
-                    iso3, A,
+                    iso3,
+                    A,
                 )
             age_ranges = [g.age_range for g in schema.demographic_groups]
             matrix = aggregate_to_bands(source, age_ranges)
@@ -581,7 +612,10 @@ class Model(ABC):
         if effective_ids == schema_ids and schema.contact_matrix_overrides:
             applied = []
             for override in schema.contact_matrix_overrides:
-                if override.from_group in effective_ids and override.to_group in effective_ids:
+                if (
+                    override.from_group in effective_ids
+                    and override.to_group in effective_ids
+                ):
                     i = effective_ids.index(override.from_group)
                     j = effective_ids.index(override.to_group)
                     matrix[i, j] = override.value
@@ -589,13 +623,16 @@ class Model(ABC):
             if applied:
                 log.info(
                     "Applied %d schema contact override(s) (Prem suppressed): %s.",
-                    len(applied), ", ".join(applied),
+                    len(applied),
+                    ", ".join(applied),
                 )
 
         # Config-level overrides always applied (keys match whatever the config declared)
         if config:
             config_applied = []
-            for from_group, targets in (config.get("contact_matrix_overrides") or {}).items():
+            for from_group, targets in (
+                config.get("contact_matrix_overrides") or {}
+            ).items():
                 if from_group not in effective_ids:
                     continue
                 i = effective_ids.index(from_group)
@@ -606,7 +643,8 @@ class Model(ABC):
             if config_applied:
                 log.info(
                     "Applied %d config contact_matrix_override(s): %s.",
-                    len(config_applied), ", ".join(config_applied),
+                    len(config_applied),
+                    ", ".join(config_applied),
                 )
 
         return xp.array(matrix)
@@ -682,8 +720,7 @@ class Model(ABC):
         )
         A = len(group_ids)
         edge_value_types = {
-            e.variable_name: e.parameter.value_type
-            for e in schema.transmission_edges
+            e.variable_name: e.parameter.value_type for e in schema.transmission_edges
         }
         result = {}
 
@@ -697,7 +734,9 @@ class Model(ABC):
             vec = np.full(A, base_rate, dtype=float)
             for group_id, raw_value in group_rates.items():
                 if group_id in group_ids:
-                    vec[group_ids.index(group_id)] = self._to_rate(raw_value, value_type)
+                    vec[group_ids.index(group_id)] = self._to_rate(
+                        raw_value, value_type
+                    )
             result[variable_name] = xp.array(vec)
 
         return result or None
