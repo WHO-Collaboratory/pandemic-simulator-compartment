@@ -744,11 +744,12 @@ def create_transmission_dict(transmission_edge_items):
         if variable:
             value = edge.get("value", 0)
 
-            # Convert API rate back to native units so _load_transmission_params
-            # can apply _to_rate() consistently
-            if value_type == "DAYS" and value > 0:
-                value = 1.0 / value  # rate -> days
-            elif value_type == "PERCENTAGE":
+            # The cloud UI sends raw day values for DAYS-type params (e.g. 5.0
+            # for a 5-day incubation). _load_transmission_params._to_rate()
+            # inverts them to per-day rates, so no conversion is needed here.
+            # For PERCENTAGE the UI sends a fraction (e.g. 0.04 for 4%); store
+            # as percentage so _to_rate() can divide by 100 to recover the fraction.
+            if value_type == "PERCENTAGE":
                 value = value * 100.0  # fraction -> percentage
 
             # When multiple edges map to the same param (e.g. S->I and S->E
