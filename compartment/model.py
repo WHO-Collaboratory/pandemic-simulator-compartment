@@ -555,6 +555,10 @@ class Model(ABC):
         # differences between the schema and the cloud API (which may return
         # demographic groups in a different order than they were declared).
         prem_applied = False
+        schema_group_by_id = {g.id: g for g in schema.demographic_groups}
+        # Use set comparison so the Prem auto-load is not blocked by ordering
+        # differences between the schema and the cloud API (which may return
+        # demographic groups in a different order than they were declared).
         if (
             set(effective_ids) == set(schema_ids)
             and not schema_has_overrides
