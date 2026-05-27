@@ -30,7 +30,7 @@
             },
             {
                 "transmission_edge": { "source": "recovered", "target": "susceptible", "value_type": "DAYS" },
-                "value": 0.0167,
+                "value": 60.0,
                 "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "OMEGA", "min": 0, "max": 0 }] }
             }
         ]

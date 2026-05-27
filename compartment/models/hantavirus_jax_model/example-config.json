@@ -26,32 +26,32 @@
         "items": [
             {
                 "transmission_edge": { "source": "M_aaE", "target": "M_aaI", "value_type": "DAYS" },
-                "value": 0.02,
+                "value": 50.0,
                 "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "DELTA_AA", "min": 0, "max": 0 }] }
             },
             {
                 "transmission_edge": { "source": "M_aaI", "target": "M_aaR", "value_type": "DAYS" },
-                "value": 0.2,
+                "value": 5.0,
                 "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "GAMMA_AA", "min": 0, "max": 0 }] }
             },
             {
                 "transmission_edge": { "source": "M_ffE", "target": "M_ffI", "value_type": "DAYS" },
-                "value": 0.02,
+                "value": 50.0,
                 "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "DELTA_FF", "min": 0, "max": 0 }] }
             },
             {
                 "transmission_edge": { "source": "M_ffI", "target": "M_ffR", "value_type": "DAYS" },
-                "value": 0.2,
+                "value": 5.0,
                 "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "GAMMA_FF", "min": 0, "max": 0 }] }
             },
             {
                 "transmission_edge": { "source": "M_afE", "target": "M_afI", "value_type": "DAYS" },
-                "value": 0.02,
+                "value": 50.0,
                 "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "DELTA_AF", "min": 0, "max": 0 }] }
             },
             {
                 "transmission_edge": { "source": "M_afI", "target": "M_afR", "value_type": "DAYS" },
-                "value": 0.2,
+                "value": 5.0,
                 "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "GAMMA_AF", "min": 0, "max": 0 }] }
             },
             {

@@ -8,12 +8,12 @@
     "TransmissionEdges": {
         "items": [
             { "transmission_edge": { "value_type": "RATE", "source": "susceptible", "target": "exposed" }, "value": 0.25 },
-            { "transmission_edge": { "value_type": "DAYS", "source": "exposed", "target": "infected" }, "value": 0.2 },
-            { "transmission_edge": { "value_type": "PERCENTAGE", "source": "infected", "target": "hospitalized" }, "value": 0.0004 },
+            { "transmission_edge": { "value_type": "DAYS", "source": "exposed", "target": "infected" }, "value": 5.0 },
+            { "transmission_edge": { "value_type": "PERCENTAGE", "source": "infected", "target": "hospitalized" }, "value": 4 },
             { "transmission_edge": { "value_type": "RATE", "source": "infected", "target": "deceased" }, "value": 0.0001 },
             { "transmission_edge": { "value_type": "RATE", "source": "hospitalized", "target": "deceased" }, "value": 0.001 },
-            { "transmission_edge": { "value_type": "DAYS", "source": "infected", "target": "recovered" }, "value": 0.14 },
-            { "transmission_edge": { "value_type": "DAYS", "source": "hospitalized", "target": "recovered" }, "value": 0.14 }
+            { "transmission_edge": { "value_type": "DAYS", "source": "infected", "target": "recovered" }, "value": 7.14 },
+            { "transmission_edge": { "value_type": "DAYS", "source": "hospitalized", "target": "recovered" }, "value": 7.14 }
         ]
     },
     "Interventions": {
