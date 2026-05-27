@@ -550,6 +550,10 @@ class Model(ABC):
         import logging
 
         log = logging.getLogger(__name__)
+        schema_group_by_id = {g.id: g for g in schema.demographic_groups}
+        # Use set comparison so the Prem auto-load is not blocked by ordering
+        # differences between the schema and the cloud API (which may return
+        # demographic groups in a different order than they were declared).
         prem_applied = False
         schema_group_by_id = {g.id: g for g in schema.demographic_groups}
         # Use set comparison so the Prem auto-load is not blocked by ordering

@@ -707,14 +707,12 @@ def create_initial_population_matrix(case_file, compartment_list):
 def create_transmission_dict(transmission_edge_items):
     """Map normalized TransmissionEdges.items to transmission rate variables.
 
-    The API sends values as pre-converted rates (e.g. 1/14 = 0.0714 for a
-    14-day period).  Since ``_load_transmission_params`` applies ``_to_rate()``
-    based on the model schema's value_type, we convert API values back to
-    native units here so the downstream conversion produces correct rates.
+    Values are passed through in their native units so ``_load_transmission_params``
+    can apply ``_to_rate()`` exactly once:
 
-    - DAYS:       API sends 1/days (rate) -> we store days (1/value)
-    - PERCENTAGE: API sends fraction   -> we store percentage (value * 100)
-    - RATE:       API sends rate       -> stored as-is
+    - DAYS:       value is raw days (e.g. 5.0) -> stored as-is; _to_rate() inverts
+    - PERCENTAGE: value is whole-number percent (e.g. 4.0) -> stored as-is; _to_rate() divides by 100
+    - RATE:       passed through as-is
 
     Args:
         transmission_edge_items: List of dicts from TransmissionEdges.items[]
@@ -744,13 +742,6 @@ def create_transmission_dict(transmission_edge_items):
         if variable:
             value = edge.get("value", 0)
 
-            # The cloud UI sends raw day values for DAYS-type params (e.g. 5.0
-            # for a 5-day incubation). _load_transmission_params._to_rate()
-            # inverts them to per-day rates, so no conversion is needed here.
-            # For PERCENTAGE the UI sends a fraction (e.g. 0.04 for 4%); store
-            # as percentage so _to_rate() can divide by 100 to recover the fraction.
-            if value_type == "PERCENTAGE":
-                value = value * 100.0  # fraction -> percentage
 
             # When multiple edges map to the same param (e.g. S->I and S->E
             # both map to beta), prefer the non-zero value so the active
