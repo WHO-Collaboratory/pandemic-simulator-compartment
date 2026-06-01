@@ -89,7 +89,7 @@ def get_simulation_job(job_params: dict, graphql_query: str) -> dict:
             admin_unit_id = unit.get("admin_unit_id")
             ref = admin_unit_refs.get(admin_unit_id, {})
 
-            zone = {"id": admin_unit_id, **ref, **unit}
+            zone = {**ref, **unit, "id": admin_unit_id}
             # Remove join-table metadata that isn't part of the zone
             zone.pop("admin_unit_id", None)
 
