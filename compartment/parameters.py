@@ -139,13 +139,16 @@ class CompartmentDef:
     description: str  # explanation for UI
     infective: bool = False  # contributes to force of infection
 
-    def to_dict(self) -> dict:
-        return {
+    def to_dict(self, order: int | None = None) -> dict:
+        d = {
             "id": self.id,
             "label": self.label,
             "description": self.description,
             "infective": self.infective,
         }
+        if order is not None:
+            d["order"] = order
+        return d
 
 
 class CompartmentRegistry:
@@ -727,7 +730,9 @@ class ModelParameterSchema:
             "name": self.disease_label,
             "definition": self.description,
             # Compartment graph
-            "compartments": [c.to_dict() for c in self.compartments],
+            "compartments": [
+                c.to_dict(order=idx) for idx, c in enumerate(self.compartments, start=1)
+            ],
             "transmission_edges": edges,
             # Interventions
             "interventions": [i.to_dict() for i in self.interventions],
