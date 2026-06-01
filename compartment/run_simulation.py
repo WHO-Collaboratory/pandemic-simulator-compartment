@@ -90,6 +90,22 @@ def run_simulation(
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
+    # Resolve model_class from the artifact's disease_type (e.g. COVID_SIHR)
+    # so variant selection routes to the correct subclass. ModelArtifact is
+    # preferred over Disease because it carries the specific variant type;
+    # Disease.disease_type is the base type (e.g. COVID_SEIHDR).
+    # The caller-supplied model_class is kept as a final fallback.
+    from compartment.registry import resolve as _resolve
+    job = config["data"]["getSimulationJob"]
+    config_disease_type = (
+        (job.get("ModelArtifact") or {}).get("disease_type")
+        or (job.get("Disease") or {}).get("disease_type")
+    )
+    if config_disease_type:
+        resolved = _resolve(config_disease_type)
+        if resolved is not None:
+            model_class = resolved
+
     disease_type = model_class.DISEASE_TYPE
     config["data"]["getSimulationJob"]["Disease"]["disease_type"] = disease_type
 

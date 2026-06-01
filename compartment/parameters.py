@@ -727,6 +727,7 @@ class ModelParameterSchema:
         # -- Assemble -------------------------------------------------------
         result: dict[str, Any] = {
             # ModelArtifact identity
+            "disease_type": self.disease_type,
             "name": self.disease_label,
             "definition": self.description,
             # Compartment graph
