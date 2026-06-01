@@ -19,6 +19,12 @@ GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
       returning
     }
     updatedAt
+    model_artifact_id
+    ModelArtifact {
+      id
+      version
+      disease_type
+    }
     AdminUnit {
       id
       center_lat
