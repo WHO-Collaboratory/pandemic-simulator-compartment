@@ -80,6 +80,16 @@ class Model(ABC):
             schema = cls._build_parameter_schema()
             cls._cached_schema = schema
 
+            # Derive the display order for the results sidebar from
+            # COMPARTMENT_DELTA_GROUPING (if the model defines one) or
+            # fall back to the raw compartment IDs.  Must run before
+            # _add_total_compartments so that _total entries are excluded.
+            grouping = getattr(cls, "COMPARTMENT_DELTA_GROUPING", None)
+            if grouping:
+                schema.compartment_display_order = list(grouping.keys())
+            else:
+                schema.compartment_display_order = [c.id for c in schema.compartments]
+
             # Auto-generate _total compartments for each edge target.
             # These are a framework concern (derivative accumulation,
             # post-processing) — model authors never declare them.
