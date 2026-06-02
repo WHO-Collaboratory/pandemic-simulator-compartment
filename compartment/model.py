@@ -300,7 +300,18 @@ class Model(ABC):
         # Let the subclass fill the rest
         cls.define_parameters(schema)
 
-        return schema.build()
+        built = schema.build()
+
+        # Expose the UI compartment display order. When the model groups raw
+        # compartments (COMPARTMENT_DELTA_GROUPING), the grouped keys are what
+        # appear in time series + deltas — surface those (in order) so the
+        # results view orders bespoke compartments correctly. Ungrouped models
+        # fall back to declared-compartment order in to_artifact_dict.
+        grouping = getattr(cls, "COMPARTMENT_DELTA_GROUPING", None)
+        if grouping:
+            built.compartment_display_order = list(grouping.keys())
+
+        return built
 
     # ------------------------------------------------------------------
     # Shared parameter helpers (inherited by all subclasses)

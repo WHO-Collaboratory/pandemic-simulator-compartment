@@ -198,8 +198,86 @@ def get_simulation_job(job_params: dict, graphql_query: str) -> dict:
     return config
 
 
+def _np_safe(o):
+    """json.dumps default for numpy scalars inside AWSJSON payloads."""
+    if hasattr(o, "item"):  # numpy float/int scalar -> native Python
+        return o.item()
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
+
+def _to_awsjson(obj):
+    """Serialize a dict/list to a JSON string for an AWSJSON GraphQL field."""
+    return json.dumps(obj, default=_np_safe)
+
+
+def _build_time_series_v2(time_series):
+    """Repackage [{date, <comp>: {...}}] into [{date, compartments: <AWSJSON>}].
+
+    Compartment keys are arbitrary, so the whole per-timestep compartment map is
+    stored as a single AWSJSON string — letting any model (rodent/human, AMR,
+    etc.) write its time series without a closed-field schema type. Derived from
+    the already-built legacy ``time_series`` (which already carries the bespoke
+    keys; only the old schema type rejected them on write).
+    """
+    v2 = []
+    for rec in time_series or []:
+        comps = {k: v for k, v in rec.items() if k != "date"}
+        v2.append({"date": rec.get("date"), "compartments": _to_awsjson(comps)})
+    return v2
+
+
+# Compartment keys representable by the closed-field TimeSeriesStratification /
+# SimulationDiseaseStateMetrics schema types. Legacy fields are pruned to these
+# so the write never fails for models with bespoke compartments; the full data
+# is preserved in the v2 (AWSJSON) fields.
+_LEGACY_COMPARTMENT_KEYS = {
+    "SV", "EV", "IV", "S", "E", "I", "H", "D", "R", "C", "Snot", "E2", "I2",
+}
+
+
+def _sanitize_legacy_time_series(time_series):
+    """Drop compartment keys the closed TimeSeriesStratification type rejects."""
+    return [
+        {k: v for k, v in rec.items() if k == "date" or k in _LEGACY_COMPARTMENT_KEYS}
+        for rec in time_series or []
+    ]
+
+
+def _add_v2_payloads(results):
+    """Derive compartment-agnostic v2 fields and prune the legacy ones, in place.
+
+    For each payload, build the full time_series_v2 / compartment_deltas_v2 (any
+    compartment key, stored as AWSJSON), then prune the legacy time_series /
+    compartment_deltas down to the keys the closed-field schema types accept — so
+    the write never fails for models with bespoke compartments. Known models
+    (COVID/dengue) keep their legacy data intact; novel models carry their full
+    data only in v2. Single chokepoint for every builder path (deterministic
+    3D/4D + uncertainty), which all converge on the same ``results`` shape here.
+    """
+    for zone in results.get("admin_zones", []) or []:
+        if isinstance(zone, dict) and "time_series" in zone:
+            zone["time_series_v2"] = _build_time_series_v2(zone["time_series"])
+            zone["time_series"] = _sanitize_legacy_time_series(zone["time_series"])
+    parent = results.get("parent_admin_total")
+    if isinstance(parent, dict) and "time_series" in parent:
+        parent["time_series_v2"] = _build_time_series_v2(parent["time_series"])
+        parent["time_series"] = _sanitize_legacy_time_series(parent["time_series"])
+    deltas = results.get("compartment_deltas")
+    if deltas is not None:
+        results["compartment_deltas_v2"] = _to_awsjson(deltas)
+        if isinstance(deltas, dict):
+            results["compartment_deltas"] = {
+                k: v for k, v in deltas.items() if k in _LEGACY_COMPARTMENT_KEYS
+            }
+    return results
+
+
 def write_to_gql(job_params, results):
     """Write results of model to GraphQL and return responses"""
+
+    # Derive compartment-agnostic v2 payloads (time_series_v2 / compartment_deltas_v2)
+    # before splitting/writing, so any compartment key is representable.
+    _add_v2_payloads(results)
 
     responses = {"child_responses": [], "parent_response": None}
 

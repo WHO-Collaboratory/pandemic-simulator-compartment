@@ -725,15 +725,27 @@ class ModelParameterSchema:
                 sim_params.append(self._wrap_parameter(param, len(sim_params) + 1))
 
         # -- Assemble -------------------------------------------------------
+        compartment_dicts = [
+            c.to_dict(order=idx) for idx, c in enumerate(self.compartments, start=1)
+        ]
+        # Display order for the UI. Prefer an explicit order derived from the
+        # model's COMPARTMENT_DELTA_GROUPING (the grouped/display compartments
+        # that actually appear in time series + deltas — set on the schema in
+        # Model.__init_subclass__); otherwise fall back to declared compartment
+        # ids, excluding auto-generated cumulative (_total) compartments (which
+        # the time-series/delta builders also drop). The frontend reads this
+        # from the stored artifact JSON instead of hardcoding per-disease lists.
+        display_order = getattr(self, "compartment_display_order", None) or [
+            c["id"] for c in compartment_dicts if not c["id"].endswith("_total")
+        ]
         result: dict[str, Any] = {
             # ModelArtifact identity
             "disease_type": self.disease_type,
             "name": self.disease_label,
             "definition": self.description,
             # Compartment graph
-            "compartments": [
-                c.to_dict(order=idx) for idx, c in enumerate(self.compartments, start=1)
-            ],
+            "compartments": compartment_dicts,
+            "compartment_display_order": display_order,
             "transmission_edges": edges,
             # Interventions
             "interventions": [i.to_dict() for i in self.interventions],
