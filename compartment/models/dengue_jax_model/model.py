@@ -32,26 +32,23 @@ class DengueJaxModel(Model):
         # (E_total, I_total, etc.) covering all serotypes.
         pass
 
-    # Output grouping: collapse serotype detail for display
+    # Output grouping: collapse serotype detail for display.
+    # Human compartments first, then vector compartments at the end
+    # (vectors are displayed on the same line graph but aren't actual
+    # disease compartments).
     COMPARTMENT_DELTA_GROUPING = {
-        "SV": ["SV"],
-        "EV": ["EV1", "EV2", "EV3", "EV4"],
-        "IV": ["IV1", "IV2", "IV3", "IV4"],
         "S": ["S0"],
         "E": ["E1", "E2", "E3", "E4"],
         "I": ["I1", "I2", "I3", "I4"],
         "C": ["C1", "C2", "C3", "C4"],
         "Snot": ["Snot1", "Snot2", "Snot3", "Snot4"],
-        "E2": [
-            "E12", "E13", "E14", "E21", "E23", "E24",
-            "E31", "E32", "E34", "E41", "E42", "E43",
-        ],
-        "I2": [
-            "I12", "I13", "I14", "I21", "I23", "I24",
-            "I31", "I32", "I34", "I41", "I42", "I43",
-        ],
+        "E2": ["E12", "E13", "E14", "E21", "E23", "E24", "E31", "E32", "E34", "E41", "E42", "E43"],
+        "I2": ["I12", "I13", "I14", "I21", "I23", "I24", "I31", "I32", "I34", "I41", "I42", "I43"],
         "H": ["H1", "H2", "H3", "H4"],
         "R": ["R1", "R2", "R3", "R4"],
+        "SV": ["SV"],
+        "EV": ["EV1", "EV2", "EV3", "EV4"],
+        "IV": ["IV1", "IV2", "IV3", "IV4"],
     }
 
     # ------------------------------------------------------------------
@@ -67,28 +64,36 @@ class DengueJaxModel(Model):
         )
 
         # ---- Vector compartments ----
-        schema.add_compartment("SV", "Susceptible Vectors", "Susceptible mosquito population")
+        schema.add_compartment(
+            "SV", "Susceptible Vectors", "Susceptible mosquito population"
+        )
         for s in range(1, 5):
             schema.add_compartment(
-                f"EV{s}", f"Exposed Vectors (serotype {s})",
+                f"EV{s}",
+                f"Exposed Vectors (serotype {s})",
                 f"Mosquitoes exposed to serotype {s}",
             )
         for s in range(1, 5):
             schema.add_compartment(
-                f"IV{s}", f"Infectious Vectors (serotype {s})",
+                f"IV{s}",
+                f"Infectious Vectors (serotype {s})",
                 f"Mosquitoes infectious with serotype {s}",
             )
 
         # ---- Human primary infection compartments ----
-        schema.add_compartment("S0", "Susceptible", "Fully susceptible human population")
+        schema.add_compartment(
+            "S0", "Susceptible", "Fully susceptible human population"
+        )
         for s in range(1, 5):
             schema.add_compartment(
-                f"E{s}", f"Exposed (serotype {s})",
+                f"E{s}",
+                f"Exposed (serotype {s})",
                 f"Humans exposed to serotype {s} (primary infection)",
             )
         for s in range(1, 5):
             schema.add_compartment(
-                f"I{s}", f"Infected (serotype {s})",
+                f"I{s}",
+                f"Infected (serotype {s})",
                 f"Humans infected with serotype {s} (primary infection)",
                 infective=True,
             )
@@ -96,27 +101,29 @@ class DengueJaxModel(Model):
         # ---- Cross-protection compartments ----
         for s in range(1, 5):
             schema.add_compartment(
-                f"C{s}", f"Cross-protected (serotype {s})",
+                f"C{s}",
+                f"Cross-protected (serotype {s})",
                 f"Recovered from serotype {s}, temporarily cross-protected",
             )
         for s in range(1, 5):
             schema.add_compartment(
-                f"Snot{s}", f"Susceptible (not {s})",
+                f"Snot{s}",
+                f"Susceptible (not {s})",
                 f"Immune to serotype {s}, susceptible to other serotypes",
             )
 
         # ---- Human secondary infection compartments ----
-        serotype_pairs = [
-            (i, j) for i in range(1, 5) for j in range(1, 5) if i != j
-        ]
+        serotype_pairs = [(i, j) for i in range(1, 5) for j in range(1, 5) if i != j]
         for i, j in serotype_pairs:
             schema.add_compartment(
-                f"E{i}{j}", f"Exposed 2nd ({i}→{j})",
+                f"E{i}{j}",
+                f"Exposed 2nd ({i}→{j})",
                 f"Previously infected with serotype {i}, now exposed to serotype {j}",
             )
         for i, j in serotype_pairs:
             schema.add_compartment(
-                f"I{i}{j}", f"Infected 2nd ({i}→{j})",
+                f"I{i}{j}",
+                f"Infected 2nd ({i}→{j})",
                 f"Secondary infection: previously serotype {i}, now serotype {j}",
                 infective=True,
             )
@@ -124,23 +131,41 @@ class DengueJaxModel(Model):
         # ---- Hospitalized & Recovered ----
         for s in range(1, 5):
             schema.add_compartment(
-                f"H{s}", f"Hospitalized (serotype {s})",
+                f"H{s}",
+                f"Hospitalized (serotype {s})",
                 f"Hospitalized from secondary infection leading to serotype {s}",
             )
         for s in range(1, 5):
             schema.add_compartment(
-                f"R{s}", f"Recovered (serotype {s})",
+                f"R{s}",
+                f"Recovered (serotype {s})",
                 f"Recovered from secondary infection with serotype {s}",
             )
 
         # ---- Cumulative tracking (aggregated across serotypes) ----
-        schema.add_compartment("E_total", "Exposed Total", "Cumulative primary exposures")
-        schema.add_compartment("I_total", "Infected Total", "Cumulative primary infections")
-        schema.add_compartment("C_total", "Cross-protected Total", "Cumulative cross-protected")
-        schema.add_compartment("Snot_total", "Partially Susceptible Total", "Cumulative partially susceptible")
-        schema.add_compartment("E2_total", "Exposed 2nd Total", "Cumulative secondary exposures")
-        schema.add_compartment("I2_total", "Infected 2nd Total", "Cumulative secondary infections")
-        schema.add_compartment("H_total", "Hospitalized Total", "Cumulative hospitalizations")
+        schema.add_compartment(
+            "E_total", "Exposed Total", "Cumulative primary exposures"
+        )
+        schema.add_compartment(
+            "I_total", "Infected Total", "Cumulative primary infections"
+        )
+        schema.add_compartment(
+            "C_total", "Cross-protected Total", "Cumulative cross-protected"
+        )
+        schema.add_compartment(
+            "Snot_total",
+            "Partially Susceptible Total",
+            "Cumulative partially susceptible",
+        )
+        schema.add_compartment(
+            "E2_total", "Exposed 2nd Total", "Cumulative secondary exposures"
+        )
+        schema.add_compartment(
+            "I2_total", "Infected 2nd Total", "Cumulative secondary infections"
+        )
+        schema.add_compartment(
+            "H_total", "Hospitalized Total", "Cumulative hospitalizations"
+        )
         schema.add_compartment("R_total", "Recovered Total", "Cumulative recoveries")
 
         # ---- Disease parameters ----
@@ -461,19 +486,18 @@ class DengueJaxModel(Model):
         error_val = 1e-6
         (
             SV, EV1, EV2, EV3, EV4, IV1, IV2, IV3, IV4,
-            S0, E1, E2, E3, E4, I1, I2, I3, I4,
-            C1, C2, C3, C4, Snot1, Snot2, Snot3, Snot4,
+            S0, E1, E2, E3, E4, I1, I2, I3, I4, C1, C2, C3, C4,
+            Snot1, Snot2, Snot3, Snot4,
             E12, E13, E14, E21, E23, E24, E31, E32, E34, E41, E42, E43,
             I12, I13, I14, I21, I23, I24, I31, I32, I34, I41, I42, I43,
             H1, H2, H3, H4, R1, R2, R3, R4,
-            E_total, I_total, C_total, Snot_total,
-            E2_total, I2_total, H_total, R_total,
+            E_total, I_total, C_total, Snot_total, E2_total, I2_total, H_total, R_total,
         ) = y
 
         NV = error_val + sum([SV, EV1, EV2, EV3, EV4, IV1, IV2, IV3, IV4])
         N = error_val + sum([
-            S0, E1, E2, E3, E4, I1, I2, I3, I4,
-            C1, C2, C3, C4, Snot1, Snot2, Snot3, Snot4,
+            S0, E1, E2, E3, E4, I1, I2, I3, I4, C1, C2, C3, C4,
+            Snot1, Snot2, Snot3, Snot4,
             E12, E13, E14, E21, E23, E24, E31, E32, E34, E41, E42, E43,
             I12, I13, I14, I21, I23, I24, I31, I32, I34, I41, I42, I43,
             H1, H2, H3, H4, R1, R2, R3, R4,
@@ -486,18 +510,24 @@ class DengueJaxModel(Model):
         temperature = temperature_seasonality_jax(
             Tmax, Tmin, Tmean, current_day, hemisphere
         )
-        (l_V_T, s_V_T, d_V_T, epsilon_V_T,
-         delta_V_T, gamma_T, b_V_T, mu_V_T) = calculate_thermal_responses(temperature)
+        (l_V_T, s_V_T, d_V_T, epsilon_V_T, delta_V_T, gamma_T, b_V_T, mu_V_T) = (
+            calculate_thermal_responses(temperature)
+        )
         vector_surviving_offspring, mu_V_T0 = calculate_surviving_offspring()
         carrying_capacity = get_carrying_capacity(
-            temperature, vector_surviving_offspring, mu_V_T0,
-            self.N_v_m, self.E_a, N, T0=self.T_0, k=self.k,
+            temperature,
+            vector_surviving_offspring,
+            mu_V_T0,
+            self.N_v_m,
+            self.E_a,
+            N,
+            T0=self.T_0,
+            k=self.k,
         )
 
         I_H_total = sum([
             I1, I2, I3, I4,
-            I12, I13, I14, I21, I23, I24,
-            I31, I32, I34, I41, I42, I43,
+            I12, I13, I14, I21, I23, I24, I31, I32, I34, I41, I42, I43,
         ])
         I_H_prop_infected = np.sum(I_H_total) / np.sum(N)
 
@@ -505,12 +535,18 @@ class DengueJaxModel(Model):
         current_ordinal_day = self.start_date_ordinal + t
         rates = {"b_V_T": b_V_T, "s_V_T": s_V_T}
         rates, self.intervention_statuses, contact_matrix = jax_timestep_intervention(
-            self.intervention_dict, current_ordinal_day, rates,
-            self.intervention_statuses, self.travel_matrix,
+            self.intervention_dict,
+            current_ordinal_day,
+            rates,
+            self.intervention_statuses,
+            self.travel_matrix,
         )
         rates, self.intervention_statuses, contact_matrix = jax_prop_intervention(
-            self.intervention_dict, I_H_prop_infected, rates,
-            self.intervention_statuses, self.travel_matrix,
+            self.intervention_dict,
+            I_H_prop_infected,
+            rates,
+            self.intervention_statuses,
+            self.travel_matrix,
         )
         b_V_T = rates["b_V_T"]
         s_V_T = rates["s_V_T"]
@@ -553,8 +589,10 @@ class DengueJaxModel(Model):
 
         # ---- Vector ODEs ----
         SV_dot = (
-            (l_V_T * s_V_T * d_V_T) / mu_V_T
-        ) * NV * (1 - NV / carrying_capacity) - SV * LAMBDA_V_all - mu_V_T * SV
+            ((l_V_T * s_V_T * d_V_T) / mu_V_T) * NV * (1 - NV / carrying_capacity)
+            - SV * LAMBDA_V_all
+            - mu_V_T * SV
+        )
 
         EV1_dot = SV * LAMBDA_V_1 - (epsilon_V_T + mu_V_T) * EV1
         EV2_dot = SV * LAMBDA_V_2 - (epsilon_V_T + mu_V_T) * EV2
@@ -633,8 +671,7 @@ class DengueJaxModel(Model):
         I42_dot = delta_H * E42 - (theta + eta) * I42 - mu * I42
         I43_dot = delta_H * E43 - (theta + eta) * I43 - mu * I43
         I2_total_dot = delta_H * (
-            E12 + E13 + E14 + E21 + E23 + E24
-            + E31 + E32 + E34 + E41 + E42 + E43
+            E12 + E13 + E14 + E21 + E23 + E24 + E31 + E32 + E34 + E41 + E42 + E43
         )
 
         # ---- Hospitalized & Recovered ----
@@ -643,33 +680,23 @@ class DengueJaxModel(Model):
         H3_dot = theta * (I13 + I23 + I43) - omega * H3 - mu * H3
         H4_dot = theta * (I14 + I24 + I34) - omega * H4 - mu * H4
         H_total_dot = theta * (
-            I21 + I31 + I41 + I12 + I32 + I42
-            + I13 + I23 + I43 + I14 + I24 + I34
+            I21 + I31 + I41 + I12 + I32 + I42 + I13 + I23 + I43 + I14 + I24 + I34
         )
 
         R1_dot = eta * (I21 + I31 + I41) + omega * H1 - mu * R1
         R2_dot = eta * (I12 + I32 + I42) + omega * H2 - mu * R2
         R3_dot = eta * (I13 + I23 + I43) + omega * H3 - mu * R3
         R4_dot = eta * (I14 + I24 + I34) + omega * H4 - mu * R4
-        R_total_dot = (
-            eta * (I21 + I31 + I41 + I12 + I32 + I42
-                   + I13 + I23 + I43 + I14 + I24 + I34)
-            + omega * (H1 + H2 + H3 + H4)
-        )
+        R_total_dot = eta * (
+            I21 + I31 + I41 + I12 + I32 + I42 + I13 + I23 + I43 + I14 + I24 + I34
+        ) + omega * (H1 + H2 + H3 + H4)
 
         return np.stack([
-            SV_dot, EV1_dot, EV2_dot, EV3_dot, EV4_dot,
-            IV1_dot, IV2_dot, IV3_dot, IV4_dot,
-            S0_dot, E1_dot, E2_dot, E3_dot, E4_dot,
-            I1_dot, I2_dot, I3_dot, I4_dot,
-            C1_dot, C2_dot, C3_dot, C4_dot,
-            Snot1_dot, Snot2_dot, Snot3_dot, Snot4_dot,
-            E12_dot, E13_dot, E14_dot, E21_dot, E23_dot, E24_dot,
-            E31_dot, E32_dot, E34_dot, E41_dot, E42_dot, E43_dot,
-            I12_dot, I13_dot, I14_dot, I21_dot, I23_dot, I24_dot,
-            I31_dot, I32_dot, I34_dot, I41_dot, I42_dot, I43_dot,
-            H1_dot, H2_dot, H3_dot, H4_dot,
-            R1_dot, R2_dot, R3_dot, R4_dot,
-            E_total_dot, I_total_dot, C_total_dot, Snot_total_dot,
-            E2_total_dot, I2_total_dot, H_total_dot, R_total_dot,
+            SV_dot, EV1_dot, EV2_dot, EV3_dot, EV4_dot, IV1_dot, IV2_dot, IV3_dot, IV4_dot,
+            S0_dot, E1_dot, E2_dot, E3_dot, E4_dot, I1_dot, I2_dot, I3_dot, I4_dot,
+            C1_dot, C2_dot, C3_dot, C4_dot, Snot1_dot, Snot2_dot, Snot3_dot, Snot4_dot,
+            E12_dot, E13_dot, E14_dot, E21_dot, E23_dot, E24_dot, E31_dot, E32_dot, E34_dot, E41_dot, E42_dot, E43_dot,
+            I12_dot, I13_dot, I14_dot, I21_dot, I23_dot, I24_dot, I31_dot, I32_dot, I34_dot, I41_dot, I42_dot, I43_dot,
+            H1_dot, H2_dot, H3_dot, H4_dot, R1_dot, R2_dot, R3_dot, R4_dot,
+            E_total_dot, I_total_dot, C_total_dot, Snot_total_dot, E2_total_dot, I2_total_dot, H_total_dot, R_total_dot,
         ])
