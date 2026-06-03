@@ -44,6 +44,8 @@ jobs:
             model_display_name: "COVID SIR (Stochastic)"
           - disease_path: test_klebsiella_amr_model
             model_display_name: "Klebsiella AMR"
+          - disease_path: ebola_jax_model
+            model_display_name: "Ebola"
     steps:
       - uses: actions/checkout@v4
 
@@ -107,6 +109,8 @@ jobs:
             model_display_name: "COVID SIR (Stochastic)"
           - disease_path: test_klebsiella_amr_model
             model_display_name: "Klebsiella AMR"
+          - disease_path: ebola_jax_model
+            model_display_name: "Ebola"
     steps:
       - uses: actions/checkout@v4
 
