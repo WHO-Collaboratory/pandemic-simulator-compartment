@@ -1,6 +1,6 @@
 {
     "Disease": {
-        "disease_type": "MONKEYPOX",
+        "disease_type": "MPOX",
         "immunity_period": 60
     },
     "start_date": "2026-03-06",

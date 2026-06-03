@@ -142,7 +142,7 @@ def load_simulation_config(config: dict, disease_type: str):
 
     Args:
         config: Configuration dict (usually from GraphQL/JSON)
-        disease_type: Type of disease ("RESPIRATORY", "VECTOR_BORNE", "MONKEYPOX")
+        disease_type: Type of disease ("RESPIRATORY", "VECTOR_BORNE", "MPOX")
 
     Returns:
         ProcessedSimulation with all computed fields ready for use by Model classes.
