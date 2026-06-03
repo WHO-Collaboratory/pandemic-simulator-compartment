@@ -659,6 +659,12 @@ class ModelParameterSchema:
     demographic_groups: list[DemographicGroupDef] = field(default_factory=list)
     contact_matrix_overrides: list[ContactOverrideDef] = field(default_factory=list)
 
+    # Ordered list of grouped display keys for the results sidebar.
+    # Derived automatically from COMPARTMENT_DELTA_GROUPING when
+    # available, otherwise defaults to the raw compartment IDs
+    # (excluding cumulative _total entries).
+    compartment_display_order: list[str] = field(default_factory=list)
+
     # ---------------------------------------------------------------
     # Serialization helpers
     # ---------------------------------------------------------------
