@@ -30,15 +30,15 @@ class MpoxJaxModel(Model):
     @classmethod
     def define_parameters(cls, schema):
         schema.set_model_info(
-            disease_type="MONKEYPOX",
-            label="Monkeypox",
-            description="A simple SIR compartmental model for Monkeypox",
+            disease_type="MPOX",
+            label="MPOX",
+            description="A simple SIR compartmental model for MPOX",
         )
 
         schema.add_compartment(
             "S",
             "Susceptible",
-            "Population susceptible to Monkeypox infection",
+            "Population susceptible to MPOX infection",
         )
         schema.add_compartment(
             "I",

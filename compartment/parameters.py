@@ -633,8 +633,8 @@ class ModelParameterSchema:
     - example config JSON  (for testing / docs)
     """
 
-    disease_type: str  # "MONKEYPOX"
-    disease_label: str  # "Monkeypox"
+    disease_type: str  # "MPOX"
+    disease_label: str  # "MPOX"
     description: str  # model description
 
     compartments: list[CompartmentDef]
@@ -885,7 +885,7 @@ class ParameterSchemaBuilder:
 
         @classmethod
         def define_parameters(cls, schema):
-            schema.set_model_info("MONKEYPOX", "Monkeypox", "SIR model for Monkeypox")
+            schema.set_model_info("MPOX", "MPOX", "SIR model for MPOX")
 
             schema.add_compartment("S", "Susceptible", "Population susceptible to infection")
             schema.add_compartment("I", "Infected", "Currently infected population")
@@ -925,8 +925,8 @@ class ParameterSchemaBuilder:
         Set the disease model identity.  Must be called exactly once.
 
         Args:
-            disease_type: Machine identifier (e.g. ``"MONKEYPOX"``).
-            label: Human-readable name (e.g. ``"Monkeypox"``).
+            disease_type: Machine identifier (e.g. ``"MPOX"``).
+            label: Human-readable name (e.g. ``"MPOX"``).
             description: Short description shown in the UI.
         """
         if self._disease_type is not None:

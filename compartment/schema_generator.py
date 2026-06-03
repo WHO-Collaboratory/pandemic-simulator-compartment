@@ -166,7 +166,7 @@ def generate_disease_config(schema: ModelParameterSchema) -> type:
         else:
             fields[param.name] = (py_type, Field(**field_kwargs))
 
-    # Construct a readable class name: "MONKEYPOX" -> "MonkeypoxDiseaseConfig"
+    # Construct a readable class name: "MPOX" -> "MPOXDiseaseConfig"
     class_name = (
         schema.disease_type.replace("_", " ").title().replace(
             " ", "") + "DiseaseConfig"

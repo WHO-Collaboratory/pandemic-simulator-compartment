@@ -253,7 +253,7 @@ class Model(ABC):
     @property
     def disease_type(self):
         """
-        Disease type identifier (e.g. ``"MONKEYPOX"``).
+        Disease type identifier (e.g. ``"MPOX"``).
 
         Migrated models get this from the schema automatically. Non-migrated models should override this property.
         """
