@@ -20,9 +20,9 @@ from compartment.helpers import (
 from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.cloud_helpers.gql import (
     get_simulation_job,
+    write_to_gql,
 )
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
-from compartment.cloud_helpers.gql import write_to_gql
 from compartment.model import Model
 
 # Makes sure unix implementations don't deadlock
@@ -96,11 +96,11 @@ def run_simulation(
     # Disease.disease_type is the base type (e.g. COVID_SEIHDR).
     # The caller-supplied model_class is kept as a final fallback.
     from compartment.registry import resolve as _resolve
+
     job = config["data"]["getSimulationJob"]
-    config_disease_type = (
-        (job.get("ModelArtifact") or {}).get("disease_type")
-        or (job.get("Disease") or {}).get("disease_type")
-    )
+    config_disease_type = (job.get("ModelArtifact") or {}).get("disease_type") or (
+        job.get("Disease") or {}
+    ).get("disease_type")
     if config_disease_type:
         resolved = _resolve(config_disease_type)
         if resolved is not None:
@@ -250,30 +250,37 @@ def run_simulation(
             write_results_to_local(results, output_path)
             logger.info(f"Results saved to: {output_path}")
     else:
-        # Cloud mode: write to GQL and S3, invoke lambda
-        s3_results = deepcopy(results)
+        # Cloud mode: write results to S3 (full data) and GQL (metadata only)
         s3_client = boto3.client("s3", region_name="us-east-1")
         bucket_name = f"compartmental-results-{simulation_params.get('ENVIRONMENT')}"
 
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        max_workers = min(32, max(4, len(results) * 2))  # tune as needed
-        gql_statuses_by_i = [None] * len(results)
-        s3_statuses_by_i = [None] * len(results)
-
+        gql_statuses = [None] * len(results)
+        s3_statuses = [None] * len(results)
         future_to_meta = {}
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=len(results) * 2) as executor:
             for i, result in enumerate(results):
+                # GQL: write SimulationJobResult metadata only (no time series).
+                # Extract metadata before submitting to avoid races with S3
+                # writer which pops admin_zones/parent_admin_total.
+                gql_metadata = {
+                    k: v
+                    for k, v in result.items()
+                    if k not in ("admin_zones", "parent_admin_total")
+                }
                 future_to_meta[
-                    executor.submit(write_to_gql, simulation_params, result)
+                    executor.submit(write_to_gql, simulation_params, gql_metadata)
                 ] = (i, "gql")
+
+                # S3: write full data (time series + metadata)
                 future_to_meta[
                     executor.submit(
                         write_to_s3,
                         s3_client,
                         bucket_name,
-                        s3_results[i],
+                        result,
                         simulation_job_id,
                     )
                 ] = (i, "s3")
@@ -287,13 +294,13 @@ def run_simulation(
                     out = {"status": "error", "error": str(e)}
 
                 if kind == "gql":
-                    gql_statuses_by_i[i] = out
+                    gql_statuses[i] = out
                 else:
-                    s3_statuses_by_i[i] = out
+                    s3_statuses[i] = out
 
         for i in range(len(results)):
-            logger.info(f"gql_statuses_{i}: {gql_statuses_by_i[i]}")
-            logger.info(f"s3_statuses_{i}: {s3_statuses_by_i[i]}")
+            logger.info(f"gql_statuses_{i}: {gql_statuses[i]}")
+            logger.info(f"s3_statuses_{i}: {s3_statuses[i]}")
 
         # Invoke get-ai-summary lambda
         lambda_client = boto3.client("lambda", region_name="us-east-1")

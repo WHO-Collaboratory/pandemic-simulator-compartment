@@ -1,9 +1,7 @@
 import json
 import requests
 import logging
-from compartment.helpers import setup_logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from compartment.helpers import convert_dates
+from compartment.helpers import setup_logging, convert_dates
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -231,7 +229,19 @@ def _build_time_series_v2(time_series):
 # so the write never fails for models with bespoke compartments; the full data
 # is preserved in the v2 (AWSJSON) fields.
 _LEGACY_COMPARTMENT_KEYS = {
-    "SV", "EV", "IV", "S", "E", "I", "H", "D", "R", "C", "Snot", "E2", "I2",
+    "SV",
+    "EV",
+    "IV",
+    "S",
+    "E",
+    "I",
+    "H",
+    "D",
+    "R",
+    "C",
+    "Snot",
+    "E2",
+    "I2",
 }
 
 
@@ -273,33 +283,20 @@ def _add_v2_payloads(results):
 
 
 def write_to_gql(job_params, results):
-    """Write results of model to GraphQL and return responses"""
+    """Write SimulationJobResult metadata to DynamoDB via GraphQL.
 
-    # Derive compartment-agnostic v2 payloads (time_series_v2 / compartment_deltas_v2)
-    # before splitting/writing, so any compartment key is representable.
+    Only writes the lightweight result record (compartment_deltas,
+    control_run, dates, etc.).  AdminZoneTimeSeries (large time-series
+    data) is no longer written to DynamoDB — it lives only in S3.
+
+    Derives compartment-agnostic v2 payloads (compartment_deltas_v2)
+    before writing so any compartment key is representable.
+    """
+    # Derive v2 payloads so compartment_deltas_v2 is available on the
+    # metadata record (also enriches time series in-place for S3).
     _add_v2_payloads(results)
 
-    responses = {"child_responses": [], "parent_response": None}
-
-    # Mutation for child entities (admin_zones)
-    child_query = """
-        mutation MyMutation($input: CreateAdminZoneTimeSeriesInput!) {
-            createAdminZoneTimeSeries(input: $input) {
-                id
-            }
-        }
-    """
-    child_result = results["admin_zones"]
-
-    responses["child_responses"] = parallel_write(
-        job_params=job_params, inputs=child_result, query=child_query, max_workers=4
-    )
-
-    response = gql_write_helper(job_params, results["parent_admin_total"], child_query)
-    responses["child_responses"].append(response)
-
-    # Mutation for parent entity (simulation job result)
-    parent_query = """
+    query = """
         mutation CreateSimulationJobResult($input: CreateSimulationJobResultInput!) {
             createSimulationJobResult(input: $input) {
                 id
@@ -307,67 +304,33 @@ def write_to_gql(job_params, results):
             }
         }
     """
-    results.pop("admin_zones")  # Remove child data before parent write
-    results.pop("parent_admin_total")  # Remove parent admin data before parent write
-    responses["parent_response"] = gql_write_helper(job_params, results, parent_query)
+    # Strip time-series payloads — they are not part of the mutation input
+    # and would be rejected.  Build a clean metadata-only dict.
+    excluded_keys = {"admin_zones", "parent_admin_total"}
+    metadata = {k: v for k, v in results.items() if k not in excluded_keys}
 
-    return responses  # Return collected responses
+    return _gql_write(job_params, metadata, query)
 
 
-def gql_write_helper(job_params, results, query):
-    """Write resutls of model to GraphQL"""
-
-    # Ensure JSON-serializable payload (dates, datetimes, ndarrays → strings/lists)
-    safe_results = convert_dates(results)
-
-    payload = {
-        "query": query,
-        "variables": {"input": safe_results},
-    }
+def _gql_write(job_params, data, query):
+    """POST a single GraphQL mutation."""
+    safe_data = convert_dates(data)
+    payload = {"query": query, "variables": {"input": safe_data}}
 
     headers = {"Content-Type": "application/json"}
     api_key = job_params.get("GRAPHQL_APIKEY")
-    GRAPHQL_ENDPOINT = job_params.get("GRAPHQL_ENDPOINT")
+    endpoint = job_params.get("GRAPHQL_ENDPOINT")
     if api_key:
         headers["x-api-key"] = api_key
 
     try:
-        response = requests.post(GRAPHQL_ENDPOINT, json=payload, headers=headers)
+        response = requests.post(endpoint, json=payload, headers=headers)
         status_code = response.status_code
         response.raise_for_status()
-        gql_response = response.json()
-        return {"status_code": status_code, "gql_response": gql_response}
+        return {"status_code": status_code, "gql_response": response.json()}
     except requests.RequestException as e:
         status_code = getattr(e.response, "status_code", None)
         return {"status_code": status_code, "error": str(e)}
-
-
-def parallel_write(job_params, inputs, query, max_workers=8):
-    """
-    Parallel writes inputs to gql
-
-    Args:
-        job_params (dict): GraphQL job parameters
-        inputs (list of dict): One dict per record to write
-        query (str): GraphQL mutation string for writes
-        max_workers (int): Number of threads
-
-    Returns:
-        list: Responses from the GraphQL API, in the same order as inputs.
-    """
-    responses = [None] * len(inputs)
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_index = {
-            executor.submit(gql_write_helper, job_params, i, query): idx
-            for idx, i in enumerate(inputs)
-        }
-        for future in as_completed(future_to_index):
-            idx = future_to_index[future]
-            try:
-                responses[idx] = future.result()
-            except Exception as e:
-                responses[idx] = {"error": str(e)}
-    return responses
 
 
 def _gql_query(job_params: dict, query: str, variables: dict) -> dict:
