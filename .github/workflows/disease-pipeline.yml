@@ -178,7 +178,7 @@ jobs:
           : "${EVENT_BUS_NAME:?MODEL_PUBLICATION_EVENT_BUS_NAME secret is not set}"
           for artifact in compartment/models/${{ matrix.disease_path }}/artifacts/*.json; do
             HASH=$(sha256sum "$artifact" | awk '{ print $1 }')
-            DISPLAY_NAME=$(jq -r '.disease_label' "$artifact")
+            DISPLAY_NAME=$(jq -r '.name' "$artifact")
             S3_KEY="${HASH}.json"
             DETAIL_JSON=$(jq -nc \
               --arg name "${DISPLAY_NAME}" \
