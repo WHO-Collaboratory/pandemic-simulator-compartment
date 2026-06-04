@@ -33,7 +33,7 @@ def test_discover_models_from_dir_resolves_disease_type():
 
     classes = _discover_models_from_dir("compartment/models/mpox_jax_model")
     schema = classes[0]._build_parameter_schema()
-    assert schema.disease_type == "MONKEYPOX"
+    assert schema.disease_type == "MPOX"
 
 
 def test_discover_models_from_dir_invalid_path(capsys):
@@ -82,7 +82,7 @@ def test_cli_model_dir_matches_disease_type_output():
         capture_output=True, text=True,
     )
     result_type = subprocess.run(
-        [sys.executable, "-m", "compartment.generate_artifact", "MONKEYPOX"],
+        [sys.executable, "-m", "compartment.generate_artifact", "MPOX"],
         capture_output=True, text=True,
     )
     assert result_dir.returncode == 0, result_dir.stderr
