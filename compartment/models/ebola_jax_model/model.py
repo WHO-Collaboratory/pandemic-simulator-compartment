@@ -5,7 +5,7 @@ Port of ``model_ebola()`` from epiverse-trace/epidemics
 based on the consensus compartment structure of Li et al. (2019) and the
 Erlang boxcar passage-time formulation of Getz & Dougherty (2018).
 
-Compartments: S, E (k_E boxcars), I (k_I boxcars), H (k_H boxcars), F, R.
+Compartments: S, E (k_E boxcars), I (k_I boxcars), H (k_H boxcars), Funeral, R.
 Output is rolled up to the six public compartments via
 ``COMPARTMENT_DELTA_GROUPING``.
 
@@ -59,7 +59,7 @@ class EbolaJaxModel(Model):
         "E": [f"E{i}" for i in range(1, _N_E_BOXCARS + 1)],
         "I": [f"I{i}" for i in range(1, _N_I_BOXCARS + 1)],
         "H": [f"H{i}" for i in range(1, _N_H_BOXCARS + 1)],
-        "F": ["F"],
+        "Funeral": ["Funeral"],
         "R": ["R"],
     }
 
@@ -70,10 +70,14 @@ class EbolaJaxModel(Model):
     @classmethod
     def _add_total_compartments(cls, schema):
         # Suppress framework auto-generation of per-edge ``_total``
-        # compartments. The boxcar slots aren't meaningful aggregation
-        # targets, and the post-processor's grouping handles output
-        # rollup. Cumulative incidence can be added later as a manual
-        # ``R_total`` if needed.
+        # compartments. The per-edge boxcar slots aren't meaningful
+        # aggregation targets, so (like dengue) we declare our own
+        # aggregate cumulative compartments (``E_total``, ``I_total``,
+        # ``H_total``, ``Funeral_total``, ``R_total``) covering all boxcars in
+        # ``define_parameters`` and accumulate the inflows in
+        # ``derivative()``. ``compute_jax_compartment_deltas`` then reports
+        # cumulative throughput (people who *passed through* a compartment)
+        # rather than final-day occupancy.
         return
 
     @classmethod
@@ -109,13 +113,41 @@ class EbolaJaxModel(Model):
                 infective=True,
             )
         schema.add_compartment(
-            "F", "Funeral",
+            "Funeral", "Funeral",
             "In funeral transmission stage (single timestep)",
             infective=True,
         )
         schema.add_compartment(
             "R", "Removed",
             "Removed from the dynamic system (recovered or safely buried)",
+        )
+
+        # Aggregate cumulative (``_total``) trackers, one per public
+        # compartment group. These accumulate inflows only (never
+        # decremented) so they record the total number of individuals who
+        # passed through each stage over the run. They are intentionally
+        # left out of COMPARTMENT_DELTA_GROUPING — the post-processor maps
+        # them to their group by the ``{group}_total`` naming convention
+        # and drops ``_total`` columns from the displayed time series.
+        schema.add_compartment(
+            "E_total", "Exposed Total",
+            "Cumulative number of individuals who entered the exposed stage",
+        )
+        schema.add_compartment(
+            "I_total", "Infectious Total",
+            "Cumulative number of individuals who became infectious",
+        )
+        schema.add_compartment(
+            "H_total", "Hospitalised Total",
+            "Cumulative number of hospital (ETU) admissions",
+        )
+        schema.add_compartment(
+            "Funeral_total", "Funeral Total",
+            "Cumulative number of individuals who entered the funeral-transmission stage",
+        )
+        schema.add_compartment(
+            "R_total", "Removed Total",
+            "Cumulative number of individuals removed (recovered or safely buried)",
         )
 
         # Transmission-edge rates exposed to the UI/uncertainty layer.
@@ -145,9 +177,9 @@ class EbolaJaxModel(Model):
             value_type=ValueType.DAYS,
         )
         schema.add_transmission_edge(
-            source="I1", target="F",
+            source="I1", target="Funeral",
             variable_name="gamma",
-            label="Infectious / Hospitalised Period (I->F, H->R)",
+            label="Infectious / Hospitalised Period (I->Funeral, H->R)",
             description=(
                 "Mean duration in the infectious community or hospitalised "
                 "compartment in days."
@@ -344,14 +376,14 @@ class EbolaJaxModel(Model):
         i_end = i_start + self.N_I_BOXCARS
         h_start = i_end
         h_end = h_start + self.N_H_BOXCARS
-        f_idx = h_end
+        funeral_idx = h_end
         r_idx = h_end + 1
 
         S = y[0]
         E = y[e_start:e_end]
         I = y[i_start:i_end]  # noqa: E741
         H = y[h_start:h_end]
-        F = y[f_idx]
+        Funeral = y[funeral_idx]
         R = y[r_idx]
 
         N = self._population_size
@@ -360,16 +392,16 @@ class EbolaJaxModel(Model):
         # _apply_interventions's travel handling is a no-op.
         I_total = I.sum(axis=0)
         H_total = H.sum(axis=0)
-        prop_inf_scalar = (I_total.sum() + H_total.sum() + F.sum()) / N.sum()
+        prop_inf_scalar = (I_total.sum() + H_total.sum() + Funeral.sum()) / N.sum()
         rates = {"beta": beta}
         rates, _ = self._apply_interventions(t, rates, prop_inf_scalar)
         beta = rates["beta"]
 
         # R model formula (per region):
-        #   λ(t) = β * (I + etu*H + funeral*F) / N
+        #   λ(t) = β * (I + etu*H + funeral*Funeral) / N
         #   p_exposure = 1 - exp(-λ)
         infectious_pressure = (
-            I_total + self.etu_risk * H_total + self.funeral_risk * F
+            I_total + self.etu_risk * H_total + self.funeral_risk * Funeral
         )
         current_rate = beta * infectious_pressure / N
         exposure_prob = 1.0 - jnp.exp(-jnp.maximum(current_rate, 0.0))
@@ -428,26 +460,46 @@ class EbolaJaxModel(Model):
         hosp_admit_padded = jnp.concatenate([zero_row, hosp_admit], axis=0)
         H_new = H_shifted + hosp_admit_padded
 
-        # F is single-timestep: F_new = old I[0] (slot exiting infectious).
-        F_new = I[0]
+        # Funeral is single-timestep: Funeral_new = old I[0] (slot exiting infectious).
+        Funeral_new = I[0]
 
-        # R accumulates exits from H (slot 0) and the previous F.
-        R_new = R + H[0] + F
+        # R accumulates exits from H (slot 0) and the previous Funeral.
+        R_new = R + H[0] + Funeral
 
         # S decreases by new exposures.
         S_new = S - new_exposed
 
+        # Cumulative (``_total``) trackers: accumulate this step's inflow
+        # into each stage (never decremented). These give throughput
+        # ("how many ever passed through") rather than occupancy.
+        d_E_total = new_exposed  # new S->E exposures
+        d_I_total = new_infectious  # E[0] exiting incubation into I
+        d_H_total = hosp_admit.sum(axis=0)  # all I->H admissions this step
+        d_Funeral_total = I[0]  # inflow into the funeral stage (== Funeral_new)
+        d_R_total = H[0] + Funeral  # H[0]->R recoveries plus Funeral->R safe burials
+
         # Return the per-step delta. Order must match self.compartment_list:
-        #   [S, E1..E_NE, I1..I_NI, H1..H_NH, F, R]
+        #   [S, E1..E_NE, I1..I_NI, H1..H_NH, Funeral, R,
+        #    E_total, I_total, H_total, Funeral_total, R_total]
         delta_S = (S_new - S)[None, :]
         delta_E = E_new - E
         delta_I = I_new - I
         delta_H = H_new - H
-        delta_F = (F_new - F)[None, :]
+        delta_Funeral = (Funeral_new - Funeral)[None, :]
         delta_R = (R_new - R)[None, :]
+        delta_E_total = d_E_total[None, :]
+        delta_I_total = d_I_total[None, :]
+        delta_H_total = d_H_total[None, :]
+        delta_Funeral_total = d_Funeral_total[None, :]
+        delta_R_total = d_R_total[None, :]
 
         return jnp.concatenate(
-            [delta_S, delta_E, delta_I, delta_H, delta_F, delta_R], axis=0,
+            [
+                delta_S, delta_E, delta_I, delta_H, delta_Funeral, delta_R,
+                delta_E_total, delta_I_total, delta_H_total,
+                delta_Funeral_total, delta_R_total,
+            ],
+            axis=0,
         )
 
 

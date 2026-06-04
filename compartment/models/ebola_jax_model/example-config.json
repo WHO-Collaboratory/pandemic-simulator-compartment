@@ -1,52 +1,51 @@
 {
-    "start_date": "2026-05-04",
-    "end_date": "2026-08-02",
+    "start_date": "2026-06-04",
+    "end_date": "2026-09-02",
     "Disease": {
         "disease_type": "EBOLA",
         "transmission_edges": [
-            { "source": "susceptible", "target": "E1", "data": { "transmission_rate": 0.125 } },
-            { "source": "E1", "target": "I1", "data": { "transmission_rate": 5.0 } },
-            { "source": "I1", "target": "F", "data": { "transmission_rate": 12.0 } }
+            {
+                "source": "susceptible",
+                "target": "E1",
+                "data": {
+                    "transmission_rate": 0.125
+                }
+            },
+            {
+                "source": "E1",
+                "target": "I1",
+                "data": {
+                    "transmission_rate": 5.0
+                }
+            },
+            {
+                "source": "I1",
+                "target": "Funeral",
+                "data": {
+                    "transmission_rate": 12.0
+                }
+            }
         ],
         "prop_community": 90.0,
         "etu_risk": 70.0,
         "funeral_risk": 50.0
-    },
-    "TransmissionEdges": {
-        "items": [
-            {
-                "transmission_edge": { "source": "susceptible", "target": "E1", "value_type": "RATE" },
-                "value": 0.125,
-                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "BETA", "min": 0, "max": 0 }] }
-            },
-            {
-                "transmission_edge": { "source": "E1", "target": "I1", "value_type": "DAYS" },
-                "value": 5.0,
-                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "SIGMA", "min": 0, "max": 0 }] }
-            },
-            {
-                "transmission_edge": { "source": "I1", "target": "F", "value_type": "DAYS" },
-                "value": 12.0,
-                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "GAMMA", "min": 0, "max": 0 }] }
-            }
-        ]
     },
     "admin_unit_id": "USA",
     "AdminUnit": {
         "id": "USA",
         "center_lat": 37.0902
     },
-    "Interventions": {
-        "items": [
-            {
-                "Intervention": { "name": "social_distancing", "display_name": "Social Distancing" },
-                "adherence_min": 50.0,
-                "transmission_percentage": 40.0,
-                "start_date": "2026-05-25",
-                "end_date": "2026-08-02"
-            }
-        ]
-    },
+    "interventions": [
+        {
+            "id": "social_distancing",
+            "adherence_min": 50.0,
+            "transmission_percentage": 40.0,
+            "start_date": null,
+            "end_date": null,
+            "start_threshold": null,
+            "end_threshold": null
+        }
+    ],
     "case_file": {
         "admin_zones": [
             {
