@@ -12,18 +12,20 @@ class BatchSimulationManager:
             yield iterable[i:i + n]
 
     def _single_run(self, model, params):
+        # Rebuild the model from an overridden config rather than mutating a
+        # constructed instance. Re-running __init__ re-derives every value
+        # declared via add_transmission_edge / add_disease_parameter /
+        # add_intervention, so uncertainty sampling covers params that the
+        # model bakes into derived constants (e.g. 1/latent_period) or into
+        # frozen Intervention objects.
         import copy
-        model_copy = copy.deepcopy(model)
-        # override rates attributes
-        for key, val in params.items():
-            parts = key.split(".")
-            if len(parts) == 1:
-                setattr(model_copy, key, val)
-            elif parts[0] == "intervention" and len(parts) == 3:
-                _, intervention_id, field_name = parts
-                model_copy.intervention_dict[intervention_id][field_name] = val
-            else:
-                raise ValueError(f"Invalid parameter key: {key}")
+
+        overridden = model.build_overridden_config(params)
+        if overridden is None:
+            # Non-reconstructable model: fall back to copying the instance.
+            model_copy = copy.deepcopy(model)
+        else:
+            model_copy = type(model)(overridden)
         return SimulationManager(model_copy).run_simulation()
 
     def run_batch(self, model, n_sims, param_list):

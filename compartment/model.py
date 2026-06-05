@@ -772,6 +772,84 @@ class Model(ABC):
 
         return result or None
 
+    def _source_config(self):
+        """Return the config object this model was constructed from.
+
+        Migrated models store it as ``self.config`` (set by
+        ``super().__init__``); some hand-written models (e.g. dengue) store
+        it as ``self.payload``.  Either can be re-fed to ``type(self)(...)``
+        to rebuild an equivalent model.
+        """
+        cfg = getattr(self, "config", None)
+        if cfg is None:
+            cfg = getattr(self, "payload", None)
+        return cfg
+
+    def build_overridden_config(self, params: dict[str, Any]):
+        """Deep-copy this model's source config and apply LHS uncertainty
+        overrides, returning the new config.
+
+        This is the basis for uncertainty sampling: instead of mutating a
+        constructed model (whose ``__init__`` may have already baked params
+        into derived constants like ``1/latent_period``), the runner rebuilds
+        the model from an overridden config so every value declared via
+        ``add_transmission_edge`` / ``add_disease_parameter`` /
+        ``add_intervention`` is re-derived from scratch.
+
+        Override keys are routed by kind, using the schema to disambiguate:
+
+        - ``"intervention.<id>.<field>"`` → ``intervention_dict[id][field]``
+          (values are fractions, matching ``create_intervention_dict``).
+        - a transmission-edge ``variable_name`` → ``transmission_dict[name]``
+          in **native units**, so ``_to_rate`` is applied on rebuild
+          (correct for RATE, DAYS, and PERCENTAGE edges alike).
+        - any other single-token key → the ``Disease`` dict (disease
+          parameters), again in native units.
+
+        Args:
+            params: ``{key: sampled_value}`` from ``generate_LHS_samples``.
+
+        Returns:
+            A deep-copied config object with overrides applied. Falls back to
+            returning the original config untouched if the model exposes no
+            source config (non-reconstructable model).
+        """
+        import copy
+
+        source = self._source_config()
+        if source is None:
+            return source
+
+        config = copy.deepcopy(source)
+        schema = type(self)._get_cached_schema()
+        edge_vars = (
+            {e.variable_name for e in schema.transmission_edges} if schema else set()
+        )
+
+        def _disease_dict():
+            # config.config is the validated config dict (holds "Disease");
+            # plain-dict configs hold "Disease" directly.
+            inner = getattr(config, "config", config)
+            return inner.setdefault("Disease", {})
+
+        for key, val in params.items():
+            parts = key.split(".")
+            if len(parts) == 3 and parts[0] == "intervention":
+                _, intervention_id, field_name = parts
+                config.intervention_dict.setdefault(intervention_id, {})[
+                    field_name
+                ] = val
+            elif len(parts) == 1:
+                name = parts[0]
+                if name in edge_vars:
+                    config.transmission_dict[name] = val
+                else:
+                    _disease_dict()[name] = val
+            else:
+                raise ValueError(f"Invalid uncertainty parameter key: {key}")
+
+        return config
+
     def get_params(self):
         """
         Return transmission parameters as a tuple in schema edge order.
