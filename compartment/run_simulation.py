@@ -165,6 +165,13 @@ def run_simulation(
     # Create a deepcopy for the interventionless model
     model_without = deepcopy(model_with)
     model_without.intervention_dict = {}
+    # Keep the control model's *source config* interventionless too: uncertainty
+    # rebuilds (Model.build_overridden_config) reconstruct from the source
+    # config, so a non-empty intervention_dict there would silently re-add
+    # interventions to the control batch.
+    _control_cfg = model_without._source_config()
+    if _control_cfg is not None and hasattr(_control_cfg, "intervention_dict"):
+        _control_cfg.intervention_dict = {}
 
     # Split cpu in half for top level workers
     # Then split the remaining cpu in half for low level workers
