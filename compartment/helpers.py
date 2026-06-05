@@ -808,6 +808,83 @@ def build_uncertainty_params(transmission_edge_items: list, intervention_items: 
     return uncertainty_params
 
 
+def _section_items(section):
+    """Return the .items list from a config section that may be either a dict
+    or a Pydantic model (or None)."""
+    if not section:
+        return []
+    if isinstance(section, dict):
+        return section.get("items", [])
+    return getattr(section, "items", [])
+
+
+def extract_disease_variance_params(disease_section):
+    """Normalize disease-parameter variance configs from a local config's
+    Disease section into the {param, dist, min, max} shape used for LHS.
+
+    Mirrors the cloud path (gql.get_simulation_job), which derives the same
+    shape from SimulationJobCustomField FieldConfig records. Local configs
+    instead declare variance inline as Disease.variance_params[].
+
+    Args:
+        disease_section: the Disease dict from a loaded local config.
+    """
+    if not disease_section:
+        return []
+    return [
+        {
+            "param": vp["param"],
+            "dist": vp.get("dist", "uniform"),
+            "min": vp["min"],
+            "max": vp["max"],
+        }
+        for vp in disease_section.get("variance_params", [])
+    ]
+
+
+def collect_uncertainty_params(cleaned_config, disease_param_field_configs=None):
+    """Gather every variance/uncertainty parameter for a validated config into
+    a single flat list suitable for generate_LHS_samples.
+
+    Sources, all merged:
+      - TransmissionEdges.items[].FieldConfigs with has_variance
+      - Interventions.items[].FieldConfigs with has_variance
+      - disease_param_field_configs (disease custom fields, already normalized
+        by extract_disease_variance_params for local or gql for cloud)
+
+    Args:
+        cleaned_config: the validated Pydantic config.
+        disease_param_field_configs: pre-extracted disease variance configs.
+    """
+    transmission_edge_items = _section_items(
+        getattr(cleaned_config, "TransmissionEdges", None)
+    )
+    intervention_items = _section_items(
+        getattr(cleaned_config, "Interventions", None)
+    )
+
+    params = build_uncertainty_params(
+        as_dict_list(transmission_edge_items),
+        as_dict_list(intervention_items),
+    )
+    if disease_param_field_configs:
+        params.extend(disease_param_field_configs)
+    return params
+
+
+def resolve_run_mode(configured_run_mode, uncertainty_params):
+    """Promote run_mode to UNCERTAINTY whenever any variance parameter is
+    present, regardless of the configured mode. Otherwise leave it unchanged.
+
+    This makes variance the single source of truth for run behaviour: declaring
+    variance on any transmission edge, intervention, or disease parameter (in
+    either local or cloud mode) is enough to trigger an uncertainty run.
+    """
+    if uncertainty_params and configured_run_mode == "DETERMINISTIC":
+        return "UNCERTAINTY"
+    return configured_run_mode
+
+
 def extract_admin_units(case_file):
     return [case["name"] for case in case_file]
 

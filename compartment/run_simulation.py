@@ -12,10 +12,11 @@ from compartment.batch_simulation_manager import BatchSimulationManager
 from compartment.helpers import (
     get_executor_class,
     generate_LHS_samples,
-    build_uncertainty_params,
+    collect_uncertainty_params,
+    extract_disease_variance_params,
+    resolve_run_mode,
     load_config_from_json,
     write_results_to_local,
-    as_dict_list,
 )
 from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.cloud_helpers.gql import (
@@ -70,6 +71,8 @@ def run_simulation(
         simulation_job_id = config["data"]["getSimulationJob"].get(
             "id", "local-simulation"
         )
+        disease_section = config["data"]["getSimulationJob"].get("Disease", {})
+        disease_param_field_configs = extract_disease_variance_params(disease_section)
         owner = "local-user"
     elif mode == "cloud":
         logger.info("Running in CLOUD mode")
@@ -144,7 +147,17 @@ def run_simulation(
         logger.error(f"model_class must be a subclass of Model, got {model_class}")
         raise ValueError(f"model_class must be a subclass of Model, got {model_class}")
 
-    run_mode = cleaned_config.run_mode
+    # Gather variance from every source (edges, interventions, disease params)
+    # and let its presence decide run_mode — works the same in local and cloud.
+    uncertainty_params = collect_uncertainty_params(
+        cleaned_config, disease_param_field_configs
+    )
+    run_mode = resolve_run_mode(cleaned_config.run_mode, uncertainty_params)
+    if run_mode != cleaned_config.run_mode:
+        logger.info(
+            f"Detected {len(uncertainty_params)} variance param(s) — "
+            f"promoting run_mode {cleaned_config.run_mode} -> {run_mode}"
+        )
     logger.info(f"run_mode: {run_mode}")
 
     # Create business as usual model
@@ -169,43 +182,6 @@ def run_simulation(
     else:
         n_sims = getattr(cleaned_config, "n_simulations", None) or 30
         ci = 0.95
-
-        # Extract normalized TransmissionEdges and Interventions for uncertainty
-        transmission_edge_items = []
-        interventions_items = []
-
-        transmission_edges_section = getattr(cleaned_config, "TransmissionEdges", None)
-        if transmission_edges_section:
-            if isinstance(transmission_edges_section, dict):
-                transmission_edge_items = transmission_edges_section.get("items", [])
-            else:
-                transmission_edge_items = getattr(
-                    transmission_edges_section, "items", []
-                )
-
-        interventions_section = getattr(cleaned_config, "Interventions", None)
-        if interventions_section:
-            if isinstance(interventions_section, dict):
-                interventions_items = interventions_section.get("items", [])
-            else:
-                interventions_items = getattr(interventions_section, "items", [])
-
-        # Convert to dicts if they're Pydantic models
-        transmission_edge_dicts = as_dict_list(transmission_edge_items)
-        intervention_dicts = as_dict_list(interventions_items)
-
-        uncertainty_params = build_uncertainty_params(
-            transmission_edge_dicts, intervention_dicts
-        )
-
-        # Append disease parameter custom field variance configs (if any).
-        # These were collected by get_simulation_job() from FieldConfig
-        # records on SimulationJobCustomField entries.
-        if disease_param_field_configs:
-            uncertainty_params.extend(disease_param_field_configs)
-            logger.info(
-                f"Added {len(disease_param_field_configs)} disease parameter variance config(s) to uncertainty params"
-            )
 
         logger.info(f"Number of simulations: {n_sims}")
         logger.info(f"Confidence interval: {ci}")
