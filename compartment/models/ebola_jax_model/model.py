@@ -227,6 +227,14 @@ class EbolaJaxModel(Model):
             transmission_reduction=40.0,
         )
 
+        schema.set_travel_volume(
+            leaving_default=0.05,
+            leaving_description=(
+                "Fraction of each zone's population traveling to other zones per day. "
+                "Drives the gravity-model travel matrix used in spatial FOI mixing."
+            ),
+        )
+
     # ------------------------------------------------------------------
     # Initial population
     # ------------------------------------------------------------------
@@ -260,8 +268,14 @@ class EbolaJaxModel(Model):
     def __init__(self, config):
         super().__init__(config)
 
-        n_regions = self.population_matrix.shape[1]
-        self.travel_matrix = jnp.eye(n_regions)
+        # Use the gravity-model travel matrix built by the post-processor.
+        # Falls back to identity (no spatial coupling) if travel_volume is absent.
+        raw_tm = config.get("travel_matrix")
+        if raw_tm is not None:
+            self.travel_matrix = jnp.array(onp.array(raw_tm))
+        else:
+            n_regions = self.population_matrix.shape[1]
+            self.travel_matrix = jnp.eye(n_regions)
 
         if self.beta is None:
             self.beta = 0.125
@@ -327,13 +341,14 @@ class EbolaJaxModel(Model):
         rates, _ = self._apply_interventions(t, rates, prop_inf_scalar)
         beta = rates["beta"]
 
-        # R model FOI formula: β * (I + etu*H + funeral*Funeral) / N
-        infectious_pressure = (
-            (I1 + I2)
-            + self.etu_risk * (H1 + H2)
-            + self.funeral_risk * Funeral
-        )
-        current_rate = beta * infectious_pressure / N
+        # R model FOI formula with gravity-model spatial mixing.
+        # Compute effective infectious fraction per zone, then mix across zones
+        # via the travel matrix so susceptibles in zone i are exposed to the
+        # weighted-average infectious pressure from all zones they visit.
+        I_eff = (I1 + I2) + self.etu_risk * (H1 + H2) + self.funeral_risk * Funeral
+        I_frac = I_eff / N                         # shape (R,)
+        mixed_frac = self.travel_matrix @ I_frac   # shape (R,)
+        current_rate = beta * mixed_frac
         p_exposure = 1.0 - jnp.exp(-jnp.maximum(current_rate, 0.0))
         p_exposure = jnp.clip(p_exposure, 0.0, 1.0)
 

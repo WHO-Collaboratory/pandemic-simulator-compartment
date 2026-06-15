@@ -1,6 +1,6 @@
 {
     "start_date": "2026-06-15",
-    "end_date": "2026-09-13",
+    "end_date": "2027-06-15",
     "Disease": {
         "disease_type": "EBOLA",
         "prop_community": 90.0,
@@ -26,14 +26,28 @@
             }
         ]
     },
+    "travel_volume": { "leaving": 0.05 },
     "admin_zones": [
         {
-            "name": "Example Zone",
-            "center_lat": 40.7128,
-            "center_lon": -74.006,
-            "population": 1000000,
-            "infected_population": 0.01
+            "name": "Guinea (Conakry)",
+            "center_lat": 9.9456,
+            "center_lon": -11.1872,
+            "population": 1800000,
+            "infected_population": 0.05
+        },
+        {
+            "name": "Sierra Leone (Freetown)",
+            "center_lat": 8.4657,
+            "center_lon": -13.2317,
+            "population": 1200000,
+            "infected_population": 0.0
+        },
+        {
+            "name": "Liberia (Monrovia)",
+            "center_lat": 6.2907,
+            "center_lon": -10.7605,
+            "population": 1500000,
+            "infected_population": 0.0
         }
-    ],
-    "demographics": { "age_0_17": 25.0, "age_18_55": 50.0, "age_56_plus": 25.0 }
+    ]
 }
