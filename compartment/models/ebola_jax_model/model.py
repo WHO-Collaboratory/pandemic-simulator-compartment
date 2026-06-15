@@ -3,9 +3,17 @@
 Port of ``model_ebola()`` from epiverse-trace/epidemics
 (https://github.com/epiverse-trace/epidemics/blob/main/R/model_ebola.R),
 based on the consensus compartment structure of Li et al. (2019) and the
-Erlang boxcar passage-time formulation of Getz & Dougherty (2018).
+Erlang passage-time formulation of Getz & Dougherty (2018).
 
-Compartments: S, E (k_E boxcars), I (k_I boxcars), H (k_H boxcars), Funeral, R.
+The original large-boxcar Erlang implementation is replaced here by the
+standard **linear chain trick**: each Erlang(k=2, λ) period is represented
+as two sequential sub-compartments each draining at rate λ per step. This
+produces the same Erlang(2) sojourn time distribution as the boxcar model
+with a fraction of the state — O(k) = 2 compartments per stage instead of
+O(k * mean_period) boxcars, reducing ~133 compartments to 14 and making
+uncertainty runs practical.
+
+Compartments: S, E1/E2, I1/I2, H1/H2, Funeral, R.
 Output is rolled up to the six public compartments via
 ``COMPARTMENT_DELTA_GROUPING``.
 
@@ -14,7 +22,6 @@ intended for local experimentation; it is not yet supported by the
 pandemic simulator app.
 """
 
-import math
 import time as _time
 import logging
 
@@ -30,35 +37,17 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-# Boxcar counts. Sized to capture > 99% of the discrete Erlang density
-# at the schema default rates and enough headroom for the declared
-# uncertainty bounds (incubation 3-10 days, infectious 7-20 days, k=2).
-_N_E_BOXCARS = 25
-_N_I_BOXCARS = 50
-_N_H_BOXCARS = 50  # R model uses one rate for both I and H, so equal sizes
-
-
 class EbolaJaxModel(Model):
-    """Discrete-time, stochastic Ebola model with Erlang passage times."""
+    """Discrete-time stochastic Ebola model with Erlang(2) linear chain."""
 
-    # Use the framework's fixed-step Euler integrator; ``derivative()``
-    # returns the per-timestep change rather than an instantaneous rate.
     STOCHASTIC = True
-
-    # Erlang shape (k). The R model forbids varying this at runtime
-    # because it changes the compartment count, so it is fixed here.
     ERLANG_K = 2
 
-    N_E_BOXCARS = _N_E_BOXCARS
-    N_I_BOXCARS = _N_I_BOXCARS
-    N_H_BOXCARS = _N_H_BOXCARS
-
-    # Roll boxcars up to the six public compartments for output.
     COMPARTMENT_DELTA_GROUPING = {
         "S": ["S"],
-        "E": [f"E{i}" for i in range(1, _N_E_BOXCARS + 1)],
-        "I": [f"I{i}" for i in range(1, _N_I_BOXCARS + 1)],
-        "H": [f"H{i}" for i in range(1, _N_H_BOXCARS + 1)],
+        "E": ["E1", "E2"],
+        "I": ["I1", "I2"],
+        "H": ["H1", "H2"],
         "Funeral": ["Funeral"],
         "R": ["R"],
     }
@@ -69,15 +58,8 @@ class EbolaJaxModel(Model):
 
     @classmethod
     def _add_total_compartments(cls, schema):
-        # Suppress framework auto-generation of per-edge ``_total``
-        # compartments. The per-edge boxcar slots aren't meaningful
-        # aggregation targets, so (like dengue) we declare our own
-        # aggregate cumulative compartments (``E_total``, ``I_total``,
-        # ``H_total``, ``Funeral_total``, ``R_total``) covering all boxcars in
-        # ``define_parameters`` and accumulate the inflows in
-        # ``derivative()``. ``compute_jax_compartment_deltas`` then reports
-        # cumulative throughput (people who *passed through* a compartment)
-        # rather than final-day occupancy.
+        # Suppress framework auto-generation; we declare our own aggregate
+        # cumulative compartments below in define_parameters().
         return
 
     @classmethod
@@ -87,31 +69,40 @@ class EbolaJaxModel(Model):
             label="Ebola Virus Disease",
             description=(
                 "Discrete-time stochastic SEIR model with hospitalisation "
-                "and funeral transmission, with Erlang passage times "
-                "(Li et al. 2019, Getz & Dougherty 2018)."
+                "and funeral transmission, Erlang(2) passage times via "
+                "linear chain (Li et al. 2019, Getz & Dougherty 2018)."
             ),
         )
 
         schema.add_compartment(
             "S", "Susceptible", "Population susceptible to Ebola infection",
         )
-        for i in range(1, cls.N_E_BOXCARS + 1):
-            schema.add_compartment(
-                f"E{i}", f"Exposed boxcar {i}",
-                f"Exposed individuals with {i} timesteps until becoming infectious",
-            )
-        for i in range(1, cls.N_I_BOXCARS + 1):
-            schema.add_compartment(
-                f"I{i}", f"Infectious boxcar {i}",
-                f"Infectious in community with {i} timesteps until removal",
-                infective=True,
-            )
-        for i in range(1, cls.N_H_BOXCARS + 1):
-            schema.add_compartment(
-                f"H{i}", f"Hospitalised boxcar {i}",
-                f"Hospitalised with {i} timesteps until removal",
-                infective=True,
-            )
+        schema.add_compartment(
+            "E1", "Exposed stage 1", "First Erlang(2) exposed sub-stage",
+        )
+        schema.add_compartment(
+            "E2", "Exposed stage 2", "Second Erlang(2) exposed sub-stage",
+        )
+        schema.add_compartment(
+            "I1", "Infectious stage 1",
+            "First Erlang(2) community-infectious sub-stage",
+            infective=True,
+        )
+        schema.add_compartment(
+            "I2", "Infectious stage 2",
+            "Second Erlang(2) community-infectious sub-stage",
+            infective=True,
+        )
+        schema.add_compartment(
+            "H1", "Hospitalised stage 1",
+            "First Erlang(2) hospitalised sub-stage",
+            infective=True,
+        )
+        schema.add_compartment(
+            "H2", "Hospitalised stage 2",
+            "Second Erlang(2) hospitalised sub-stage",
+            infective=True,
+        )
         schema.add_compartment(
             "Funeral", "Funeral",
             "In funeral transmission stage (single timestep)",
@@ -122,13 +113,8 @@ class EbolaJaxModel(Model):
             "Removed from the dynamic system (recovered or safely buried)",
         )
 
-        # Aggregate cumulative (``_total``) trackers, one per public
-        # compartment group. These accumulate inflows only (never
-        # decremented) so they record the total number of individuals who
-        # passed through each stage over the run. They are intentionally
-        # left out of COMPARTMENT_DELTA_GROUPING — the post-processor maps
-        # them to their group by the ``{group}_total`` naming convention
-        # and drops ``_total`` columns from the displayed time series.
+        # Aggregate cumulative trackers — accumulate inflows only so they
+        # record total throughput rather than occupancy.
         schema.add_compartment(
             "E_total", "Exposed Total",
             "Cumulative number of individuals who entered the exposed stage",
@@ -150,8 +136,6 @@ class EbolaJaxModel(Model):
             "Cumulative number of individuals removed (recovered or safely buried)",
         )
 
-        # Transmission-edge rates exposed to the UI/uncertainty layer.
-        # The actual flow math is computed manually in ``derivative()``.
         schema.add_transmission_edge(
             source="susceptible", target="E1",
             variable_name="beta",
@@ -191,7 +175,6 @@ class EbolaJaxModel(Model):
             value_type=ValueType.DAYS,
         )
 
-        # Disease-specific scalars.
         schema.add_disease_parameter(
             name="prop_community",
             label="Proportion in Community",
@@ -250,12 +233,11 @@ class EbolaJaxModel(Model):
 
     @classmethod
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
-        """Distribute each zone's population across S and the I boxcars.
+        """Distribute each zone's population across S and I1/I2 (50/50 split).
 
-        ``infected_population`` percentage is spread uniformly across the
-        ``I1..I_NI`` boxcars. The exact slot distribution stabilises within
-        a few simulated days as the boxcars relax to the steady-state
-        Erlang shape, so a uniform initial seed is acceptable.
+        The 50/50 I1/I2 split approximates steady-state Erlang(2) seeding;
+        the chain relaxes to the correct distribution within a few simulated
+        days regardless of the initial split.
         """
         col = {v: i for i, v in enumerate(compartment_list)}
         pop = onp.zeros((len(admin_zones), len(compartment_list)))
@@ -266,9 +248,8 @@ class EbolaJaxModel(Model):
             inf_pct = max(inf_pct, 0.0)
             infected = N * inf_pct / 100.0
             pop[z, col["S"]] = max(N - infected, 0.0)
-            per_box = infected / max(cls.N_I_BOXCARS, 1)
-            for i in range(1, cls.N_I_BOXCARS + 1):
-                pop[z, col[f"I{i}"]] = per_box
+            pop[z, col["I1"]] = infected * 0.5
+            pop[z, col["I2"]] = infected * 0.5
 
         return pop
 
@@ -277,53 +258,32 @@ class EbolaJaxModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, config):
-        # Wire up the common state (population_matrix, schema rate attrs,
-        # intervention runtime objects, etc.).
         super().__init__(config)
 
         n_regions = self.population_matrix.shape[1]
-        # No spatial coupling — each admin zone evolves independently.
         self.travel_matrix = jnp.eye(n_regions)
 
-        # ``_load_transmission_params`` converts DAYS edges via
-        # ``_to_rate(days) = 1/days``. So self.sigma and self.gamma are
-        # per-day rates (1 / mean period). The Erlang rate λ = k * (1/period)
-        # gives mean stay = period in the Getz & Dougherty formulation.
         if self.beta is None:
             self.beta = 0.125
         sigma_per_day = self.sigma if self.sigma is not None else 1.0 / 5.0
         gamma_per_day = self.gamma if self.gamma is not None else 1.0 / 12.0
-        self._erlang_lambda_E = self.ERLANG_K * sigma_per_day
-        self._erlang_lambda_I = self.ERLANG_K * gamma_per_day
 
-        # Disease-specific scalars (already validated by schema; defaults
-        # mirror the R model).
+        # Erlang(k=2) per-step transition probabilities.
+        # λ = k * (1/mean_period); p = 1 - exp(-λ * dt) with dt = 1 day.
+        self._p_E = float(1.0 - onp.exp(-self.ERLANG_K * sigma_per_day))
+        self._p_I = float(1.0 - onp.exp(-self.ERLANG_K * gamma_per_day))
+
         disease_cfg = config.get("Disease", {}) or {}
         self.prop_community = float(disease_cfg.get("prop_community", 90.0)) / 100.0
         self.etu_risk = float(disease_cfg.get("etu_risk", 70.0)) / 100.0
         self.funeral_risk = float(disease_cfg.get("funeral_risk", 50.0)) / 100.0
 
-        # Pre-compute the discrete Erlang weights once per run.
-        self._exposed_weights = jnp.array(
-            _discrete_erlang_density(
-                self.ERLANG_K, self._erlang_lambda_E, self.N_E_BOXCARS,
-            )
-        )
-        self._infectious_weights = jnp.array(
-            _discrete_erlang_density(
-                self.ERLANG_K, self._erlang_lambda_I, self.N_I_BOXCARS,
-            )
-        )
-
-        # PRNG seed — config seed for reproducibility, otherwise wall clock.
         seed = config.get("seed")
         if seed is None:
             seed = int(_time.time() * 1000) % (2**31)
         self._key = jax.random.PRNGKey(int(seed))
 
-        # Population_size used as the FOI denominator. R model uses
-        # ``sum(initial_state)`` — fixed throughout the run since this is
-        # a closed population.
+        # Fixed-population denominator for FOI (R model uses initial sum).
         self._population_size = jnp.sum(self.population_matrix, axis=0) + 1e-10
 
     # ------------------------------------------------------------------
@@ -331,25 +291,6 @@ class EbolaJaxModel(Model):
     # ------------------------------------------------------------------
 
     def prepare_initial_state(self):
-        # population_matrix is already (K, R) from super().__init__.
-        # Distribute initial E/I across boxcars per the discrete Erlang
-        # density, mimicking the R model's rmultinom seeding.
-        pm = onp.array(self.population_matrix)
-        e_w = onp.array(self._exposed_weights)
-        i_w = onp.array(self._infectious_weights)
-
-        s_idx = self.compartment_list.index("S")  # noqa: F841 (sanity)
-        e_start = self.compartment_list.index("E1")
-        i_start = self.compartment_list.index("I1")
-
-        # Collapse per-region E and I totals, then redistribute by weights.
-        e_total = pm[e_start : e_start + self.N_E_BOXCARS].sum(axis=0)
-        i_total = pm[i_start : i_start + self.N_I_BOXCARS].sum(axis=0)
-
-        pm[e_start : e_start + self.N_E_BOXCARS] = e_w[:, None] * e_total[None, :]
-        pm[i_start : i_start + self.N_I_BOXCARS] = i_w[:, None] * i_total[None, :]
-
-        self.population_matrix = jnp.array(pm)
         return self.population_matrix, list(self.compartment_list)
 
     # ------------------------------------------------------------------
@@ -357,225 +298,108 @@ class EbolaJaxModel(Model):
     # ------------------------------------------------------------------
 
     def derivative(self, y, t, p):
-        """Per-timestep change for the discrete stochastic model.
+        """Per-timestep change for the discrete stochastic Erlang(2) chain model.
 
         With ``STOCHASTIC = True`` the framework uses Euler integration:
-        ``y_{t+1} = y_t + 1 * derivative(y_t, t, p)``. So we return the
-        full discrete-step change here, not an instantaneous rate.
+        ``y_{t+1} = y_t + 1 * derivative(y_t, t, p)``.
         """
         params = self._unpack_params(p)
-        # ``params`` has the schema-converted per-day rates: beta (rate),
-        # sigma (1/days), gamma (1/days). The Erlang rates λ_E, λ_I are
-        # already cached on self.
         beta = params["beta"]
 
-        # Slice the state vector by compartment groups.
-        e_start = 1
-        e_end = e_start + self.N_E_BOXCARS
-        i_start = e_end
-        i_end = i_start + self.N_I_BOXCARS
-        h_start = i_end
-        h_end = h_start + self.N_H_BOXCARS
-        funeral_idx = h_end
-        r_idx = h_end + 1
-
-        S = y[0]
-        E = y[e_start:e_end]
-        I = y[i_start:i_end]  # noqa: E741
-        H = y[h_start:h_end]
-        Funeral = y[funeral_idx]
-        R = y[r_idx]
+        # Unpack state; each is shape (R,) for R regions.
+        # Order matches define_parameters() compartment declaration order.
+        S       = y[0]
+        E1      = y[1]
+        E2      = y[2]
+        I1      = y[3]
+        I2      = y[4]
+        H1      = y[5]
+        H2      = y[6]
+        Funeral = y[7]
+        R       = y[8]  # noqa: F841
+        # y[9..13] are _total trackers; read-only here, accumulated below.
 
         N = self._population_size
 
-        # Schema-driven interventions on β. Travel matrix is identity so
-        # _apply_interventions's travel handling is a no-op.
-        I_total = I.sum(axis=0)
-        H_total = H.sum(axis=0)
-        prop_inf_scalar = (I_total.sum() + H_total.sum() + Funeral.sum()) / N.sum()
+        # Schema-driven interventions on β.
+        prop_inf_scalar = (I1 + I2 + H1 + H2 + Funeral).sum() / N.sum()
         rates = {"beta": beta}
         rates, _ = self._apply_interventions(t, rates, prop_inf_scalar)
         beta = rates["beta"]
 
-        # R model formula (per region):
-        #   λ(t) = β * (I + etu*H + funeral*Funeral) / N
-        #   p_exposure = 1 - exp(-λ)
+        # R model FOI formula: β * (I + etu*H + funeral*Funeral) / N
         infectious_pressure = (
-            I_total + self.etu_risk * H_total + self.funeral_risk * Funeral
+            (I1 + I2)
+            + self.etu_risk * (H1 + H2)
+            + self.funeral_risk * Funeral
         )
         current_rate = beta * infectious_pressure / N
-        exposure_prob = 1.0 - jnp.exp(-jnp.maximum(current_rate, 0.0))
-        exposure_prob = jnp.clip(exposure_prob, 0.0, 1.0)
+        p_exposure = 1.0 - jnp.exp(-jnp.maximum(current_rate, 0.0))
+        p_exposure = jnp.clip(p_exposure, 0.0, 1.0)
 
-        # Split keys for each random draw in this step.
-        keys = jax.random.split(self._key, 4)
+        p_E = jnp.float32(self._p_E)
+        p_I = jnp.float32(self._p_I)
+        p_comm = jnp.float32(self.prop_community)
+
+        # One PRNG key per binomial draw.
+        keys = jax.random.split(self._key, 9)
         self._key = keys[0]
-        key_new_exposed = keys[1]
-        key_exposed_split = keys[2]
-        key_infectious_split = keys[3]
 
-        # 1. New exposures per region.
-        new_exposed = jax.random.binomial(
-            key_new_exposed, jnp.maximum(S, 0.0), exposure_prob,
-        ).astype(S.dtype)
-        new_exposed = jnp.minimum(new_exposed, jnp.maximum(S, 0.0))
+        def _binom(key, n, p):
+            n = jnp.maximum(n, 0.0)
+            draw = jax.random.binomial(key, n, p).astype(n.dtype)
+            return jnp.minimum(draw, n)
 
-        # 2. Distribute new exposures across the E boxcars (multinomial
-        #    per region). Output shape: (N_E, R).
-        new_exposed_dist = _multinomial_per_region(
-            key_exposed_split, new_exposed, self._exposed_weights,
-        )
+        # S → E1
+        new_exposed = _binom(keys[1], S, p_exposure)
 
-        # 3. Hospitalisation: a fraction of every I boxcar above slot 0
-        #    moves into H at the same remaining-stay-time slot.
-        hosp_admit = jnp.round(I[1:] * (1.0 - self.prop_community))
-        hosp_admit = jnp.maximum(hosp_admit, 0.0)
-        # Don't take more than what's in each I slot.
-        hosp_admit = jnp.minimum(hosp_admit, jnp.maximum(I[1:], 0.0))
+        # E1 → E2
+        E1_exit = _binom(keys[2], E1, p_E)
 
-        # 4. New infectious are those exiting slot 0 of the E boxcars.
-        new_infectious = E[0]
-        new_infectious_dist = _multinomial_per_region(
-            key_infectious_split, new_infectious, self._infectious_weights,
-        )
+        # E2 → new infectious, routed to I1 (community) or H1 (hospital)
+        E2_exit = _binom(keys[3], E2, p_E)
+        E2_community = _binom(keys[4], E2_exit, p_comm)
+        E2_hosp = E2_exit - E2_community
 
-        # 5. Boxcar advancement.
-        zero_row = jnp.zeros((1, E.shape[1]), dtype=E.dtype)
+        # I1 → I2
+        I1_exit = _binom(keys[5], I1, p_I)
 
-        # E_new = shift(E left by 1) + new_exposed_dist
-        E_shifted = jnp.concatenate([E[1:], zero_row], axis=0)
-        E_new = E_shifted + new_exposed_dist
+        # I2 → Funeral (single-timestep stage)
+        I2_exit = _binom(keys[6], I2, p_I)
 
-        # I_new = shift(I left by 1) - hosp_admit (in slots 0..NI-2)
-        #         + new_infectious_dist
-        I_shifted_minus_hosp = jnp.concatenate(
-            [I[1:] - hosp_admit, zero_row], axis=0,
-        )
-        I_new = I_shifted_minus_hosp + new_infectious_dist
+        # H1 → H2  (same rate γ as I; Getz & Dougherty use one rate for both)
+        H1_exit = _binom(keys[7], H1, p_I)
 
-        # H_new = shift(H left by 1) + hospitalisations padded with a
-        # leading zero (admissions go to slots 1..NH-1, matching the
-        # remaining-stay-time of the I slot they came from).
-        H_shifted = jnp.concatenate([H[1:], zero_row], axis=0)
-        hosp_admit_padded = jnp.concatenate([zero_row, hosp_admit], axis=0)
-        H_new = H_shifted + hosp_admit_padded
+        # H2 → R
+        H2_exit = _binom(keys[8], H2, p_I)
 
-        # Funeral is single-timestep: Funeral_new = old I[0] (slot exiting infectious).
-        Funeral_new = I[0]
+        delta_S       = -new_exposed
+        delta_E1      = new_exposed - E1_exit
+        delta_E2      = E1_exit - E2_exit
+        delta_I1      = E2_community - I1_exit
+        delta_I2      = I1_exit - I2_exit
+        delta_H1      = E2_hosp - H1_exit
+        delta_H2      = H1_exit - H2_exit
+        # Funeral holds people exactly one step: receives I2_exit, clears to R.
+        delta_Funeral = I2_exit - Funeral
+        delta_R       = H2_exit + Funeral
 
-        # R accumulates exits from H (slot 0) and the previous Funeral.
-        R_new = R + H[0] + Funeral
+        # Cumulative inflow trackers (never decremented).
+        delta_E_total       = new_exposed       # S → E1
+        delta_I_total       = E2_exit           # all new infectious (community + hospital)
+        delta_H_total       = E2_hosp           # E2 → H1 admissions
+        delta_Funeral_total = I2_exit           # I2 → Funeral inflow
+        delta_R_total       = H2_exit + Funeral # H2 → R and Funeral → R
 
-        # S decreases by new exposures.
-        S_new = S - new_exposed
-
-        # Cumulative (``_total``) trackers: accumulate this step's inflow
-        # into each stage (never decremented). These give throughput
-        # ("how many ever passed through") rather than occupancy.
-        d_E_total = new_exposed  # new S->E exposures
-        d_I_total = new_infectious  # E[0] exiting incubation into I
-        d_H_total = hosp_admit.sum(axis=0)  # all I->H admissions this step
-        d_Funeral_total = I[0]  # inflow into the funeral stage (== Funeral_new)
-        d_R_total = H[0] + Funeral  # H[0]->R recoveries plus Funeral->R safe burials
-
-        # Return the per-step delta. Order must match self.compartment_list:
-        #   [S, E1..E_NE, I1..I_NI, H1..H_NH, Funeral, R,
-        #    E_total, I_total, H_total, Funeral_total, R_total]
-        delta_S = (S_new - S)[None, :]
-        delta_E = E_new - E
-        delta_I = I_new - I
-        delta_H = H_new - H
-        delta_Funeral = (Funeral_new - Funeral)[None, :]
-        delta_R = (R_new - R)[None, :]
-        delta_E_total = d_E_total[None, :]
-        delta_I_total = d_I_total[None, :]
-        delta_H_total = d_H_total[None, :]
-        delta_Funeral_total = d_Funeral_total[None, :]
-        delta_R_total = d_R_total[None, :]
-
-        return jnp.concatenate(
+        return jnp.stack(
             [
-                delta_S, delta_E, delta_I, delta_H, delta_Funeral, delta_R,
+                delta_S,
+                delta_E1, delta_E2,
+                delta_I1, delta_I2,
+                delta_H1, delta_H2,
+                delta_Funeral, delta_R,
                 delta_E_total, delta_I_total, delta_H_total,
                 delta_Funeral_total, delta_R_total,
             ],
             axis=0,
         )
-
-
-# ----------------------------------------------------------------------
-# Module-level helpers
-# ----------------------------------------------------------------------
-
-
-def _discrete_erlang_density(shape, rate, n_bins):
-    """Discrete Erlang(shape, rate) probability vector of length ``n_bins``.
-
-    Direct port of ``prob_discrete_erlang`` from the R source. Returns the
-    probability mass for waiting times T = 1, 2, ..., n_bins, renormalised
-    so the truncated density sums to 1. ``rate`` is the Erlang rate λ;
-    mean waiting time is shape/λ.
-    """
-    if rate <= 0 or n_bins <= 0:
-        # Degenerate case: put all mass in the last slot so individuals
-        # exit only after the maximum delay (better than NaN).
-        v = onp.zeros(max(n_bins, 1))
-        v[-1] = 1.0
-        return v
-
-    factorials = onp.array(
-        [math.factorial(j) for j in range(shape + 1)], dtype=float,
-    )
-    # one_minus_cum[n] = 1 - P(T <= n) for n = 0..n_bins
-    one_minus_cum = onp.zeros(n_bins + 1)
-    one_minus_cum[0] = 1.0
-    for n_bin in range(1, n_bins + 1):
-        j = onp.arange(shape)
-        terms = (
-            onp.exp(-n_bin * rate)
-            * (n_bin * rate) ** j
-            / factorials[:shape]
-        )
-        one_minus_cum[n_bin] = terms.sum()
-
-    density = one_minus_cum[:-1] - one_minus_cum[1:]
-    s = density.sum()
-    if s <= 0:
-        density = onp.full(n_bins, 1.0 / n_bins)
-    else:
-        density = density / s
-    return density
-
-
-def _multinomial_per_region(key, total, probs):
-    """Sample Multinomial(total, probs) independently per region.
-
-    Implemented as a sequential cascade of binomials, which avoids the
-    fixed ``n_max`` requirement of ``jax.random.multinomial`` and keeps
-    the operation differentiable in shape.
-
-    Args:
-        key: PRNG key.
-        total: array of shape ``(R,)`` — number of trials per region.
-        probs: array of shape ``(K,)`` — multinomial probabilities.
-
-    Returns:
-        array of shape ``(K, R)`` with ``sum_K == total`` per region.
-    """
-    K = probs.shape[0]
-    keys = jax.random.split(key, K)
-    counts = []
-    remaining = jnp.maximum(total, 0.0).astype(jnp.float32)
-    cum_p = jnp.float32(0.0)
-    for i in range(K):
-        if i < K - 1:
-            cond_p = probs[i] / jnp.maximum(1.0 - cum_p, 1e-10)
-            cond_p = jnp.clip(cond_p, 0.0, 1.0)
-            draw = jax.random.binomial(keys[i], remaining, cond_p)
-            draw = jnp.minimum(draw, remaining)
-            counts.append(draw)
-            remaining = remaining - draw
-            cum_p = cum_p + probs[i]
-        else:
-            counts.append(remaining)
-    return jnp.stack(counts, axis=0).astype(total.dtype)
