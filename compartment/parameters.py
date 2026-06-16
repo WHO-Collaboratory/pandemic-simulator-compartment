@@ -38,6 +38,17 @@ class ValueType(str, Enum):
     COORDINATE = "coordinate"  # lat/lon
 
 
+MAX_DEMOGRAPHIC_GROUPS = 20
+"""Hard upper bound on the number of demographic groups per schema.
+
+Prem 2021 source matrices are 16×16, so beyond ~16 age-ranged bands the
+aggregated contact matrix becomes meaningless.  The limit is set slightly
+higher (20) to accommodate models that mix ranged and unranged groups, while
+still preventing accidental runaway declarations that would silently produce
+enormous population tensors.
+"""
+
+
 # ---------------------------------------------------------------------------
 # Core parameter definition
 # ---------------------------------------------------------------------------
@@ -1364,6 +1375,12 @@ class ParameterSchemaBuilder:
             raise ValueError(
                 f"Duplicate demographic group id '{id}'. "
                 f"Already registered: {sorted(existing_ids)}"
+            )
+        if len(self._demographic_groups) >= MAX_DEMOGRAPHIC_GROUPS:
+            raise ValueError(
+                f"Too many demographic groups: the maximum is {MAX_DEMOGRAPHIC_GROUPS}. "
+                f"Attempted to add '{id}' but {MAX_DEMOGRAPHIC_GROUPS} groups are already "
+                f"registered: {sorted(existing_ids)}"
             )
         if age_range is not None:
             if (
