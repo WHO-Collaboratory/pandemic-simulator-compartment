@@ -30,6 +30,64 @@ Existing models to copy from:
 - Stochastic SIR (tau-leaping): [compartment/models/test_covid_sir_stochastic/model.py](../compartment/models/test_covid_sir_stochastic/model.py)
 - Multi-dimensional AMR model: [compartment/models/test_klebsiella_amr_model/model.py](../compartment/models/test_klebsiella_amr_model/model.py)
 
+## Scaffolding a new model
+
+The fastest way to start is the built-in scaffold command.  It creates the full
+directory layout, a working SIR template, and the standard boilerplate files in
+one shot:
+
+```bash
+python -m compartment.new_model my_disease
+```
+
+This creates `compartment/models/my_disease_jax_model/` containing:
+- `__init__.py` — empty package marker
+- `model.py` — `MyDiseaseJaxModel` with a minimal SIR (`define_parameters` + `derivative`)
+- `main.py` — standard CLI wrapper around `drive_simulation()`
+- `example-config.json` — minimal runnable config wired to the template's edges
+
+### Naming conventions
+
+| Input name | Directory | Class | Disease type |
+|---|---|---|---|
+| `my_disease` | `my_disease_jax_model/` | `MyDiseaseJaxModel` | `MY_DISEASE` |
+| `my_disease_jax_model` | same (suffix stripped) | same | same |
+
+### Optional flags
+
+```bash
+# Custom display label and disease-type identifier
+python -m compartment.new_model my_disease \
+    --label "My Disease" \
+    --disease-type MY_DISEASE
+
+# Preview what would be created without writing anything
+python -m compartment.new_model my_disease --dry-run
+```
+
+### After scaffolding
+
+The generated model runs immediately as a sanity check:
+
+```bash
+python -m compartment.models.my_disease_jax_model.main \
+    --mode local \
+    --config_file compartment/models/my_disease_jax_model/example-config.json \
+    --output_file results/my_disease-test.json
+```
+
+From there, open `model.py` and:
+1. Add or replace compartments and transmission edges in `define_parameters()`.
+2. Regenerate `example-config.json` to pick up the new schema:
+   ```bash
+   python -m compartment.generate_artifact MY_DISEASE \
+       --example-config \
+       --config-output compartment/models/my_disease_jax_model/example-config.json
+   ```
+3. Flesh out `derivative()` with the actual ODE logic.
+
+The sections below explain each piece in detail.
+
 ## File layout
 
 Create a new directory under `compartment/models/<your_model>/`:
