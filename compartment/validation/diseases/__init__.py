@@ -17,7 +17,6 @@ Example:
 """
 from .covid import CovidDiseaseConfig
 from .dengue import DengueDiseaseConfig
-from .dengue_2strain import Dengue2StrainDiseaseConfig
 from .mpox import MpoxDiseaseConfig
 from .klebsiella_amr import KlebsiellaAmrDiseaseConfig
 from .covid_sir_stochastic import CovidSirStochasticDiseaseConfig
@@ -25,7 +24,6 @@ from .covid_sir_stochastic import CovidSirStochasticDiseaseConfig
 __all__ = [
     "CovidDiseaseConfig",
     "DengueDiseaseConfig",
-    "Dengue2StrainDiseaseConfig",
     "MpoxDiseaseConfig",
     "KlebsiellaAmrDiseaseConfig",
     "CovidSirStochasticDiseaseConfig",
