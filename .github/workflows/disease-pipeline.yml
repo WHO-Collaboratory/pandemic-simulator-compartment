@@ -19,8 +19,24 @@ jobs:
   smoke-tests:
     uses: ./.github/workflows/smoke-tests.yml
 
+  # Auto-discover every model under compartment/models/ that ships a runnable
+  # example-config.json.  Both the image-build and artifact-generation matrices
+  # fan out over this list, so adding a new model directory automatically wires
+  # it into the deploy pipeline — no manual matrix edits required.
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      models: ${{ steps.find.outputs.models }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        run: |
+          models=$(ls -d compartment/models/*/example-config.json 2>/dev/null | xargs -I{} dirname {} | xargs -I{} basename {} | jq -R . | jq -sc .)
+          echo "models=$models" >> "$GITHUB_OUTPUT"
+          echo "Discovered models: $models"
+
   build-image:
-    needs: smoke-tests
+    needs: [smoke-tests, discover]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -29,23 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - disease_path: covid_jax_model
-            model_display_name: "Novel Respiratory"
-          - disease_path: dengue_jax_model
-            model_display_name: "Novel Vector-Borne"
-          - disease_path: mpox_jax_model
-            model_display_name: "Test Mpox Model"
-          - disease_path: hantavirus_jax_model
-            model_display_name: "Hantavirus"
-          - disease_path: hantavirus_human_jax_model
-            model_display_name: "Hantavirus (Human Transmission)"
-          - disease_path: test_covid_sir_stochastic
-            model_display_name: "COVID SIR (Stochastic)"
-          - disease_path: test_klebsiella_amr_model
-            model_display_name: "Klebsiella AMR"
-          - disease_path: ebola_jax_model
-            model_display_name: "Ebola"
+        disease_path: ${{ fromJson(needs.discover.outputs.models) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -86,7 +86,7 @@ jobs:
             MODEL_DIR=compartment/models/${{ matrix.disease_path }}/
 
   generate-artifact:
-    needs: [smoke-tests, build-image]
+    needs: [smoke-tests, build-image, discover]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -94,23 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - disease_path: covid_jax_model
-            model_display_name: "Novel Respiratory"
-          - disease_path: dengue_jax_model
-            model_display_name: "Novel Vector-Borne"
-          - disease_path: mpox_jax_model
-            model_display_name: "Test Mpox Model"
-          - disease_path: hantavirus_jax_model
-            model_display_name: "Hantavirus"
-          - disease_path: hantavirus_human_jax_model
-            model_display_name: "Hantavirus (Human Transmission)"
-          - disease_path: test_covid_sir_stochastic
-            model_display_name: "COVID SIR (Stochastic)"
-          - disease_path: test_klebsiella_amr_model
-            model_display_name: "Klebsiella AMR"
-          - disease_path: ebola_jax_model
-            model_display_name: "Ebola"
+        disease_path: ${{ fromJson(needs.discover.outputs.models) }}
     steps:
       - uses: actions/checkout@v4
 

@@ -1,0 +1,21 @@
+{
+    "Disease": {
+        "disease_type": "VECTOR_BORNE_2STRAIN",
+        "transmission_rate": 0.03,
+        "seasonality_amplitude": 0.2,
+        "ade_factor": 1.5,
+        "infectious_period": 50.0,
+        "cross_immunity_period": 730.0
+    },
+    "start_date": "2026-01-01",
+    "end_date": "2027-01-01",
+    "admin_unit_id": "MDG",
+    "admin_zones": [
+        { "name": "Antananarivo", "center_lat": -18.94, "center_lon": 46.80, "population": 7982937, "infected_population": 3.0, "seroprevalence": 30.0 },
+        { "name": "Antsiranana",  "center_lat": -13.87, "center_lon": 49.41, "population": 2127141, "infected_population": 3.0, "seroprevalence": 30.0 },
+        { "name": "Fianarantsoa", "center_lat": -21.86, "center_lon": 46.86, "population": 5785134, "infected_population": 3.0, "seroprevalence": 30.0 },
+        { "name": "Mahajanga",    "center_lat": -16.54, "center_lon": 46.68, "population": 3783162, "infected_population": 3.0, "seroprevalence": 30.0 },
+        { "name": "Toamasina",    "center_lat": -17.82, "center_lon": 48.75, "population": 3693480, "infected_population": 3.0, "seroprevalence": 30.0 },
+        { "name": "Toliary",      "center_lat": -22.60, "center_lon": 45.02, "population": 4621930, "infected_population": 3.0, "seroprevalence": 30.0 }
+    ]
+}
