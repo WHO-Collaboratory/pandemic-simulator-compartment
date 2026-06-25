@@ -872,23 +872,27 @@ def collect_uncertainty_params(cleaned_config, disease_param_field_configs=None)
     return params
 
 
-def resolve_run_mode(model_class, configured_run_mode, uncertainty_params):
-    """Determine the effective run mode for a simulation.
+def resolve_run_mode(model_class, uncertainty_params):
+    """Determine the effective run mode entirely from the model and its params.
+
+    The run_mode field from the frontend config is intentionally ignored — the
+    frontend has not yet been updated to distinguish STOCHASTIC from UNCERTAINTY,
+    and relying on it would create edge cases (e.g. UNCERTAINTY with no variance
+    params running 30 identical deterministic trajectories).
 
     Priority order:
-    1. STOCHASTIC — when the model class declares ``STOCHASTIC = True``.
-       Always runs 30 trajectories regardless of the user-configured run_mode.
-       If variance parameters are also present they are spread across those
-       same 30 runs rather than adding additional runs.
-    2. UNCERTAINTY — when variance parameters are declared on any edge,
-       intervention, or disease param, and the configured mode is DETERMINISTIC.
-    3. configured_run_mode — otherwise (DETERMINISTIC or a user-set UNCERTAINTY).
+    1. STOCHASTIC — model class declares ``STOCHASTIC = True``.  Always runs 30
+       trajectories.  If variance parameters are also present they are spread
+       across those same 30 runs rather than adding additional runs.
+    2. UNCERTAINTY — any variance parameter is declared on an edge, intervention,
+       or disease param.
+    3. DETERMINISTIC — otherwise.
     """
     if getattr(model_class, "STOCHASTIC", False):
         return "STOCHASTIC"
-    if uncertainty_params and configured_run_mode == "DETERMINISTIC":
+    if uncertainty_params:
         return "UNCERTAINTY"
-    return configured_run_mode
+    return "DETERMINISTIC"
 
 
 def extract_admin_units(case_file):

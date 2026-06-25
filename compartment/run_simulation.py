@@ -152,7 +152,7 @@ def run_simulation(
     uncertainty_params = collect_uncertainty_params(
         cleaned_config, disease_param_field_configs
     )
-    run_mode = resolve_run_mode(model_class, cleaned_config.run_mode, uncertainty_params)
+    run_mode = resolve_run_mode(model_class, uncertainty_params)
     if run_mode == "STOCHASTIC":
         logger.info(
             f"Model has STOCHASTIC=True — effective run_mode: STOCHASTIC (30 runs)"
@@ -162,10 +162,10 @@ def run_simulation(
                 else ""
             )
         )
-    elif run_mode != cleaned_config.run_mode:
+    elif run_mode == "UNCERTAINTY":
         logger.info(
             f"Detected {len(uncertainty_params)} variance param(s) — "
-            f"promoting run_mode {cleaned_config.run_mode} -> {run_mode}"
+            f"effective run_mode: UNCERTAINTY"
         )
     logger.info(f"run_mode: {run_mode}")
 
