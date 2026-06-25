@@ -1,6 +1,7 @@
 {
   "start_date": "2026-03-26",
   "end_date": "2026-06-24",
+  "n_simulations": 5,
   "Disease": {
     "disease_type": "COVID_SIR_STOCHASTIC",
     "transmission_edges": [

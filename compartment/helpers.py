@@ -600,6 +600,7 @@ def format_uncertainty_output(
     n_timesteps,
     step,
     avg_compartment_deltas,
+    intervention_dict=None,
 ):
 
     unique_id = str(uuid.uuid4())  # Generate unique id for gql
@@ -614,6 +615,7 @@ def format_uncertainty_output(
         "start_date": payload["start_date"],
         "end_date": payload["end_date"],
         "time_steps": payload["time_steps"],
+        "interventions": transform_interventions(intervention_dict or {}),
         "admin_zones": [],
         "compartment_deltas": avg_compartment_deltas,
         "parent_admin_total": [],

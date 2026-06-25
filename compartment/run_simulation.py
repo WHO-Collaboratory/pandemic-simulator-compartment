@@ -155,7 +155,7 @@ def run_simulation(
     run_mode = resolve_run_mode(model_class, uncertainty_params)
     if run_mode == "STOCHASTIC":
         logger.info(
-            f"Model has STOCHASTIC=True — effective run_mode: STOCHASTIC (30 runs)"
+            f"Model has STOCHASTIC=True — effective run_mode: STOCHASTIC"
             + (
                 f", {len(uncertainty_params)} variance param(s) spread across runs"
                 if uncertainty_params
@@ -196,10 +196,11 @@ def run_simulation(
             results_with = future_with.result()
             results_without = future_without.result()
     elif run_mode == "STOCHASTIC":
-        # Fixed 30-trajectory stochastic run.  If variance params are also
-        # present, spread LHS samples across these 30 runs — no additional
-        # runs are added on top.
-        n_sims = 30
+        # Stochastic run.  Default is 30 trajectories; configs (e.g. smoke-test
+        # example configs) can set n_simulations to a smaller value.  If
+        # variance params are also present, LHS samples are spread across these
+        # runs — no additional runs are added on top.
+        n_sims = getattr(cleaned_config, "n_simulations", None) or 30
         ci = 0.95
 
         logger.info(f"Number of stochastic trajectories: {n_sims}")

@@ -216,13 +216,12 @@ class TestStochasticSpread:
 
 
 class TestStochasticRunCount:
-    """Stochastic runs always use exactly 30 trajectories per arm,
-    regardless of config values."""
+    """Stochastic run count: defaults to 30, honoured from n_simulations when set."""
 
     @pytest.mark.integration
-    def test_always_30_ignoring_n_simulations_from_config(self):
-        """n_simulations in config is for UNCERTAINTY LHS sizing; stochastic ignores it."""
-        cfg = _stochastic_config(n_simulations=6)
+    def test_defaults_to_30_without_n_simulations(self):
+        """Without n_simulations in config, stochastic trajectories default to 30."""
+        cfg = _stochastic_config()  # no n_simulations key
         n_sims_seen = []
 
         import compartment.run_simulation as _rs
@@ -237,8 +236,28 @@ class TestStochasticRunCount:
 
         assert n_sims_seen, "batch_simulate_and_postprocess was never called"
         assert all(n == 30 for n in n_sims_seen), (
-            f"Expected every batch call to use 30 runs, got {n_sims_seen}. "
-            "Stochastic mode must fix n_sims=30 regardless of config.n_simulations."
+            f"Expected 30 trajectories per arm by default, got {n_sims_seen}."
+        )
+
+    @pytest.mark.integration
+    def test_honours_n_simulations_from_config(self):
+        """n_simulations in config overrides the 30-trajectory default (e.g. for smoke tests)."""
+        cfg = _stochastic_config(n_simulations=6)
+        n_sims_seen = []
+
+        import compartment.run_simulation as _rs
+        original = _rs.batch_simulate_and_postprocess
+
+        def _capture(model, n_sims, param_list, ci, num_workers):
+            n_sims_seen.append(n_sims)
+            return original(model, n_sims, param_list, ci, num_workers)
+
+        with patch.object(_rs, "batch_simulate_and_postprocess", side_effect=_capture):
+            _run(cfg)
+
+        assert n_sims_seen, "batch_simulate_and_postprocess was never called"
+        assert all(n == 6 for n in n_sims_seen), (
+            f"Expected 6 trajectories per arm (from n_simulations=6), got {n_sims_seen}."
         )
 
     @pytest.mark.integration
