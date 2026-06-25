@@ -352,7 +352,7 @@ class Model(ABC):
             ParameterDef(
                 name="run_mode",
                 label="Run Mode",
-                description="Run a single deterministic simulation or uncertainty analysis with multiple runs",
+                description="Run a single deterministic simulation or uncertainty analysis with multiple runs. Models with STOCHASTIC=True automatically run 30 stochastic trajectories regardless of this setting.",
                 value_type=ValueType.SELECT,
                 default="DETERMINISTIC",
                 options=["DETERMINISTIC", "UNCERTAINTY"],

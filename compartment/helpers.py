@@ -872,14 +872,20 @@ def collect_uncertainty_params(cleaned_config, disease_param_field_configs=None)
     return params
 
 
-def resolve_run_mode(configured_run_mode, uncertainty_params):
-    """Promote run_mode to UNCERTAINTY whenever any variance parameter is
-    present, regardless of the configured mode. Otherwise leave it unchanged.
+def resolve_run_mode(model_class, configured_run_mode, uncertainty_params):
+    """Determine the effective run mode for a simulation.
 
-    This makes variance the single source of truth for run behaviour: declaring
-    variance on any transmission edge, intervention, or disease parameter (in
-    either local or cloud mode) is enough to trigger an uncertainty run.
+    Priority order:
+    1. STOCHASTIC — when the model class declares ``STOCHASTIC = True``.
+       Always runs 30 trajectories regardless of the user-configured run_mode.
+       If variance parameters are also present they are spread across those
+       same 30 runs rather than adding additional runs.
+    2. UNCERTAINTY — when variance parameters are declared on any edge,
+       intervention, or disease param, and the configured mode is DETERMINISTIC.
+    3. configured_run_mode — otherwise (DETERMINISTIC or a user-set UNCERTAINTY).
     """
+    if getattr(model_class, "STOCHASTIC", False):
+        return "STOCHASTIC"
     if uncertainty_params and configured_run_mode == "DETERMINISTIC":
         return "UNCERTAINTY"
     return configured_run_mode

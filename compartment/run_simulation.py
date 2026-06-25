@@ -152,8 +152,17 @@ def run_simulation(
     uncertainty_params = collect_uncertainty_params(
         cleaned_config, disease_param_field_configs
     )
-    run_mode = resolve_run_mode(cleaned_config.run_mode, uncertainty_params)
-    if run_mode != cleaned_config.run_mode:
+    run_mode = resolve_run_mode(model_class, cleaned_config.run_mode, uncertainty_params)
+    if run_mode == "STOCHASTIC":
+        logger.info(
+            f"Model has STOCHASTIC=True — effective run_mode: STOCHASTIC (30 runs)"
+            + (
+                f", {len(uncertainty_params)} variance param(s) spread across runs"
+                if uncertainty_params
+                else ""
+            )
+        )
+    elif run_mode != cleaned_config.run_mode:
         logger.info(
             f"Detected {len(uncertainty_params)} variance param(s) — "
             f"promoting run_mode {cleaned_config.run_mode} -> {run_mode}"
@@ -186,7 +195,46 @@ def run_simulation(
             future_without = executor.submit(simulate_and_postprocess, model_without)
             results_with = future_with.result()
             results_without = future_without.result()
-    else:
+    elif run_mode == "STOCHASTIC":
+        # Fixed 30-trajectory stochastic run.  If variance params are also
+        # present, spread LHS samples across these 30 runs — no additional
+        # runs are added on top.
+        n_sims = 30
+        ci = 0.95
+
+        logger.info(f"Number of stochastic trajectories: {n_sims}")
+        logger.info(f"Confidence interval: {ci}")
+        if uncertainty_params:
+            logger.info(f"Variance parameters (spread across trajectories): {uncertainty_params}")
+            param_list = generate_LHS_samples(n_sims, uncertainty_params)
+        else:
+            param_list = [{} for _ in range(n_sims)]
+
+        interventionless_param_list = [
+            {k: v for k, v in d.items() if not k.startswith("intervention.")}
+            for d in param_list
+        ]
+
+        with ExecutorClass(max_workers=top_level_workers) as executor:
+            future_with = executor.submit(
+                batch_simulate_and_postprocess,
+                model_with,
+                n_sims,
+                param_list,
+                ci,
+                low_level_workers,
+            )
+            future_without = executor.submit(
+                batch_simulate_and_postprocess,
+                model_without,
+                n_sims,
+                interventionless_param_list,
+                ci,
+                low_level_workers,
+            )
+            results_with = future_with.result()
+            results_without = future_without.result()
+    else:  # UNCERTAINTY
         n_sims = getattr(cleaned_config, "n_simulations", None) or 30
         ci = 0.95
 
