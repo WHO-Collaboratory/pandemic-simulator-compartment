@@ -41,18 +41,29 @@ class TestExtractDiseaseVarianceParams:
         assert result[0]["dist"] == "uniform"
 
 
+class _DeterministicModel:
+    pass
+
+
+class _StochasticModel:
+    STOCHASTIC = True
+
+
 class TestResolveRunMode:
-    def test_promotes_deterministic_when_params_present(self):
+    def test_promotes_to_uncertainty_when_params_present(self):
         params = [{"param": "beta", "dist": "uniform", "min": 0.1, "max": 0.4}]
-        assert resolve_run_mode("DETERMINISTIC", params) == "UNCERTAINTY"
+        assert resolve_run_mode(_DeterministicModel, params) == "UNCERTAINTY"
 
-    def test_no_promotion_without_params(self):
-        assert resolve_run_mode("DETERMINISTIC", []) == "DETERMINISTIC"
+    def test_deterministic_without_params(self):
+        assert resolve_run_mode(_DeterministicModel, []) == "DETERMINISTIC"
 
-    def test_leaves_uncertainty_untouched(self):
+    def test_stochastic_model_returns_stochastic_without_params(self):
+        assert resolve_run_mode(_StochasticModel, []) == "STOCHASTIC"
+
+    def test_stochastic_model_with_variance_params_stays_stochastic(self):
+        # Variance params spread across the 30 stochastic runs — no extra runs added.
         params = [{"param": "beta", "dist": "uniform", "min": 0.1, "max": 0.4}]
-        assert resolve_run_mode("UNCERTAINTY", params) == "UNCERTAINTY"
-        assert resolve_run_mode("UNCERTAINTY", []) == "UNCERTAINTY"
+        assert resolve_run_mode(_StochasticModel, params) == "STOCHASTIC"
 
 
 class TestCollectUncertaintyParams:
