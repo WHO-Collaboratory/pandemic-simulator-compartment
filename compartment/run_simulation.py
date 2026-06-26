@@ -196,11 +196,16 @@ def run_simulation(
             results_with = future_with.result()
             results_without = future_without.result()
     elif run_mode == "STOCHASTIC":
-        # Stochastic run.  Default is 30 trajectories; configs (e.g. smoke-test
-        # example configs) can set n_simulations to a smaller value.  If
-        # variance params are also present, LHS samples are spread across these
-        # runs — no additional runs are added on top.
-        n_sims = getattr(cleaned_config, "n_simulations", None) or 30
+        # Priority: smoke-test config override > disease param (user-configured
+        # per simulation) > model class default (NUM_RUNS derived from schema).
+        disease_params_num_runs = getattr(
+            getattr(model_with, "disease_params", None), "num_runs", None
+        )
+        n_sims = (
+            getattr(cleaned_config, "n_simulations", None)
+            or disease_params_num_runs
+            or getattr(model_class, "NUM_RUNS", 30)
+        )
         ci = 0.95
 
         logger.info(f"Number of stochastic trajectories: {n_sims}")
@@ -235,7 +240,7 @@ def run_simulation(
             )
             results_with = future_with.result()
             results_without = future_without.result()
-    else:  # UNCERTAINTY
+    else:  # UNCERTAINTY — only reached for DETERMINISTIC models (STOCHASTIC takes priority)
         n_sims = getattr(cleaned_config, "n_simulations", None) or 30
         ci = 0.95
 

@@ -235,6 +235,16 @@ class EbolaJaxModel(Model):
             ),
         )
 
+        schema.add_disease_parameter(
+            name="num_runs",
+            label="Number of Runs",
+            description="Number of stochastic trajectories to simulate.",
+            value_type=ValueType.INTEGER,
+            default=10,
+            min_value=5,
+            max_value=30,
+        )
+
     # ------------------------------------------------------------------
     # Initial population
     # ------------------------------------------------------------------

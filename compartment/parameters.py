@@ -676,6 +676,16 @@ class ModelParameterSchema:
     # (excluding cumulative _total entries).
     compartment_display_order: list[str] = field(default_factory=list)
 
+    # Model-level run mode: DETERMINISTIC or STOCHASTIC.
+    # Derived from the model class's STOCHASTIC attribute.
+    run_mode: str = "DETERMINISTIC"
+
+    # Number of stochastic/uncertainty trajectories for this model.
+    # Overrides the global default of 30 when set on the model class as NUM_RUNS.
+    num_runs: int = 30
+    num_runs_min: int = 1
+    num_runs_max: int = 100
+
     # ---------------------------------------------------------------
     # Serialization helpers
     # ---------------------------------------------------------------
@@ -760,6 +770,10 @@ class ModelParameterSchema:
             "disease_type": self.disease_type,
             "name": self.disease_label,
             "definition": self.description,
+            "run_mode": self.run_mode,
+            "num_runs": self.num_runs,
+            "num_runs_min": self.num_runs_min,
+            "num_runs_max": self.num_runs_max,
             # Compartment graph
             "compartments": compartment_dicts,
             "compartment_display_order": display_order,
@@ -923,6 +937,9 @@ class ParameterSchemaBuilder:
         self._simulation_parameters: list[ParameterDef] = []
         self._demographic_groups: list[DemographicGroupDef] = []
         self._contact_overrides: list[ContactOverrideDef] = []
+        self._num_runs: int = 30
+        self._num_runs_min: int = 1
+        self._num_runs_max: int = 100
 
     # ----- Identity --------------------------------------------------------
 
@@ -1233,6 +1250,30 @@ class ParameterSchemaBuilder:
         )
         self._travel_volume = tv
 
+    # ----- Number of runs (stochastic models only) -------------------------
+
+    def set_num_runs(
+        self,
+        default: int,
+        min_value: int = 1,
+        max_value: int = 100,
+    ) -> None:
+        """
+        Set the number of stochastic trajectories for this model.
+
+        Only meaningful for models with ``STOCHASTIC = True``.  Omit this
+        call on deterministic models — they always run once.
+
+        Args:
+            default: Default trajectory count used when no per-run override is
+                provided (e.g. ``10`` for a large model, ``30`` for a small one).
+            min_value: Hard lower bound enforced by the UI.
+            max_value: Hard upper bound enforced by the UI.
+        """
+        self._num_runs = default
+        self._num_runs_min = min_value
+        self._num_runs_max = max_value
+
     # ----- Custom fields (enforced contract) --------------------------------
 
     def add_admin_zone_field(
@@ -1466,6 +1507,19 @@ class ParameterSchemaBuilder:
                         f"Age ranges must be non-overlapping."
                     )
 
+        # If a disease parameter named "num_runs" was declared via
+        # add_disease_parameter(), use its default/min/max to populate the
+        # artifact-level fields so ModelArtifact.num_runs stays accurate.
+        num_runs_param = next(
+            (p for p in self._disease_parameters if p.name == "num_runs"), None
+        )
+        if num_runs_param is not None:
+            self._num_runs = int(num_runs_param.default or self._num_runs)
+            if num_runs_param.min_value is not None:
+                self._num_runs_min = int(num_runs_param.min_value)
+            if num_runs_param.max_value is not None:
+                self._num_runs_max = int(num_runs_param.max_value)
+
         return ModelParameterSchema(
             disease_type=self._disease_type,
             disease_label=self._disease_label or "",
@@ -1479,4 +1533,7 @@ class ParameterSchemaBuilder:
             simulation_parameters=self._simulation_parameters,
             demographic_groups=self._demographic_groups,
             contact_matrix_overrides=self._contact_overrides,
+            num_runs=self._num_runs,
+            num_runs_min=self._num_runs_min,
+            num_runs_max=self._num_runs_max,
         )
