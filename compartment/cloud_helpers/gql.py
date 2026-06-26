@@ -282,6 +282,28 @@ def _add_v2_payloads(results):
     return results
 
 
+def update_simulation_job_run_mode(job_params: dict, run_mode: str) -> dict:
+    """Write the effective run_mode back to the SimulationJob record.
+
+    The frontend cannot reliably determine whether a model is stochastic before
+    the simulation runs, so the backend is the authoritative source and must
+    persist the resolved value so the results page can display bands correctly.
+    """
+    simulation_job_id = job_params.get("SIMULATION_JOB_ID")
+    if not simulation_job_id:
+        return {"status": "skipped", "reason": "no SIMULATION_JOB_ID"}
+
+    query = """
+        mutation UpdateSimulationJob($input: UpdateSimulationJobInput!) {
+            updateSimulationJob(input: $input) {
+                id
+                run_mode
+            }
+        }
+    """
+    return _gql_write(job_params, {"id": simulation_job_id, "run_mode": run_mode}, query)
+
+
 def write_to_gql(job_params, results):
     """Write SimulationJobResult metadata to DynamoDB via GraphQL.
 

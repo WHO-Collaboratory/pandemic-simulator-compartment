@@ -21,6 +21,7 @@ from compartment.helpers import (
 from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.cloud_helpers.gql import (
     get_simulation_job,
+    update_simulation_job_run_mode,
     write_to_gql,
 )
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
@@ -168,6 +169,8 @@ def run_simulation(
             f"effective run_mode: UNCERTAINTY"
         )
     logger.info(f"run_mode: {run_mode}")
+    if mode == "cloud" and simulation_params:
+        update_simulation_job_run_mode(simulation_params, run_mode)
 
     # Create business as usual model
     model_with = model_class(cleaned_config)
