@@ -199,14 +199,20 @@ def run_simulation(
             results_with = future_with.result()
             results_without = future_without.result()
     elif run_mode == "STOCHASTIC":
-        # Priority: smoke-test config override > disease param (user-configured
-        # per simulation) > model class default (NUM_RUNS derived from schema).
+        # Priority: smoke-test config override > disease param (via
+        # DiseaseParamValues for models using standard __init__) > Disease
+        # config field (catches models with custom __init__ that bypass
+        # DiseaseParamValues) > model class default (NUM_RUNS from schema).
         disease_params_num_runs = getattr(
             getattr(model_with, "disease_params", None), "num_runs", None
+        )
+        _disease_config_num_runs = getattr(
+            getattr(cleaned_config, "Disease", None), "num_runs", None
         )
         n_sims = (
             getattr(cleaned_config, "n_simulations", None)
             or disease_params_num_runs
+            or _disease_config_num_runs
             or getattr(model_class, "NUM_RUNS", 30)
         )
         ci = 0.95
