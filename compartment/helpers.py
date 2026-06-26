@@ -878,8 +878,8 @@ def resolve_run_mode(model_class, uncertainty_params):
     """Determine the effective run mode entirely from the model and its params.
 
     The run_mode field from the frontend config is intentionally ignored — the
-    frontend has not yet been updated to distinguish STOCHASTIC from UNCERTAINTY,
-    and relying on it would create edge cases (e.g. UNCERTAINTY with no variance
+    model class is the authoritative source for STOCHASTIC, and relying on the
+    frontend value would create edge cases (e.g. UNCERTAINTY with no variance
     params running 30 identical deterministic trajectories).
 
     Priority order:
