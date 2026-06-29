@@ -206,10 +206,17 @@ def run_simulation(
         disease_params_num_runs = getattr(
             getattr(model_with, "disease_params", None), "num_runs", None
         )
-        _disease_config_num_runs = getattr(
-            getattr(cleaned_config, "Disease", None), "num_runs", None
+        # cleaned_config.Disease is the validated config *dict* (ProcessedSimulation
+        # resolves it from self.config), so read num_runs with dict access.
+        _disease_dict = getattr(cleaned_config, "Disease", None) or {}
+        _disease_config_num_runs = (
+            _disease_dict.get("num_runs") if isinstance(_disease_dict, dict) else None
         )
-        n_sims = (
+        # int() coercion: a num_runs disease parameter (value_type INTEGER)
+        # is serialised to the artifact as "NUMBER", which the cloud custom-
+        # field caster turns into a float (e.g. 10.0). range()/LHS sampling
+        # below require an int, so normalise here regardless of source.
+        n_sims = int(
             getattr(cleaned_config, "n_simulations", None)
             or disease_params_num_runs
             or _disease_config_num_runs
@@ -250,7 +257,7 @@ def run_simulation(
             results_with = future_with.result()
             results_without = future_without.result()
     else:  # UNCERTAINTY — only reached for DETERMINISTIC models (STOCHASTIC takes priority)
-        n_sims = getattr(cleaned_config, "n_simulations", None) or 30
+        n_sims = int(getattr(cleaned_config, "n_simulations", None) or 30)
         ci = 0.95
 
         logger.info(f"Number of simulations: {n_sims}")

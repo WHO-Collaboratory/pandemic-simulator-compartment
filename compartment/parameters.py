@@ -771,9 +771,11 @@ class ModelParameterSchema:
             "name": self.disease_label,
             "definition": self.description,
             "run_mode": self.run_mode,
-            "num_runs": self.num_runs,
-            "num_runs_min": self.num_runs_min,
-            "num_runs_max": self.num_runs_max,
+            # num_runs is surfaced solely as a "disease_parameter" custom field
+            # (with default_value/min/max in its metadata) — declare it via
+            # schema.add_disease_parameter(name="num_runs", ...). It is
+            # intentionally NOT emitted at the artifact root; the runtime falls
+            # back to the model-class NUM_RUNS default when no value is provided.
             # Compartment graph
             "compartments": compartment_dicts,
             "compartment_display_order": display_order,
