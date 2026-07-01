@@ -79,6 +79,7 @@ class ParameterDef:
     required: bool = True
     unit: Optional[str] = None  # display unit: "per day", "%"
     options: Optional[list[str]] = None  # for SELECT type
+    enable_variance: bool = True  # set False to hide the variance checkbox in the UI
 
     def to_dict(self) -> dict:
         """Serialize to a plain dict (None values omitted).
@@ -123,6 +124,8 @@ class ParameterDef:
             "name": self.name,
             "required": self.required,
             "unit": self.unit,
+            # Only emit when explicitly disabled so the artifact stays clean.
+            "enable_variance": None if self.enable_variance else False,
         }
         return {k: v for k, v in d.items() if v is not None}
 
@@ -1343,6 +1346,7 @@ class ParameterSchemaBuilder:
         unit: str | None = None,
         required: bool = True,
         options: list[str] | None = None,
+        enable_variance: bool = True,
     ) -> None:
         """
         Add a disease-specific top-level parameter.
@@ -1363,6 +1367,8 @@ class ParameterSchemaBuilder:
             unit: Display unit (e.g. ``"days"``, ``"per day"``).
             required: Whether this parameter is required in the config.
             options: Valid choices for ``ValueType.SELECT`` fields.
+            enable_variance: Set ``False`` to hide the variance checkbox for this
+                parameter in the UI (e.g. for integer count fields like num_runs).
         """
         self._disease_parameters.append(
             ParameterDef(
@@ -1378,6 +1384,7 @@ class ParameterSchemaBuilder:
                 unit=unit,
                 required=required,
                 options=options,
+                enable_variance=enable_variance,
             )
         )
 

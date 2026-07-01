@@ -243,6 +243,7 @@ class EbolaJaxModel(Model):
             default=10,
             min_value=5,
             max_value=30,
+            enable_variance=False,
         )
 
     # ------------------------------------------------------------------

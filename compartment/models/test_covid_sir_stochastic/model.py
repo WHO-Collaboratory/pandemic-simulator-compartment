@@ -77,6 +77,7 @@ class CovidSirStochasticModel(Model):
             default=30,
             min_value=5,
             max_value=50,
+            enable_variance=False,
         )
 
     # ------------------------------------------------------------------
