@@ -600,6 +600,7 @@ def format_uncertainty_output(
     n_timesteps,
     step,
     avg_compartment_deltas,
+    intervention_dict=None,
 ):
 
     unique_id = str(uuid.uuid4())  # Generate unique id for gql
@@ -614,6 +615,7 @@ def format_uncertainty_output(
         "start_date": payload["start_date"],
         "end_date": payload["end_date"],
         "time_steps": payload["time_steps"],
+        "interventions": transform_interventions(intervention_dict or {}),
         "admin_zones": [],
         "compartment_deltas": avg_compartment_deltas,
         "parent_admin_total": [],
@@ -872,17 +874,27 @@ def collect_uncertainty_params(cleaned_config, disease_param_field_configs=None)
     return params
 
 
-def resolve_run_mode(configured_run_mode, uncertainty_params):
-    """Promote run_mode to UNCERTAINTY whenever any variance parameter is
-    present, regardless of the configured mode. Otherwise leave it unchanged.
+def resolve_run_mode(model_class, uncertainty_params):
+    """Determine the effective run mode entirely from the model and its params.
 
-    This makes variance the single source of truth for run behaviour: declaring
-    variance on any transmission edge, intervention, or disease parameter (in
-    either local or cloud mode) is enough to trigger an uncertainty run.
+    The run_mode field from the frontend config is intentionally ignored — the
+    model class is the authoritative source for STOCHASTIC, and relying on the
+    frontend value would create edge cases (e.g. UNCERTAINTY with no variance
+    params running 30 identical deterministic trajectories).
+
+    Priority order:
+    1. STOCHASTIC — model class declares ``STOCHASTIC = True``.  Always runs 30
+       trajectories.  If variance parameters are also present they are spread
+       across those same 30 runs rather than adding additional runs.
+    2. UNCERTAINTY — any variance parameter is declared on an edge, intervention,
+       or disease param.
+    3. DETERMINISTIC — otherwise.
     """
-    if uncertainty_params and configured_run_mode == "DETERMINISTIC":
+    if getattr(model_class, "STOCHASTIC", False):
+        return "STOCHASTIC"
+    if uncertainty_params:
         return "UNCERTAINTY"
-    return configured_run_mode
+    return "DETERMINISTIC"
 
 
 def extract_admin_units(case_file):

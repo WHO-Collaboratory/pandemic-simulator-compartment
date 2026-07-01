@@ -69,6 +69,17 @@ class CovidSirStochasticModel(Model):
             value_type=ValueType.DAYS,
         )
 
+        schema.add_disease_parameter(
+            name="num_runs",
+            label="Number of Runs",
+            description="Number of stochastic trajectories to simulate.",
+            value_type=ValueType.INTEGER,
+            default=30,
+            min_value=5,
+            max_value=50,
+            enable_variance=False,
+        )
+
     # ------------------------------------------------------------------
     # Model interface
     # ------------------------------------------------------------------

@@ -54,6 +54,10 @@ class Model(ABC):
     # None means the model hasn't migrated to define_parameters() yet.
     _cached_schema: ClassVar[ModelParameterSchema | None] = None
 
+    # Derived from schema.set_num_runs() in define_parameters(); set by __init_subclass__.
+    # Read by run_simulation to determine the trajectory count for stochastic runs.
+    NUM_RUNS: ClassVar[int] = 30
+
     def __init_subclass__(cls, **kwargs):
         """
         Auto-populate schema-derived class attributes when a subclass is
@@ -108,6 +112,9 @@ class Model(ABC):
             # disease parameter and admin zone field names.
             cls.DISEASE_PARAMS = DiseaseParamRegistry(schema.disease_parameters)
             cls.ADMIN_ZONE_FIELDS = AdminZoneFieldRegistry(schema.admin_zone_fields)
+            # Derive NUM_RUNS from the schema so run_simulation can read it
+            # without importing the parameters module.
+            cls.NUM_RUNS = schema.num_runs
         except (NotImplementedError, Exception):
             # Non-migrated model — leave everything as-is.
             pass
@@ -321,6 +328,10 @@ class Model(ABC):
         if grouping:
             built.compartment_display_order = list(grouping.keys())
 
+        # run_mode is derived from the class-level STOCHASTIC flag (not
+        # a schema field) since it reflects the integrator, not a parameter.
+        built.run_mode = "STOCHASTIC" if getattr(cls, "STOCHASTIC", False) else "DETERMINISTIC"
+
         return built
 
     # ------------------------------------------------------------------
@@ -352,7 +363,7 @@ class Model(ABC):
             ParameterDef(
                 name="run_mode",
                 label="Run Mode",
-                description="Run a single deterministic simulation or uncertainty analysis with multiple runs",
+                description="Run a single deterministic simulation or uncertainty analysis with multiple runs. STOCHASTIC models always run their model-defined NUM_RUNS trajectories. UNCERTAINTY runs 30 trajectories on deterministic models.",
                 value_type=ValueType.SELECT,
                 default="DETERMINISTIC",
                 options=["DETERMINISTIC", "UNCERTAINTY"],

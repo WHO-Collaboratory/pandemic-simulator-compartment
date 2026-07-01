@@ -1,53 +1,65 @@
 {
-    "start_date": "2026-06-15",
-    "end_date": "2027-06-15",
+    "start_date": "2026-06-29",
+    "end_date": "2026-09-27",
     "Disease": {
         "disease_type": "EBOLA",
+        "transmission_edges": [
+            {
+                "source": "susceptible",
+                "target": "E1",
+                "data": {
+                    "transmission_rate": 0.125
+                }
+            },
+            {
+                "source": "E1",
+                "target": "I1",
+                "data": {
+                    "transmission_rate": 5.0
+                }
+            },
+            {
+                "source": "I1",
+                "target": "Funeral",
+                "data": {
+                    "transmission_rate": 12.0
+                }
+            }
+        ],
         "prop_community": 90.0,
         "etu_risk": 70.0,
-        "funeral_risk": 50.0
+        "funeral_risk": 50.0,
+        "num_runs": 10
     },
-    "TransmissionEdges": {
-        "items": [
+    "admin_unit_id": "USA",
+    "AdminUnit": {
+        "id": "USA",
+        "center_lat": 37.0902
+    },
+    "travel_volume": {
+        "leaving": 0.05,
+        "returning": null
+    },
+    "interventions": [
+        {
+            "id": "social_distancing",
+            "adherence_min": 50.0,
+            "transmission_percentage": 40.0,
+            "start_date": null,
+            "end_date": null,
+            "start_threshold": null,
+            "end_threshold": null
+        }
+    ],
+    "case_file": {
+        "admin_zones": [
             {
-                "transmission_edge": { "source": "susceptible", "target": "E1", "value_type": "RATE" },
-                "value": 0.125,
-                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "BETA", "min": 0, "max": 0 }] }
-            },
-            {
-                "transmission_edge": { "source": "E1", "target": "I1", "value_type": "DAYS" },
-                "value": 5.0,
-                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "SIGMA", "min": 0, "max": 0 }] }
-            },
-            {
-                "transmission_edge": { "source": "I1", "target": "Funeral", "value_type": "DAYS" },
-                "value": 12.0,
-                "FieldConfigs": { "items": [{ "field_key": "value", "has_variance": false, "distribution_type": "UNIFORM", "disease_param": "GAMMA", "min": 0, "max": 0 }] }
+                "center_lat": 40.7128,
+                "center_lon": -74.006,
+                "name": "Example Zone",
+                "population": 1000000,
+                "infected_population": 1
             }
         ]
-    },
-    "travel_volume": { "leaving": 0.05 },
-    "admin_zones": [
-        {
-            "name": "Guinea (Conakry)",
-            "center_lat": 9.9456,
-            "center_lon": -11.1872,
-            "population": 1800000,
-            "infected_population": 0.05
-        },
-        {
-            "name": "Sierra Leone (Freetown)",
-            "center_lat": 8.4657,
-            "center_lon": -13.2317,
-            "population": 1200000,
-            "infected_population": 0.0
-        },
-        {
-            "name": "Liberia (Monrovia)",
-            "center_lat": 6.2907,
-            "center_lon": -10.7605,
-            "population": 1500000,
-            "infected_population": 0.0
-        }
-    ]
+    }
 }

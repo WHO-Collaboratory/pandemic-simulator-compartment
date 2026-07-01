@@ -21,6 +21,7 @@ from compartment.helpers import (
 from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.cloud_helpers.gql import (
     get_simulation_job,
+    update_simulation_job_run_mode,
     write_to_gql,
 )
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
@@ -152,13 +153,24 @@ def run_simulation(
     uncertainty_params = collect_uncertainty_params(
         cleaned_config, disease_param_field_configs
     )
-    run_mode = resolve_run_mode(cleaned_config.run_mode, uncertainty_params)
-    if run_mode != cleaned_config.run_mode:
+    run_mode = resolve_run_mode(model_class, uncertainty_params)
+    if run_mode == "STOCHASTIC":
+        logger.info(
+            f"Model has STOCHASTIC=True — effective run_mode: STOCHASTIC"
+            + (
+                f", {len(uncertainty_params)} variance param(s) spread across runs"
+                if uncertainty_params
+                else ""
+            )
+        )
+    elif run_mode == "UNCERTAINTY":
         logger.info(
             f"Detected {len(uncertainty_params)} variance param(s) — "
-            f"promoting run_mode {cleaned_config.run_mode} -> {run_mode}"
+            f"effective run_mode: UNCERTAINTY"
         )
     logger.info(f"run_mode: {run_mode}")
+    if mode == "cloud" and simulation_params:
+        update_simulation_job_run_mode(simulation_params, run_mode)
 
     # Create business as usual model
     model_with = model_class(cleaned_config)
@@ -186,8 +198,66 @@ def run_simulation(
             future_without = executor.submit(simulate_and_postprocess, model_without)
             results_with = future_with.result()
             results_without = future_without.result()
-    else:
-        n_sims = getattr(cleaned_config, "n_simulations", None) or 30
+    elif run_mode == "STOCHASTIC":
+        # Priority: smoke-test config override > disease param (via
+        # DiseaseParamValues for models using standard __init__) > Disease
+        # config field (catches models with custom __init__ that bypass
+        # DiseaseParamValues) > model class default (NUM_RUNS from schema).
+        disease_params_num_runs = getattr(
+            getattr(model_with, "disease_params", None), "num_runs", None
+        )
+        # cleaned_config.Disease is the validated config *dict* (ProcessedSimulation
+        # resolves it from self.config), so read num_runs with dict access.
+        _disease_dict = getattr(cleaned_config, "Disease", None) or {}
+        _disease_config_num_runs = (
+            _disease_dict.get("num_runs") if isinstance(_disease_dict, dict) else None
+        )
+        # int() coercion: a num_runs disease parameter (value_type INTEGER)
+        # is serialised to the artifact as "NUMBER", which the cloud custom-
+        # field caster turns into a float (e.g. 10.0). range()/LHS sampling
+        # below require an int, so normalise here regardless of source.
+        n_sims = int(
+            getattr(cleaned_config, "n_simulations", None)
+            or disease_params_num_runs
+            or _disease_config_num_runs
+            or getattr(model_class, "NUM_RUNS", 30)
+        )
+        ci = 0.95
+
+        logger.info(f"Number of stochastic trajectories: {n_sims}")
+        logger.info(f"Confidence interval: {ci}")
+        if uncertainty_params:
+            logger.info(f"Variance parameters (spread across trajectories): {uncertainty_params}")
+            param_list = generate_LHS_samples(n_sims, uncertainty_params)
+        else:
+            param_list = [{} for _ in range(n_sims)]
+
+        interventionless_param_list = [
+            {k: v for k, v in d.items() if not k.startswith("intervention.")}
+            for d in param_list
+        ]
+
+        with ExecutorClass(max_workers=top_level_workers) as executor:
+            future_with = executor.submit(
+                batch_simulate_and_postprocess,
+                model_with,
+                n_sims,
+                param_list,
+                ci,
+                low_level_workers,
+            )
+            future_without = executor.submit(
+                batch_simulate_and_postprocess,
+                model_without,
+                n_sims,
+                interventionless_param_list,
+                ci,
+                low_level_workers,
+            )
+            results_with = future_with.result()
+            results_without = future_without.result()
+    else:  # UNCERTAINTY — only reached for DETERMINISTIC models (STOCHASTIC takes priority)
+        n_sims = int(getattr(cleaned_config, "n_simulations", None) or 30)
         ci = 0.95
 
         logger.info(f"Number of simulations: {n_sims}")

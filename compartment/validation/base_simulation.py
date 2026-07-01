@@ -90,7 +90,7 @@ class BaseSimulationShared(BaseModel):
     # Owner & meta
     owner: Optional[str] = None
     simulation_type: Literal["COMPARTMENTAL", "AGENT_BASED"] = "COMPARTMENTAL"
-    run_mode: Literal["UNCERTAINTY", "DETERMINISTIC"] = "DETERMINISTIC"
+    run_mode: Literal["UNCERTAINTY", "DETERMINISTIC", "STOCHASTIC"] = "DETERMINISTIC"
 
     # Time
     start_date: date
