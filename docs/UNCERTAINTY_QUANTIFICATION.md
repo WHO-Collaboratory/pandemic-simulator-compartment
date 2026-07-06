@@ -408,6 +408,8 @@ Three values per compartment per timestep:
 - "On day 19, we expect **550 infections** (median)"
 - "We're 95% confident the true value is between **450 and 680**"
 
+> **Visualizing bands:** `python tools/view_results.py results/<output>.json` plots the `mean` line and shades the `lower`–`upper` band for each compartment, with the intervention and control runs side by side. See [tools/README.md](../tools/README.md).
+
 ### Confidence Interval (CI)
 
 The framework uses a **95% confidence interval** by default:
@@ -816,6 +818,7 @@ LHS assumes **independence** between parameters. To model correlation:
 
 - **[INTERVENTIONS.md](./INTERVENTIONS.md)** — Varying intervention effectiveness
 - **[DEVELOPING_MODELS.md](./DEVELOPING_MODELS.md)** — Model development guide
+- **[tools/view_results.py](../tools/view_results.py)** — Local results viewer; shades the mean/lower/upper uncertainty bands from UNCERTAINTY output
 - **[compartment/run_simulation.py](../compartment/run_simulation.py)** — UQ orchestration code
 - **[compartment/helpers.py](../compartment/helpers.py)** — LHS implementation (`generate_LHS_samples`)
 - **[compartment/batch_simulation_manager.py](../compartment/batch_simulation_manager.py)** — Parallel simulation runner
