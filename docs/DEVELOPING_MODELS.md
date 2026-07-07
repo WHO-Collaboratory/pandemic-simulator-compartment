@@ -22,7 +22,7 @@ You only need to write code for the parts that are genuinely model-specific: the
 | Output formatter | [compartment/simulation_postprocessor.py](../compartment/simulation_postprocessor.py) | Aggregates age groups, applies `COMPARTMENT_DELTA_GROUPING`, emits `_total` deltas |
 | Generic driver / CLI plumbing | [compartment/driver.py](../compartment/driver.py) | `drive_simulation(model_class, args)` — your `main.py` is just a thin wrapper |
 | Artifact generator CLI | [compartment/generate_artifact.py](../compartment/generate_artifact.py) | `python -m compartment.generate_artifact <DISEASE_TYPE> [--example-config]` |
-| Results viewer (local tool) | [tools/view_results.py](../tools/view_results.py) | Plots `parent_admin_total` with vs. without interventions, intervention start/stop lines, and uncertainty bands |
+| Results viewer (local tool) | [tools/view_results.py](../tools/view_results.py) | Plots `parent_admin_total` with vs. without interventions, intervention start/stop lines, uncertainty bands, and a `compartment_deltas` metric table |
 
 Existing models to copy from:
 - Minimal SIR with mobility: [compartment/models/mpox_jax_model/model.py](../compartment/models/mpox_jax_model/model.py)
@@ -506,7 +506,7 @@ To eyeball a run, use the local results viewer:
 python tools/view_results.py results/test_run.json
 ```
 
-It plots the whole-population (`parent_admin_total`) compartment time series for the **with-interventions** and **control** runs side by side, drops a vertical line at each intervention's start/stop date, and shades the uncertainty bands for `UNCERTAINTY` output. See [tools/README.md](../tools/README.md) for flags (compartment subset, log scale, saving to an image).
+It plots the whole-population (`parent_admin_total`) compartment time series for the **with-interventions** and **control** runs side by side, drops a vertical line at each intervention's start/stop date, shades the uncertainty bands for `UNCERTAINTY` output, and lists each run's `compartment_deltas` (cumulative per-compartment totals) as a metric table using the frontend's compartment names. See [tools/README.md](../tools/README.md) for flags (compartment subset, log scale, `--no-deltas`, saving to an image).
 
 ## Tests
 

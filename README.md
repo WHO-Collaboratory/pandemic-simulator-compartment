@@ -60,7 +60,7 @@ Once a simulation has written its output JSON, you can quickly visualize it with
 python tools/view_results.py results/example-run.json
 ```
 
-The viewer draws the **with-interventions** and **control (no-interventions)** runs side by side on a shared axis, marks each intervention's start and stop date, and shades uncertainty bounds when the run used `UNCERTAINTY` (or a stochastic multi-run) mode. It reads only the parent admin total, never per-admin-zone series. See [`tools/README.md`](tools/README.md) for the available options (compartment subset, log scale, saving to an image). It only needs `matplotlib`, which is already a core dependency.
+The viewer draws the **with-interventions** and **control (no-interventions)** runs side by side on a shared axis, marks each intervention's start and stop date, and shades uncertainty bounds when the run used `UNCERTAINTY` (or a stochastic multi-run) mode. Beneath the chart it lists each run's `compartment_deltas` (cumulative per-compartment totals) as a metric table, using the same compartment names and number formatting as the web app. It reads only the parent admin total, never per-admin-zone series. See [`tools/README.md`](tools/README.md) for the available options (compartment subset, log scale, hiding the deltas table, saving to an image). It only needs `matplotlib`, which is already a core dependency.
 
 ## Using Reference Files
 

@@ -31,7 +31,12 @@ What it does automatically:
 - **Uncertainty / stochastic bounds** — for `UNCERTAINTY` (or multi-run) output,
   where each compartment record is `{mean, lower, upper}`, the mean is drawn as a
   line and the `lower..upper` range is shaded.
+- **Compartment deltas metric** — a table beneath the chart lists each run's
+  `compartment_deltas` (the per-compartment cumulative totals: total ever-infected,
+  total deaths, etc.). Compartment names, colours, and number formatting mirror the
+  Pandemic Simulator frontend (`getCompartmentLabelsByDiseaseType`), so `E` shows as
+  "Exposed", `D` as "Deceased", and so on. Hide it with `--no-deltas`.
 
 It reads only the *parent* admin total, never per-admin-zone series.
 
-Flags: `-c/--compartments`, `--log`, `--title`, `-o/--save`. Run with `-h` for details.
+Flags: `-c/--compartments`, `--log`, `--no-deltas`, `--title`, `-o/--save`. Run with `-h` for details.

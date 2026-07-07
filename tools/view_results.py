@@ -17,7 +17,14 @@ Features
   run actually used interventions. Threshold-triggered interventions (no fixed
   date) are listed in the panel note instead of drawn as a line.
 * Consistent colour per compartment across both panels and a shared y-axis so
-  the two runs are directly comparable.
+  the two runs are directly comparable. Compartment names and colours mirror the
+  Pandemic Simulator frontend (getCompartmentLabelsByDiseaseType in
+  src/data/constants.tsx).
+* A ``compartment_deltas`` metric table beneath the time series — one column per
+  compartment (headed by its frontend display name) and one row per run, showing
+  the cumulative total (total ever-infected, total deaths, etc.), formatted the
+  same way as the frontend (thousands-separated integers). Hide with
+  ``--no-deltas``.
 
 This reads only the *parent* admin total; it never drills into per-admin-zone
 series.
@@ -32,12 +39,91 @@ Usage
 from __future__ import annotations
 
 import argparse
+import colorsys
 import json
 import math
 from datetime import datetime
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+
+
+# --------------------------------------------------------------------------- #
+# Compartment naming — mirrors the frontend
+# --------------------------------------------------------------------------- #
+# Ported from packages/nextjs/src/data/constants.tsx
+# (compartmentObjectLabelsCovid / compartmentObjectLabelsDengue) so this viewer
+# uses the same display names and colours as the Pandemic Simulator web app.
+
+COVID_LABELS = {
+    "S": ("Susceptible", "#00bba7"),
+    "E": ("Exposed", "#5A2C85"),
+    "I": ("Infected", "#A8228E"),
+    "R": ("Recovered", "#008ECE"),
+    "H": ("Hospitalized", "#80BD01"),
+    "D": ("Deceased", "#ef4444"),
+    "C": ("Temporary Cross-protection", "#506BF7"),
+    "Snot": ("Susceptible to other three serotypes", "#F26728"),
+    "E2": ("Exposed with 2nd Serotype", "#A8228E"),
+    "I2": ("Infected with 2nd Serotype", "#008ECE"),
+}
+
+DENGUE_LABELS = {
+    "S": ("Susceptible", "#00bba7"),
+    "E": ("Exposed with 1st serotype", "#5A2C85"),
+    "I": ("Infected with 1st serotype", "#A8228E"),
+    "R": ("Recovered", "#008ECE"),
+    "H": ("Hospitalized", "#80BD01"),
+    "D": ("Deceased", "#ef4444"),
+    "C": ("Temporary Cross-protection", "#506BF7"),
+    "SV": ("Susceptible Vectors", "#F26728"),
+    "EV": ("Exposed Vectors", "#A8228E"),
+    "IV": ("Infected Vectors", "#008ECE"),
+    "Snot": ("Susceptible to other three serotypes", "#F26728"),
+    "E2": ("Exposed with 2nd Serotype", "#A8228E"),
+    "I2": ("Infected with 2nd Serotype", "#008ECE"),
+}
+
+# Compartments unique to the vector-borne model; their presence selects the
+# dengue label map, matching getCompartmentLabelsByDiseaseType.
+_DENGUE_MARKER_KEYS = {"SV", "EV", "IV", "Snot", "E2", "I2"}
+
+
+def _generate_color(key):
+    """Deterministic fallback colour for unknown compartments.
+
+    Mirrors the frontend's generateCompartmentColor: hash the key, then map to
+    hsl(hash % 360, 65%, 45%).
+    """
+    h = 0
+    for ch in key:
+        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+    if h >= 0x80000000:
+        h -= 0x100000000
+    hue = (abs(h) % 360) / 360.0
+    r, g, b = colorsys.hls_to_rgb(hue, 0.45, 0.65)  # HSL lightness 45%, saturation 65%
+    return (r, g, b)
+
+
+def resolve_labels(compartments):
+    """Return {key: (display_name, colour)} for the given compartments.
+
+    Uses the dengue label map when vector-borne compartments are present,
+    otherwise the covid/respiratory map. Unknown keys fall back to the raw key
+    and a generated colour.
+    """
+    base = DENGUE_LABELS if (set(compartments) & _DENGUE_MARKER_KEYS) else COVID_LABELS
+    return {
+        c: base[c] if c in base else (c, _generate_color(c))
+        for c in compartments
+    }
+
+
+def format_number(value):
+    """Thousands-separated integer, matching the frontend's formatNumber."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return "-"
+    return f"{value:,.0f}"
 
 
 # --------------------------------------------------------------------------- #
@@ -159,13 +245,79 @@ def intervention_markers(run):
     return starts, ends, threshold_only
 
 
+def parse_compartment_deltas(run):
+    """Return the run's compartment_deltas as {compartment: float}.
+
+    These are per-compartment cumulative totals over the whole run (the final
+    ``*_total`` value). Returns {} when the run has none.
+    """
+    cd = run.get("compartment_deltas") or {}
+    out = {}
+    for comp, val in cd.items():
+        if comp == "__typename":
+            continue
+        try:
+            out[comp] = float(val)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Plotting
 # --------------------------------------------------------------------------- #
 
-def _color_map(compartments):
-    cmap = plt.get_cmap("tab10" if len(compartments) <= 10 else "tab20")
-    return {c: cmap(i % cmap.N) for i, c in enumerate(compartments)}
+def delta_compartments(panels, selected):
+    """Compartments (in `selected` order) that appear in any run's deltas."""
+    dsets = [parse_compartment_deltas(run) for _, run in panels]
+    return [c for c in selected if any(c in d for d in dsets)]
+
+
+def plot_deltas_table(ax, panels, selected, labels):
+    """Render compartment_deltas as a metric table beneath the time series.
+
+    Mirrors the frontend's per-compartment delta metrics (DiseaseModelTable /
+    CompareSimulationsTable): each compartment is a row labelled with its display
+    name, each run is a value column, and cells are thousands-formatted totals.
+    Compartments are rows (not columns) so long disease names stay readable and
+    the table scales to any number of compartments. Returns True if drawn.
+    """
+    panel_deltas = [(label.split(" (")[0], parse_compartment_deltas(run))
+                    for label, run in panels]
+    comps = delta_compartments(panels, selected)
+    if not comps:
+        return False
+
+    ax.axis("off")
+    header = ["Compartment"] + [lbl for lbl, _ in panel_deltas]
+    cell_text = [
+        [labels[c][0]] + [format_number(d.get(c)) for _, d in panel_deltas]
+        for c in comps
+    ]
+    n_val = len(panel_deltas)
+    name_w = 0.46
+    col_widths = [name_w] + [(1 - name_w) / n_val] * n_val
+
+    tbl = ax.table(cellText=cell_text, colLabels=header, colWidths=col_widths,
+                   cellLoc="right", loc="center")
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(9)
+    tbl.scale(1, 1.4)
+
+    # Header row: bold; compartment-name column left-aligned.
+    for j in range(len(header)):
+        cell = tbl[0, j]
+        cell.get_text().set_fontweight("bold")
+        cell.get_text().set_ha("left" if j == 0 else "right")
+    # Compartment-name column: left-aligned and coloured to match its line.
+    for i, c in enumerate(comps):
+        name_cell = tbl[i + 1, 0]
+        name_cell.get_text().set_ha("left")
+        name_cell.get_text().set_color(labels[c][1])
+        name_cell.get_text().set_fontweight("bold")
+
+    ax.set_title("Compartment deltas — cumulative totals", fontsize=10, pad=8)
+    return True
 
 
 def plot_panel(ax, run, colors, selected, log_scale, draw_markers):
@@ -222,7 +374,7 @@ def _draw_markers(ax, starts, ends):
                     fontsize=7, color="#a11")
 
 
-def build_figure(path, compartments=None, log_scale=False, title=None):
+def build_figure(path, compartments=None, log_scale=False, title=None, show_deltas=True):
     runs = load_runs(path)
     with_iv, control = split_runs(runs)
 
@@ -248,47 +400,64 @@ def build_figure(path, compartments=None, log_scale=False, title=None):
     else:
         selected = all_comps
 
-    colors = _color_map(all_comps)
+    labels = resolve_labels(all_comps)
+    colors = {c: labels[c][1] for c in all_comps}
 
     panels = [("With interventions", with_iv)]
     if control is not None:
         panels.append(("Without interventions (control)", control))
+    ncols = len(panels)
 
-    fig, axes = plt.subplots(
-        1, len(panels), figsize=(7.5 * len(panels), 6), sharey=True
-    )
-    if len(panels) == 1:
-        axes = [axes]
+    delta_comps = delta_compartments(panels, selected) if show_deltas else []
+    have_deltas = bool(delta_comps)
+
+    ts_h = 5.0
+    if have_deltas:
+        # Table panel grows with the compartment count so long names stay legible.
+        delta_h = 0.55 + 0.32 * (len(delta_comps) + 1)
+        fig = plt.figure(figsize=(7.5 * ncols, ts_h + delta_h + 0.9))
+        gs = fig.add_gridspec(2, ncols, height_ratios=[ts_h, delta_h])
+    else:
+        fig = plt.figure(figsize=(7.5 * ncols, 6))
+        gs = fig.add_gridspec(1, ncols)
+
+    ts_axes = []
+    for c in range(ncols):
+        ax = fig.add_subplot(gs[0, c], sharey=ts_axes[0] if ts_axes else None)
+        ts_axes.append(ax)
 
     any_band = False
-    for ax, (label, run) in zip(axes, panels):
+    for ax, (label, run) in zip(ts_axes, panels):
         # Markers only make sense on the run that used interventions.
         draw_markers = run is with_iv
         drew = plot_panel(ax, run, colors, selected, log_scale, draw_markers)
         any_band = any_band or drew
         ax.set_title(label, fontsize=11)
         ax.set_xlabel("Date")
-    axes[0].set_ylabel("Population" + (" (log scale)" if log_scale else ""))
+    ts_axes[0].set_ylabel("Population" + (" (log scale)" if log_scale else ""))
 
     # Single shared legend (compartments + marker key).
-    handles, labels = axes[0].get_legend_handles_labels()
+    handles, leg_labels = ts_axes[0].get_legend_handles_labels()
     if any(intervention_markers(with_iv)[i] for i in (0, 1)):
         handles.append(plt.Line2D([], [], color="#2ca02c", linestyle="--", label="intervention start"))
         handles.append(plt.Line2D([], [], color="#d62728", linestyle=":", label="intervention end"))
-        labels = [h.get_label() for h in handles]
     if any_band:
         handles.append(plt.Line2D([], [], color="0.4", alpha=0.3, linewidth=8,
                                   label="uncertainty band (lower–upper)"))
-        labels = [h.get_label() for h in handles]
-    fig.legend(handles, labels, loc="upper center", ncol=min(len(labels), 8),
+    leg_labels = [h.get_label() for h in handles]
+    fig.legend(handles, leg_labels, loc="upper center", ncol=min(len(leg_labels), 8),
                fontsize=8, frameon=False, bbox_to_anchor=(0.5, 0.99))
+
+    if have_deltas:
+        delta_ax = fig.add_subplot(gs[1, :])
+        plot_deltas_table(delta_ax, panels, selected, labels)
 
     stem = path.rsplit("/", 1)[-1]
     sim_type = (with_iv or {}).get("simulation_type", "")
     suptitle = title or f"parent_admin_total — {stem}"
     if sim_type:
         suptitle += f"   ({sim_type})"
-    fig.suptitle(suptitle, fontsize=13, y=1.06)
+    fig.suptitle(suptitle, fontsize=13, y=1.04)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
     return fig
 
@@ -307,12 +476,15 @@ def main():
     ap.add_argument("--compartments", "-c", default=None,
                     help="Comma-separated subset to plot, e.g. S,I,R (default: all)")
     ap.add_argument("--log", action="store_true", help="Use a log-scale y-axis")
+    ap.add_argument("--no-deltas", action="store_true",
+                    help="Hide the compartment_deltas metric table")
     ap.add_argument("--title", default=None, help="Override the figure title")
     ap.add_argument("--save", "-o", default=None,
                     help="Save to this image path instead of opening a window")
     args = ap.parse_args()
 
-    fig = build_figure(args.file, args.compartments, args.log, args.title)
+    fig = build_figure(args.file, args.compartments, args.log, args.title,
+                       show_deltas=not args.no_deltas)
     if args.save:
         fig.savefig(args.save, dpi=150, bbox_inches="tight")
         print(f"Saved figure to {args.save}")
