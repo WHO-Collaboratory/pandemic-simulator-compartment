@@ -10,7 +10,7 @@ class BaseDiseaseConfig(BaseModel, ABC):
     # Common fields that all diseases should have
     id: Optional[str] = None
     disease_name: Optional[str] = None
-    disease_type: str  # e.g., "RESPIRATORY", "VECTOR_BORNE", "MONKEYPOX"
+    disease_type: str  # e.g., "RESPIRATORY", "VECTOR_BORNE", "MPOX"
 
     # Explicit compartment list (short IDs like ["S", "I", "R"]).
     # Only used for models without a fixed COMPARTMENT_LIST on the class.

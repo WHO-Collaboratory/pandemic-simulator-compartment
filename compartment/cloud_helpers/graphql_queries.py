@@ -6,8 +6,6 @@ GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
     disease_id
     end_date
     owner
-    selected_infected_population
-    selected_population
     simulation_name
     simulation_type
     run_mode

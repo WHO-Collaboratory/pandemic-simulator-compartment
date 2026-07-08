@@ -1,5 +1,5 @@
 """
-Monkeypox disease validation config -- auto-generated from model parameters.
+MPOX disease validation config -- auto-generated from model parameters.
 
 This module no longer contains hand-written Pydantic models.  Instead it
 imports the ``MpoxJaxModel`` parameter schema and uses the schema generator

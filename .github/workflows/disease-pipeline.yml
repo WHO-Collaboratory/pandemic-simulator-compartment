@@ -15,12 +15,33 @@ concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
   cancel-in-progress: true
 
+env:
+  # Consolidated ECR repository holding every disease-model image.
+  # Image tag convention: {disease_path}-{semver} (e.g. covid_jax_model-v1.2.3).
+  MODEL_ECR_REPOSITORY: pansim-collaboratory-models
+
 jobs:
   smoke-tests:
     uses: ./.github/workflows/smoke-tests.yml
 
+  # Auto-discover every model under compartment/models/ that ships a runnable
+  # example-config.json.  Both the image-build and artifact-generation matrices
+  # fan out over this list, so adding a new model directory automatically wires
+  # it into the deploy pipeline — no manual matrix edits required.
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      models: ${{ steps.find.outputs.models }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        run: |
+          models=$(ls -d compartment/models/*/example-config.json 2>/dev/null | xargs -I{} dirname {} | xargs -I{} basename {} | jq -R . | jq -sc .)
+          echo "models=$models" >> "$GITHUB_OUTPUT"
+          echo "Discovered models: $models"
+
   build-image:
-    needs: smoke-tests
+    needs: [smoke-tests, discover]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -29,21 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - disease_path: covid_jax_model
-            model_display_name: "Novel Respiratory"
-          - disease_path: dengue_jax_model
-            model_display_name: "Novel Vector-Borne"
-          - disease_path: mpox_jax_model
-            model_display_name: "Test Mpox Model"
-          - disease_path: hantavirus_jax_model
-            model_display_name: "Hantavirus"
-          - disease_path: hantavirus_human_jax_model
-            model_display_name: "Hantavirus (Human Transmission)"
-          - disease_path: test_covid_sir_stochastic
-            model_display_name: "COVID SIR (Stochastic)"
-          - disease_path: test_klebsiella_amr_model
-            model_display_name: "Klebsiella AMR"
+        disease_path: ${{ fromJson(needs.discover.outputs.models) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -79,12 +86,12 @@ jobs:
           provenance: false
           sbom: false
           tags: |
-            ${{ secrets.DOCKER_REGISTRY }}/pandemic-simulator-compartment/${{ matrix.disease_path }}:${{ github.ref_name }}
+            ${{ secrets.DOCKER_REGISTRY }}/${{ env.MODEL_ECR_REPOSITORY }}:${{ matrix.disease_path }}-${{ github.ref_name }}
           build-args: |
             MODEL_DIR=compartment/models/${{ matrix.disease_path }}/
 
   generate-artifact:
-    needs: [smoke-tests, build-image]
+    needs: [smoke-tests, build-image, discover]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -92,21 +99,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - disease_path: covid_jax_model
-            model_display_name: "Novel Respiratory"
-          - disease_path: dengue_jax_model
-            model_display_name: "Novel Vector-Borne"
-          - disease_path: mpox_jax_model
-            model_display_name: "Test Mpox Model"
-          - disease_path: hantavirus_jax_model
-            model_display_name: "Hantavirus"
-          - disease_path: hantavirus_human_jax_model
-            model_display_name: "Hantavirus (Human Transmission)"
-          - disease_path: test_covid_sir_stochastic
-            model_display_name: "COVID SIR (Stochastic)"
-          - disease_path: test_klebsiella_amr_model
-            model_display_name: "Klebsiella AMR"
+        disease_path: ${{ fromJson(needs.discover.outputs.models) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -168,13 +161,13 @@ jobs:
         env:
           EVENT_BUS_NAME: ${{ secrets.MODEL_PUBLICATION_EVENT_BUS_NAME }}
           SEMVER: ${{ github.ref_name }}
-          IMAGE_URI: ${{ secrets.DOCKER_REGISTRY }}/pandemic-simulator-compartment/${{ matrix.disease_path }}:${{ github.ref_name }}
+          IMAGE_URI: ${{ secrets.DOCKER_REGISTRY }}/${{ env.MODEL_ECR_REPOSITORY }}:${{ matrix.disease_path }}-${{ github.ref_name }}
         run: |
           set -euo pipefail
           : "${EVENT_BUS_NAME:?MODEL_PUBLICATION_EVENT_BUS_NAME secret is not set}"
           for artifact in compartment/models/${{ matrix.disease_path }}/artifacts/*.json; do
             HASH=$(sha256sum "$artifact" | awk '{ print $1 }')
-            DISPLAY_NAME=$(jq -r '.disease_label' "$artifact")
+            DISPLAY_NAME=$(jq -r '.name' "$artifact")
             S3_KEY="${HASH}.json"
             DETAIL_JSON=$(jq -nc \
               --arg name "${DISPLAY_NAME}" \

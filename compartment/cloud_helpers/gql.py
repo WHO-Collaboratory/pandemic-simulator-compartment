@@ -1,9 +1,7 @@
 import json
 import requests
 import logging
-from compartment.helpers import setup_logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from compartment.helpers import convert_dates
+from compartment.helpers import setup_logging, convert_dates
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -198,30 +196,129 @@ def get_simulation_job(job_params: dict, graphql_query: str) -> dict:
     return config
 
 
-def write_to_gql(job_params, results):
-    """Write results of model to GraphQL and return responses"""
+def _np_safe(o):
+    """json.dumps default for numpy scalars inside AWSJSON payloads."""
+    if hasattr(o, "item"):  # numpy float/int scalar -> native Python
+        return o.item()
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
 
-    responses = {"child_responses": [], "parent_response": None}
 
-    # Mutation for child entities (admin_zones)
-    child_query = """
-        mutation MyMutation($input: CreateAdminZoneTimeSeriesInput!) {
-            createAdminZoneTimeSeries(input: $input) {
+def _to_awsjson(obj):
+    """Serialize a dict/list to a JSON string for an AWSJSON GraphQL field."""
+    return json.dumps(obj, default=_np_safe)
+
+
+def _build_time_series_v2(time_series):
+    """Repackage [{date, <comp>: {...}}] into [{date, compartments: <AWSJSON>}].
+
+    Compartment keys are arbitrary, so the whole per-timestep compartment map is
+    stored as a single AWSJSON string — letting any model (rodent/human, AMR,
+    etc.) write its time series without a closed-field schema type. Derived from
+    the already-built legacy ``time_series`` (which already carries the bespoke
+    keys; only the old schema type rejected them on write).
+    """
+    v2 = []
+    for rec in time_series or []:
+        comps = {k: v for k, v in rec.items() if k != "date"}
+        v2.append({"date": rec.get("date"), "compartments": _to_awsjson(comps)})
+    return v2
+
+
+# Compartment keys representable by the closed-field TimeSeriesStratification /
+# SimulationDiseaseStateMetrics schema types. Legacy fields are pruned to these
+# so the write never fails for models with bespoke compartments; the full data
+# is preserved in the v2 (AWSJSON) fields.
+_LEGACY_COMPARTMENT_KEYS = {
+    "SV",
+    "EV",
+    "IV",
+    "S",
+    "E",
+    "I",
+    "H",
+    "D",
+    "R",
+    "C",
+    "Snot",
+    "E2",
+    "I2",
+}
+
+
+def _sanitize_legacy_time_series(time_series):
+    """Drop compartment keys the closed TimeSeriesStratification type rejects."""
+    return [
+        {k: v for k, v in rec.items() if k == "date" or k in _LEGACY_COMPARTMENT_KEYS}
+        for rec in time_series or []
+    ]
+
+
+def _add_v2_payloads(results):
+    """Derive compartment-agnostic v2 fields and prune the legacy ones, in place.
+
+    For each payload, build the full time_series_v2 / compartment_deltas_v2 (any
+    compartment key, stored as AWSJSON), then prune the legacy time_series /
+    compartment_deltas down to the keys the closed-field schema types accept — so
+    the write never fails for models with bespoke compartments. Known models
+    (COVID/dengue) keep their legacy data intact; novel models carry their full
+    data only in v2. Single chokepoint for every builder path (deterministic
+    3D/4D + uncertainty), which all converge on the same ``results`` shape here.
+    """
+    for zone in results.get("admin_zones", []) or []:
+        if isinstance(zone, dict) and "time_series" in zone:
+            zone["time_series_v2"] = _build_time_series_v2(zone["time_series"])
+            zone["time_series"] = _sanitize_legacy_time_series(zone["time_series"])
+    parent = results.get("parent_admin_total")
+    if isinstance(parent, dict) and "time_series" in parent:
+        parent["time_series_v2"] = _build_time_series_v2(parent["time_series"])
+        parent["time_series"] = _sanitize_legacy_time_series(parent["time_series"])
+    deltas = results.get("compartment_deltas")
+    if deltas is not None:
+        results["compartment_deltas_v2"] = _to_awsjson(deltas)
+        if isinstance(deltas, dict):
+            results["compartment_deltas"] = {
+                k: v for k, v in deltas.items() if k in _LEGACY_COMPARTMENT_KEYS
+            }
+    return results
+
+
+def update_simulation_job_run_mode(job_params: dict, run_mode: str) -> dict:
+    """Write the effective run_mode back to the SimulationJob record.
+
+    The frontend cannot reliably determine whether a model is stochastic before
+    the simulation runs, so the backend is the authoritative source and must
+    persist the resolved value so the results page can display bands correctly.
+    """
+    simulation_job_id = job_params.get("SIMULATION_JOB_ID")
+    if not simulation_job_id:
+        return {"status": "skipped", "reason": "no SIMULATION_JOB_ID"}
+
+    query = """
+        mutation UpdateSimulationJob($input: UpdateSimulationJobInput!) {
+            updateSimulationJob(input: $input) {
                 id
+                run_mode
             }
         }
     """
-    child_result = results["admin_zones"]
+    return _gql_write(job_params, {"id": simulation_job_id, "run_mode": run_mode}, query)
 
-    responses["child_responses"] = parallel_write(
-        job_params=job_params, inputs=child_result, query=child_query, max_workers=4
-    )
 
-    response = gql_write_helper(job_params, results["parent_admin_total"], child_query)
-    responses["child_responses"].append(response)
+def write_to_gql(job_params, results):
+    """Write SimulationJobResult metadata to DynamoDB via GraphQL.
 
-    # Mutation for parent entity (simulation job result)
-    parent_query = """
+    Only writes the lightweight result record (compartment_deltas,
+    control_run, dates, etc.).  AdminZoneTimeSeries (large time-series
+    data) is no longer written to DynamoDB — it lives only in S3.
+
+    Derives compartment-agnostic v2 payloads (compartment_deltas_v2)
+    before writing so any compartment key is representable.
+    """
+    # Derive v2 payloads so compartment_deltas_v2 is available on the
+    # metadata record (also enriches time series in-place for S3).
+    _add_v2_payloads(results)
+
+    query = """
         mutation CreateSimulationJobResult($input: CreateSimulationJobResultInput!) {
             createSimulationJobResult(input: $input) {
                 id
@@ -229,67 +326,33 @@ def write_to_gql(job_params, results):
             }
         }
     """
-    results.pop("admin_zones")  # Remove child data before parent write
-    results.pop("parent_admin_total")  # Remove parent admin data before parent write
-    responses["parent_response"] = gql_write_helper(job_params, results, parent_query)
+    # Strip time-series payloads — they are not part of the mutation input
+    # and would be rejected.  Build a clean metadata-only dict.
+    excluded_keys = {"admin_zones", "parent_admin_total"}
+    metadata = {k: v for k, v in results.items() if k not in excluded_keys}
 
-    return responses  # Return collected responses
+    return _gql_write(job_params, metadata, query)
 
 
-def gql_write_helper(job_params, results, query):
-    """Write resutls of model to GraphQL"""
-
-    # Ensure JSON-serializable payload (dates, datetimes, ndarrays → strings/lists)
-    safe_results = convert_dates(results)
-
-    payload = {
-        "query": query,
-        "variables": {"input": safe_results},
-    }
+def _gql_write(job_params, data, query):
+    """POST a single GraphQL mutation."""
+    safe_data = convert_dates(data)
+    payload = {"query": query, "variables": {"input": safe_data}}
 
     headers = {"Content-Type": "application/json"}
     api_key = job_params.get("GRAPHQL_APIKEY")
-    GRAPHQL_ENDPOINT = job_params.get("GRAPHQL_ENDPOINT")
+    endpoint = job_params.get("GRAPHQL_ENDPOINT")
     if api_key:
         headers["x-api-key"] = api_key
 
     try:
-        response = requests.post(GRAPHQL_ENDPOINT, json=payload, headers=headers)
+        response = requests.post(endpoint, json=payload, headers=headers)
         status_code = response.status_code
         response.raise_for_status()
-        gql_response = response.json()
-        return {"status_code": status_code, "gql_response": gql_response}
+        return {"status_code": status_code, "gql_response": response.json()}
     except requests.RequestException as e:
         status_code = getattr(e.response, "status_code", None)
         return {"status_code": status_code, "error": str(e)}
-
-
-def parallel_write(job_params, inputs, query, max_workers=8):
-    """
-    Parallel writes inputs to gql
-
-    Args:
-        job_params (dict): GraphQL job parameters
-        inputs (list of dict): One dict per record to write
-        query (str): GraphQL mutation string for writes
-        max_workers (int): Number of threads
-
-    Returns:
-        list: Responses from the GraphQL API, in the same order as inputs.
-    """
-    responses = [None] * len(inputs)
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_index = {
-            executor.submit(gql_write_helper, job_params, i, query): idx
-            for idx, i in enumerate(inputs)
-        }
-        for future in as_completed(future_to_index):
-            idx = future_to_index[future]
-            try:
-                responses[idx] = future.result()
-            except Exception as e:
-                responses[idx] = {"error": str(e)}
-    return responses
 
 
 def _gql_query(job_params: dict, query: str, variables: dict) -> dict:

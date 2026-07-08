@@ -538,3 +538,219 @@ class TestAgeRangeValidation:
             b.add_demographic_group("a", "A", default_weight=50.0, age_range=(-1, 17))
         with pytest.raises(ValueError, match="0 <= low <= high <= 120"):
             b.add_demographic_group("a", "A", default_weight=50.0, age_range=(0, 200))
+
+
+# ---------------------------------------------------------------------------
+# Demographic group count limits (>20)
+# ---------------------------------------------------------------------------
+
+
+class TestAgeGroupCountLimits:
+    def _builder(self):
+        from compartment.parameters import ParameterSchemaBuilder
+        b = ParameterSchemaBuilder()
+        b.set_model_info(disease_type="TEST", label="Test", description="t")
+        b.add_compartment("S", "Susceptible", "")
+        return b
+
+    def _fill_to_max(self, builder):
+        from compartment.parameters import MAX_DEMOGRAPHIC_GROUPS
+        weight = 100.0 / MAX_DEMOGRAPHIC_GROUPS
+        for i in range(MAX_DEMOGRAPHIC_GROUPS):
+            builder.add_demographic_group(f"g{i}", f"Group {i}", weight)
+
+    def test_exactly_max_groups_accepted(self):
+        from compartment.parameters import MAX_DEMOGRAPHIC_GROUPS
+        b = self._builder()
+        self._fill_to_max(b)
+        schema = b.build()
+        assert len(schema.demographic_groups) == MAX_DEMOGRAPHIC_GROUPS
+
+    def test_one_over_max_raises(self):
+        b = self._builder()
+        self._fill_to_max(b)
+        with pytest.raises(ValueError, match="Too many demographic groups"):
+            b.add_demographic_group("overflow", "Overflow", 0.0)
+
+    def test_error_message_includes_limit_value(self):
+        from compartment.parameters import MAX_DEMOGRAPHIC_GROUPS
+        b = self._builder()
+        self._fill_to_max(b)
+        with pytest.raises(ValueError, match=str(MAX_DEMOGRAPHIC_GROUPS)):
+            b.add_demographic_group("overflow", "Overflow", 0.0)
+
+    def test_error_raised_on_21st_group_not_before(self):
+        from compartment.parameters import MAX_DEMOGRAPHIC_GROUPS
+        b = self._builder()
+        weight = 100.0 / (MAX_DEMOGRAPHIC_GROUPS + 1)
+        for i in range(MAX_DEMOGRAPHIC_GROUPS - 1):
+            b.add_demographic_group(f"g{i}", f"Group {i}", weight)
+        # 20th group (index 19) must still succeed
+        b.add_demographic_group("g_last_valid", "Last valid", weight)
+        # 21st must fail
+        with pytest.raises(ValueError, match="Too many demographic groups"):
+            b.add_demographic_group("g_too_many", "Too many", weight)
+
+    def test_max_groups_with_age_ranges_accepted(self):
+        from compartment.parameters import MAX_DEMOGRAPHIC_GROUPS
+        b = self._builder()
+        # Divide [0, 120] evenly across MAX_DEMOGRAPHIC_GROUPS non-overlapping bands
+        span = 120 // MAX_DEMOGRAPHIC_GROUPS
+        for i in range(MAX_DEMOGRAPHIC_GROUPS):
+            lo = i * span
+            hi = lo + span - 1 if i < MAX_DEMOGRAPHIC_GROUPS - 1 else 120
+            b.add_demographic_group(f"g{i}", f"Group {i}", 5.0, age_range=(lo, hi))
+        schema = b.build()
+        assert len(schema.demographic_groups) == MAX_DEMOGRAPHIC_GROUPS
+
+
+# ---------------------------------------------------------------------------
+# Flexible age stratification — contact matrix, population tensor, rate vectors
+# ---------------------------------------------------------------------------
+
+
+class TestFlexibleAgeStratification:
+    def _builder(self):
+        from compartment.parameters import ParameterSchemaBuilder
+        b = ParameterSchemaBuilder()
+        b.set_model_info(disease_type="TEST", label="Test", description="t")
+        b.add_compartment("S", "Susceptible", "")
+        return b
+
+    # --- Contact matrix shape ---
+
+    def test_single_group_contact_matrix_is_1x1_identity(self):
+        groups = [("all", "All", 100.0)]
+        schema = _make_schema(groups=groups)
+        model = _make_model_with_schema(schema, np.zeros((1, 2)))
+        result = np.array(model._build_contact_matrix(config={}))
+        np.testing.assert_allclose(result, [[1.0]])
+
+    def test_five_groups_contact_matrix_shape_and_diagonal(self):
+        groups = [(f"g{i}", f"G{i}", 20.0) for i in range(5)]
+        schema = _make_schema(groups=groups)
+        model = _make_model_with_schema(schema, np.zeros((1, 2)))
+        result = np.array(model._build_contact_matrix(config={}))
+        assert result.shape == (5, 5)
+        np.testing.assert_allclose(result, np.eye(5))
+
+    def test_ten_groups_contact_matrix_shape(self):
+        groups = [(f"g{i}", f"G{i}", 10.0) for i in range(10)]
+        schema = _make_schema(groups=groups)
+        model = _make_model_with_schema(schema, np.zeros((1, 2)))
+        result = np.array(model._build_contact_matrix(config={}))
+        assert result.shape == (10, 10)
+        np.testing.assert_allclose(result, np.eye(10))
+
+    def test_twenty_groups_contact_matrix_shape(self):
+        groups = [(f"g{i}", f"G{i}", 5.0) for i in range(20)]
+        schema = _make_schema(groups=groups)
+        model = _make_model_with_schema(schema, np.zeros((1, 2)))
+        result = np.array(model._build_contact_matrix(config={}))
+        assert result.shape == (20, 20)
+        np.testing.assert_allclose(result, np.eye(20))
+
+    def test_age_ranged_five_bands_prem_matrix_shape(self):
+        groups = [
+            ("g0", "0-23",  20.0, (0,  23)),
+            ("g1", "24-47", 20.0, (24, 47)),
+            ("g2", "48-71", 20.0, (48, 71)),
+            ("g3", "72-95", 20.0, (72, 95)),
+            ("g4", "96+",   20.0, (96, 120)),
+        ]
+        schema = _make_schema(groups=groups)
+        model = _make_model_with_schema(schema)
+        result = np.array(model._build_contact_matrix(config={}))
+        assert result.shape == (5, 5)
+
+    def test_single_year_bands_yield_correct_matrix_size(self):
+        # Ten 1-year bands: (0,0), (1,1), …, (9,9)
+        groups = [(f"age_{i}", f"{i}yo", 10.0, (i, i)) for i in range(10)]
+        schema = _make_schema(groups=groups)
+        model = _make_model_with_schema(schema)
+        result = np.array(model._build_contact_matrix(config={}))
+        assert result.shape == (10, 10)
+
+    def test_mixed_ranged_and_unranged_falls_back_to_identity(self, caplog):
+        # Partial age_range coverage: framework tries Prem (admin_unit_id present),
+        # finds not all groups have age_range, falls back to identity + warning.
+        groups = [
+            ("young", "Young", 50.0, (0, 30)),
+            ("old",   "Old",   50.0),
+        ]
+        schema = _make_schema(groups=groups)
+        model = _make_model_with_schema(schema)
+        with caplog.at_level("WARNING", logger="compartment.model"):
+            result = np.array(model._build_contact_matrix(
+                config={
+                    "admin_unit_id": "USA.6.1_1",
+                    "case_file": {"demographics": {"young": 50, "old": 50}},
+                }
+            ))
+        np.testing.assert_allclose(result, np.eye(2))
+        assert any("defaults to identity" in r.message for r in caplog.records)
+
+    # --- Population tensor shape ---
+
+    def test_population_tensor_shape_with_many_groups(self):
+        K, R = 3, 2
+        n = 10
+        groups = [(f"g{i}", f"G{i}", 100.0 / n) for i in range(n)]
+        pm = np.full((K, R), 1000.0)
+        schema = _make_schema(groups=groups)
+        model = _make_model_with_schema(schema, pm)
+        model.demographics = {g[0]: g[2] for g in groups}
+        model.compartment_list = [f"C{i}" for i in range(K)]
+        model._prepare_demographic_state()
+        assert model.population_matrix.shape == (K, n, R)
+
+    def test_population_sums_preserved_across_group_counts(self):
+        for n in (2, 5, 8, 16):
+            K, R = 2, 3
+            groups = [(f"g{i}", f"G{i}", 100.0 / n) for i in range(n)]
+            pm = np.full((K, R), float(n) * 100)
+            schema = _make_schema(groups=groups)
+            model = _make_model_with_schema(schema, pm)
+            model.demographics = {g[0]: g[2] for g in groups}
+            model.compartment_list = [f"C{i}" for i in range(K)]
+            model._prepare_demographic_state()
+            np.testing.assert_allclose(
+                model.population_matrix.sum(axis=1), pm, rtol=1e-6,
+                err_msg=f"Population sums not preserved for n={n} groups",
+            )
+
+    # --- Rate vector length ---
+
+    def test_rate_vector_length_matches_group_count(self):
+        from compartment.parameters import ValueType
+        n = 7
+        groups = [(f"g{i}", f"G{i}", 100.0 / n) for i in range(n)]
+        edge = MagicMock()
+        edge.variable_name = "gamma"
+        edge.parameter = MagicMock()
+        edge.parameter.value_type = ValueType.RATE
+        schema = _make_schema(groups=groups, edges=[edge])
+        model = _make_model_with_schema(schema)
+        setattr(model, "gamma", 0.1)
+        config = {"demographic_rate_overrides": {"gamma": {"g0": 0.2}}}
+        result = model._build_rate_vectors(config=config)
+        assert result is not None
+        assert len(result["gamma"]) == n
+
+    def test_rate_vector_all_groups_default_when_no_override_group_match(self):
+        from compartment.parameters import ValueType
+        n = 5
+        groups = [(f"g{i}", f"G{i}", 20.0) for i in range(n)]
+        edge = MagicMock()
+        edge.variable_name = "mu"
+        edge.parameter = MagicMock()
+        edge.parameter.value_type = ValueType.RATE
+        schema = _make_schema(groups=groups, edges=[edge])
+        model = _make_model_with_schema(schema)
+        setattr(model, "mu", 0.05)
+        config = {"demographic_rate_overrides": {"mu": {"g2": 0.99}}}
+        result = model._build_rate_vectors(config=config)
+        vec = np.array(result["mu"])
+        assert vec[2] == pytest.approx(0.99)
+        for i in [0, 1, 3, 4]:
+            assert vec[i] == pytest.approx(0.05)

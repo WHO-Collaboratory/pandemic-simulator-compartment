@@ -3,16 +3,16 @@ CLI tool for generating model artifact JSON and example config files.
 
 Usage:
     # Generate artifact JSON (stdout)
-    python -m compartment.generate_artifact MONKEYPOX
+    python -m compartment.generate_artifact MPOX
 
     # Write artifact to a file
-    python -m compartment.generate_artifact MONKEYPOX --output artifact.json
+    python -m compartment.generate_artifact MPOX --output artifact.json
 
     # Generate an example simulation config instead
-    python -m compartment.generate_artifact MONKEYPOX --example-config
+    python -m compartment.generate_artifact MPOX --example-config
 
     # Generate both artifact and example config to files
-    python -m compartment.generate_artifact MONKEYPOX --output artifact.json --example-config --config-output example.json
+    python -m compartment.generate_artifact MPOX --output artifact.json --example-config --config-output example.json
 """
 
 from __future__ import annotations
@@ -100,7 +100,7 @@ def main():
     parser.add_argument(
         "disease_type",
         nargs="?",
-        help="Disease type identifier (e.g. MONKEYPOX). Omit to list available types.",
+        help="Disease type identifier (e.g. MPOX). Omit to list available types.",
     )
     parser.add_argument(
         "--output",

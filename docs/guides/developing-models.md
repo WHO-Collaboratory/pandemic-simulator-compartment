@@ -22,6 +22,7 @@ You only need to write code for the parts that are genuinely model-specific: the
 | Output formatter | [compartment/simulation_postprocessor.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/simulation_postprocessor.py) | Aggregates age groups, applies `COMPARTMENT_DELTA_GROUPING`, emits `_total` deltas |
 | Generic driver / CLI plumbing | [compartment/driver.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/driver.py) | `drive_simulation(model_class, args)` — your `main.py` is just a thin wrapper |
 | Artifact generator CLI | [compartment/generate_artifact.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/generate_artifact.py) | `python -m compartment.generate_artifact <DISEASE_TYPE> [--example-config]` |
+| Results viewer (local tool) | [tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py) | Plots `parent_admin_total` with vs. without interventions, intervention start/stop lines, uncertainty bands, and a `compartment_deltas` metric table |
 
 Existing models to copy from:
 
@@ -30,6 +31,64 @@ Existing models to copy from:
 - 4-serotype vector-borne with cumulative groupings: [compartment/models/dengue_jax_model/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/dengue_jax_model/model.py)
 - Stochastic SIR (tau-leaping): [compartment/models/test_covid_sir_stochastic/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/test_covid_sir_stochastic/model.py)
 - Multi-dimensional AMR model: [compartment/models/test_klebsiella_amr_model/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/test_klebsiella_amr_model/model.py)
+
+## Scaffolding a new model
+
+The fastest way to start is the built-in scaffold command.  It creates the full
+directory layout, a working SIR template, and the standard boilerplate files in
+one shot:
+
+```bash
+python -m compartment.new_model my_disease
+```
+
+This creates `compartment/models/my_disease_jax_model/` containing:
+- `__init__.py` — empty package marker
+- `model.py` — `MyDiseaseJaxModel` with a minimal SIR (`define_parameters` + `derivative`)
+- `main.py` — standard CLI wrapper around `drive_simulation()`
+- `example-config.json` — minimal runnable config wired to the template's edges
+
+### Naming conventions
+
+| Input name | Directory | Class | Disease type |
+|---|---|---|---|
+| `my_disease` | `my_disease_jax_model/` | `MyDiseaseJaxModel` | `MY_DISEASE` |
+| `my_disease_jax_model` | same (suffix stripped) | same | same |
+
+### Optional flags
+
+```bash
+# Custom display label and disease-type identifier
+python -m compartment.new_model my_disease \
+    --label "My Disease" \
+    --disease-type MY_DISEASE
+
+# Preview what would be created without writing anything
+python -m compartment.new_model my_disease --dry-run
+```
+
+### After scaffolding
+
+The generated model runs immediately as a sanity check:
+
+```bash
+python -m compartment.models.my_disease_jax_model.main \
+    --mode local \
+    --config_file compartment/models/my_disease_jax_model/example-config.json \
+    --output_file results/my_disease-test.json
+```
+
+From there, open `model.py` and:
+1. Add or replace compartments and transmission edges in `define_parameters()`.
+2. Regenerate `example-config.json` to pick up the new schema:
+   ```bash
+   python -m compartment.generate_artifact MY_DISEASE \
+       --example-config \
+       --config-output compartment/models/my_disease_jax_model/example-config.json
+   ```
+3. Flesh out `derivative()` with the actual ODE logic.
+
+The sections below explain each piece in detail.
 
 ## File layout
 
@@ -443,6 +502,16 @@ python -m compartment.models.your_model.main \
 `run_simulation` runs your model **twice in parallel** — once with interventions and once without (the "control run") — and writes both into the output JSON. In `UNCERTAINTY` mode (set `run_mode` in the config) it draws Latin Hypercube samples over edge variances and produces median + CI bands.
 
 > **📚 For comprehensive documentation on uncertainty quantification**, see **[UNCERTAINTY_QUANTIFICATION.md](./uncertainty-quantification.md)** — detailed guide to parameter uncertainty, Latin Hypercube Sampling, supported distributions, and interpreting results.
+
+### Viewing results
+
+To eyeball a run, use the local results viewer:
+
+```bash
+python tools/view_results.py results/test_run.json
+```
+
+It plots the whole-population (`parent_admin_total`) compartment time series for the **with-interventions** and **control** runs side by side, drops a vertical line at each intervention's start/stop date, shades the uncertainty bands for `UNCERTAINTY` output, and lists each run's `compartment_deltas` (cumulative per-compartment totals) as a metric table using the frontend's compartment names. See [tools/README.md](../tools/README.md) for flags (compartment subset, log scale, `--no-deltas`, saving to an image).
 
 ## Tests
 

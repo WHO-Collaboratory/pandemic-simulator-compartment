@@ -7,7 +7,6 @@ from .post_processor import ValidationPostProcessor, ProcessedSimulation
 from .diseases import (
     CovidDiseaseConfig,
     DengueDiseaseConfig,
-    Dengue2StrainDiseaseConfig,
 )
 
 # Auto-generated disease configs (migrated to declarative parameters)
@@ -44,7 +43,6 @@ __all__ = [
     # Disease configs
     "CovidDiseaseConfig",
     "DengueDiseaseConfig",
-    "Dengue2StrainDiseaseConfig",
     "MpoxDiseaseConfig",
     "KlebsiellaAmrDiseaseConfig",
     "CovidSirStochasticDiseaseConfig",
@@ -86,7 +84,6 @@ def _get_model_registry() -> dict:
 
 _FALLBACK_DISEASE_CONFIG = {
     "VECTOR_BORNE": DengueDiseaseConfig,
-    "VECTOR_BORNE_2STRAIN": Dengue2StrainDiseaseConfig,
 }
 
 
@@ -142,7 +139,7 @@ def load_simulation_config(config: dict, disease_type: str):
 
     Args:
         config: Configuration dict (usually from GraphQL/JSON)
-        disease_type: Type of disease ("RESPIRATORY", "VECTOR_BORNE", "MONKEYPOX")
+        disease_type: Type of disease ("RESPIRATORY", "VECTOR_BORNE", "MPOX")
 
     Returns:
         ProcessedSimulation with all computed fields ready for use by Model classes.

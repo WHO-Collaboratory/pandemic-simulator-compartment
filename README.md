@@ -51,6 +51,17 @@ docker run \
 
 Cloud mode is intended for use in the Pandemic Simulator app, and is not supported for use by the wider community at this time.
 
+## Viewing simulation results
+
+Once a simulation has written its output JSON, you can quickly visualize it with the local results viewer in the `tools/` directory:
+
+```
+# Plot the whole-population (parent_admin_total) compartment time series
+python tools/view_results.py results/example-run.json
+```
+
+The viewer draws the **with-interventions** and **control (no-interventions)** runs side by side on a shared axis, marks each intervention's start and stop date, and shades uncertainty bounds when the run used `UNCERTAINTY` (or a stochastic multi-run) mode. Beneath the chart it lists each run's `compartment_deltas` (cumulative per-compartment totals) as a metric table, using the same compartment names and number formatting as the web app. It reads only the parent admin total, never per-admin-zone series. See [`tools/README.md`](tools/README.md) for the available options (compartment subset, log scale, hiding the deltas table, saving to an image). It only needs `matplotlib`, which is already a core dependency.
+
 ## Using Reference Files
 
 Configuration files define the parameters for running simulations. These JSON files specify the disease model, geographic regions, population data, interventions, and simulation settings. Example configuration files are available in the `reference/` directory. We encourage modelers to add their own reference files to this directory when experimenting with models locally.
@@ -199,7 +210,10 @@ pandemic-simulator-compartment/
 │   │   |── covid_jax_model/        # Respiratory disease model
 |   |   |── dengue_jax_model/       # Vector-borne disease model
 │   ├── validation/                 # Pydantic syntax models which verify that a config is an acceptable input for a model.
+├── docs/                           # In-depth guides (interventions, uncertainty, contact matrices, gravity model).
 ├── reference/                      # Model configurations for running models locally. You can add your own reference configs.
+├── results/                        # Local simulation outputs (gitignored).
+├── tools/                          # Local utilities for modelers, e.g. view_results.py — the simulation results viewer.
 ```
 
 ## Caveats/Limitations

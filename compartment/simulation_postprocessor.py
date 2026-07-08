@@ -146,6 +146,7 @@ class SimulationPostProcessor:
             str(self.start_date),
             self.n_timesteps,
             self.step,
-            avg_compartment_deltas
+            avg_compartment_deltas,
+            intervention_dict=self.intervention_dict,
         )
         

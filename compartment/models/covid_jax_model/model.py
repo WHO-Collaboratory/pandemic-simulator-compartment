@@ -172,6 +172,25 @@ class CovidJaxModel(Model):
             transmission_reduction=50.0,
         )
 
+        schema.add_intervention(
+            id="lock_down",
+            label="Lockdown",
+            description="Severe movement restrictions: halts inter-regional travel and reduces transmission through reduced social contact",
+            target_rates=["beta"],
+            modifies_travel=True,
+            adherence=80.0,
+            transmission_reduction=70.0,
+        )
+
+        schema.add_intervention(
+            id="vaccination",
+            label="Vaccination",
+            description="Leaky-vaccine campaign: lowers the effective transmission rate, with adherence as vaccination coverage and transmission reduction as vaccine efficacy",
+            target_rates=["beta"],
+            adherence=60.0,
+            transmission_reduction=80.0,
+        )
+
         # ---- Demographics ----
         # age_range enables auto-loading of the country's Prem 2021 contact
         # matrix (aggregated to these bands) when no explicit overrides are

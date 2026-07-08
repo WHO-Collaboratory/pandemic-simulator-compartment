@@ -12,17 +12,19 @@ from compartment.batch_simulation_manager import BatchSimulationManager
 from compartment.helpers import (
     get_executor_class,
     generate_LHS_samples,
-    build_uncertainty_params,
+    collect_uncertainty_params,
+    extract_disease_variance_params,
+    resolve_run_mode,
     load_config_from_json,
     write_results_to_local,
-    as_dict_list,
 )
 from compartment.cloud_helpers.graphql_queries import GRAPHQL_QUERY
 from compartment.cloud_helpers.gql import (
     get_simulation_job,
+    update_simulation_job_run_mode,
+    write_to_gql,
 )
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
-from compartment.cloud_helpers.gql import write_to_gql
 from compartment.model import Model
 
 # Makes sure unix implementations don't deadlock
@@ -70,6 +72,8 @@ def run_simulation(
         simulation_job_id = config["data"]["getSimulationJob"].get(
             "id", "local-simulation"
         )
+        disease_section = config["data"]["getSimulationJob"].get("Disease", {})
+        disease_param_field_configs = extract_disease_variance_params(disease_section)
         owner = "local-user"
     elif mode == "cloud":
         logger.info("Running in CLOUD mode")
@@ -96,11 +100,11 @@ def run_simulation(
     # Disease.disease_type is the base type (e.g. COVID_SEIHDR).
     # The caller-supplied model_class is kept as a final fallback.
     from compartment.registry import resolve as _resolve
+
     job = config["data"]["getSimulationJob"]
-    config_disease_type = (
-        (job.get("ModelArtifact") or {}).get("disease_type")
-        or (job.get("Disease") or {}).get("disease_type")
-    )
+    config_disease_type = (job.get("ModelArtifact") or {}).get("disease_type") or (
+        job.get("Disease") or {}
+    ).get("disease_type")
     if config_disease_type:
         resolved = _resolve(config_disease_type)
         if resolved is not None:
@@ -144,14 +148,42 @@ def run_simulation(
         logger.error(f"model_class must be a subclass of Model, got {model_class}")
         raise ValueError(f"model_class must be a subclass of Model, got {model_class}")
 
-    run_mode = cleaned_config.run_mode
+    # Gather variance from every source (edges, interventions, disease params)
+    # and let its presence decide run_mode — works the same in local and cloud.
+    uncertainty_params = collect_uncertainty_params(
+        cleaned_config, disease_param_field_configs
+    )
+    run_mode = resolve_run_mode(model_class, uncertainty_params)
+    if run_mode == "STOCHASTIC":
+        logger.info(
+            f"Model has STOCHASTIC=True — effective run_mode: STOCHASTIC"
+            + (
+                f", {len(uncertainty_params)} variance param(s) spread across runs"
+                if uncertainty_params
+                else ""
+            )
+        )
+    elif run_mode == "UNCERTAINTY":
+        logger.info(
+            f"Detected {len(uncertainty_params)} variance param(s) — "
+            f"effective run_mode: UNCERTAINTY"
+        )
     logger.info(f"run_mode: {run_mode}")
+    if mode == "cloud" and simulation_params:
+        update_simulation_job_run_mode(simulation_params, run_mode)
 
     # Create business as usual model
     model_with = model_class(cleaned_config)
     # Create a deepcopy for the interventionless model
     model_without = deepcopy(model_with)
     model_without.intervention_dict = {}
+    # Keep the control model's *source config* interventionless too: uncertainty
+    # rebuilds (Model.build_overridden_config) reconstruct from the source
+    # config, so a non-empty intervention_dict there would silently re-add
+    # interventions to the control batch.
+    _control_cfg = model_without._source_config()
+    if _control_cfg is not None and hasattr(_control_cfg, "intervention_dict"):
+        _control_cfg.intervention_dict = {}
 
     # Split cpu in half for top level workers
     # Then split the remaining cpu in half for low level workers
@@ -166,46 +198,67 @@ def run_simulation(
             future_without = executor.submit(simulate_and_postprocess, model_without)
             results_with = future_with.result()
             results_without = future_without.result()
-    else:
-        n_sims = getattr(cleaned_config, "n_simulations", None) or 30
+    elif run_mode == "STOCHASTIC":
+        # Priority: smoke-test config override > disease param (via
+        # DiseaseParamValues for models using standard __init__) > Disease
+        # config field (catches models with custom __init__ that bypass
+        # DiseaseParamValues) > model class default (NUM_RUNS from schema).
+        disease_params_num_runs = getattr(
+            getattr(model_with, "disease_params", None), "num_runs", None
+        )
+        # cleaned_config.Disease is the validated config *dict* (ProcessedSimulation
+        # resolves it from self.config), so read num_runs with dict access.
+        _disease_dict = getattr(cleaned_config, "Disease", None) or {}
+        _disease_config_num_runs = (
+            _disease_dict.get("num_runs") if isinstance(_disease_dict, dict) else None
+        )
+        # int() coercion: a num_runs disease parameter (value_type INTEGER)
+        # is serialised to the artifact as "NUMBER", which the cloud custom-
+        # field caster turns into a float (e.g. 10.0). range()/LHS sampling
+        # below require an int, so normalise here regardless of source.
+        n_sims = int(
+            getattr(cleaned_config, "n_simulations", None)
+            or disease_params_num_runs
+            or _disease_config_num_runs
+            or getattr(model_class, "NUM_RUNS", 30)
+        )
         ci = 0.95
 
-        # Extract normalized TransmissionEdges and Interventions for uncertainty
-        transmission_edge_items = []
-        interventions_items = []
+        logger.info(f"Number of stochastic trajectories: {n_sims}")
+        logger.info(f"Confidence interval: {ci}")
+        if uncertainty_params:
+            logger.info(f"Variance parameters (spread across trajectories): {uncertainty_params}")
+            param_list = generate_LHS_samples(n_sims, uncertainty_params)
+        else:
+            param_list = [{} for _ in range(n_sims)]
 
-        transmission_edges_section = getattr(cleaned_config, "TransmissionEdges", None)
-        if transmission_edges_section:
-            if isinstance(transmission_edges_section, dict):
-                transmission_edge_items = transmission_edges_section.get("items", [])
-            else:
-                transmission_edge_items = getattr(
-                    transmission_edges_section, "items", []
-                )
+        interventionless_param_list = [
+            {k: v for k, v in d.items() if not k.startswith("intervention.")}
+            for d in param_list
+        ]
 
-        interventions_section = getattr(cleaned_config, "Interventions", None)
-        if interventions_section:
-            if isinstance(interventions_section, dict):
-                interventions_items = interventions_section.get("items", [])
-            else:
-                interventions_items = getattr(interventions_section, "items", [])
-
-        # Convert to dicts if they're Pydantic models
-        transmission_edge_dicts = as_dict_list(transmission_edge_items)
-        intervention_dicts = as_dict_list(interventions_items)
-
-        uncertainty_params = build_uncertainty_params(
-            transmission_edge_dicts, intervention_dicts
-        )
-
-        # Append disease parameter custom field variance configs (if any).
-        # These were collected by get_simulation_job() from FieldConfig
-        # records on SimulationJobCustomField entries.
-        if disease_param_field_configs:
-            uncertainty_params.extend(disease_param_field_configs)
-            logger.info(
-                f"Added {len(disease_param_field_configs)} disease parameter variance config(s) to uncertainty params"
+        with ExecutorClass(max_workers=top_level_workers) as executor:
+            future_with = executor.submit(
+                batch_simulate_and_postprocess,
+                model_with,
+                n_sims,
+                param_list,
+                ci,
+                low_level_workers,
             )
+            future_without = executor.submit(
+                batch_simulate_and_postprocess,
+                model_without,
+                n_sims,
+                interventionless_param_list,
+                ci,
+                low_level_workers,
+            )
+            results_with = future_with.result()
+            results_without = future_without.result()
+    else:  # UNCERTAINTY — only reached for DETERMINISTIC models (STOCHASTIC takes priority)
+        n_sims = int(getattr(cleaned_config, "n_simulations", None) or 30)
+        ci = 0.95
 
         logger.info(f"Number of simulations: {n_sims}")
         logger.info(f"Confidence interval: {ci}")
@@ -250,30 +303,37 @@ def run_simulation(
             write_results_to_local(results, output_path)
             logger.info(f"Results saved to: {output_path}")
     else:
-        # Cloud mode: write to GQL and S3, invoke lambda
-        s3_results = deepcopy(results)
+        # Cloud mode: write results to S3 (full data) and GQL (metadata only)
         s3_client = boto3.client("s3", region_name="us-east-1")
         bucket_name = f"compartmental-results-{simulation_params.get('ENVIRONMENT')}"
 
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        max_workers = min(32, max(4, len(results) * 2))  # tune as needed
-        gql_statuses_by_i = [None] * len(results)
-        s3_statuses_by_i = [None] * len(results)
-
+        gql_statuses = [None] * len(results)
+        s3_statuses = [None] * len(results)
         future_to_meta = {}
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=len(results) * 2) as executor:
             for i, result in enumerate(results):
+                # GQL: write SimulationJobResult metadata only (no time series).
+                # Extract metadata before submitting to avoid races with S3
+                # writer which pops admin_zones/parent_admin_total.
+                gql_metadata = {
+                    k: v
+                    for k, v in result.items()
+                    if k not in ("admin_zones", "parent_admin_total")
+                }
                 future_to_meta[
-                    executor.submit(write_to_gql, simulation_params, result)
+                    executor.submit(write_to_gql, simulation_params, gql_metadata)
                 ] = (i, "gql")
+
+                # S3: write full data (time series + metadata)
                 future_to_meta[
                     executor.submit(
                         write_to_s3,
                         s3_client,
                         bucket_name,
-                        s3_results[i],
+                        result,
                         simulation_job_id,
                     )
                 ] = (i, "s3")
@@ -287,13 +347,13 @@ def run_simulation(
                     out = {"status": "error", "error": str(e)}
 
                 if kind == "gql":
-                    gql_statuses_by_i[i] = out
+                    gql_statuses[i] = out
                 else:
-                    s3_statuses_by_i[i] = out
+                    s3_statuses[i] = out
 
         for i in range(len(results)):
-            logger.info(f"gql_statuses_{i}: {gql_statuses_by_i[i]}")
-            logger.info(f"s3_statuses_{i}: {s3_statuses_by_i[i]}")
+            logger.info(f"gql_statuses_{i}: {gql_statuses[i]}")
+            logger.info(f"s3_statuses_{i}: {s3_statuses[i]}")
 
         # Invoke get-ai-summary lambda
         lambda_client = boto3.client("lambda", region_name="us-east-1")

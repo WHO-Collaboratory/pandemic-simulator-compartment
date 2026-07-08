@@ -54,6 +54,10 @@ class Model(ABC):
     # None means the model hasn't migrated to define_parameters() yet.
     _cached_schema: ClassVar[ModelParameterSchema | None] = None
 
+    # Derived from schema.set_num_runs() in define_parameters(); set by __init_subclass__.
+    # Read by run_simulation to determine the trajectory count for stochastic runs.
+    NUM_RUNS: ClassVar[int] = 30
+
     def __init_subclass__(cls, **kwargs):
         """
         Auto-populate schema-derived class attributes when a subclass is
@@ -80,6 +84,16 @@ class Model(ABC):
             schema = cls._build_parameter_schema()
             cls._cached_schema = schema
 
+            # Derive the display order for the results sidebar from
+            # COMPARTMENT_DELTA_GROUPING (if the model defines one) or
+            # fall back to the raw compartment IDs.  Must run before
+            # _add_total_compartments so that _total entries are excluded.
+            grouping = getattr(cls, "COMPARTMENT_DELTA_GROUPING", None)
+            if grouping:
+                schema.compartment_display_order = list(grouping.keys())
+            else:
+                schema.compartment_display_order = [c.id for c in schema.compartments]
+
             # Auto-generate _total compartments for each edge target.
             # These are a framework concern (derivative accumulation,
             # post-processing) — model authors never declare them.
@@ -98,6 +112,9 @@ class Model(ABC):
             # disease parameter and admin zone field names.
             cls.DISEASE_PARAMS = DiseaseParamRegistry(schema.disease_parameters)
             cls.ADMIN_ZONE_FIELDS = AdminZoneFieldRegistry(schema.admin_zone_fields)
+            # Derive NUM_RUNS from the schema so run_simulation can read it
+            # without importing the parameters module.
+            cls.NUM_RUNS = schema.num_runs
         except (NotImplementedError, Exception):
             # Non-migrated model — leave everything as-is.
             pass
@@ -243,7 +260,7 @@ class Model(ABC):
     @property
     def disease_type(self):
         """
-        Disease type identifier (e.g. ``"MONKEYPOX"``).
+        Disease type identifier (e.g. ``"MPOX"``).
 
         Migrated models get this from the schema automatically. Non-migrated models should override this property.
         """
@@ -300,7 +317,22 @@ class Model(ABC):
         # Let the subclass fill the rest
         cls.define_parameters(schema)
 
-        return schema.build()
+        built = schema.build()
+
+        # Expose the UI compartment display order. When the model groups raw
+        # compartments (COMPARTMENT_DELTA_GROUPING), the grouped keys are what
+        # appear in time series + deltas — surface those (in order) so the
+        # results view orders bespoke compartments correctly. Ungrouped models
+        # fall back to declared-compartment order in to_artifact_dict.
+        grouping = getattr(cls, "COMPARTMENT_DELTA_GROUPING", None)
+        if grouping:
+            built.compartment_display_order = list(grouping.keys())
+
+        # run_mode is derived from the class-level STOCHASTIC flag (not
+        # a schema field) since it reflects the integrator, not a parameter.
+        built.run_mode = "STOCHASTIC" if getattr(cls, "STOCHASTIC", False) else "DETERMINISTIC"
+
+        return built
 
     # ------------------------------------------------------------------
     # Shared parameter helpers (inherited by all subclasses)
@@ -331,7 +363,7 @@ class Model(ABC):
             ParameterDef(
                 name="run_mode",
                 label="Run Mode",
-                description="Run a single deterministic simulation or uncertainty analysis with multiple runs",
+                description="Run a single deterministic simulation or uncertainty analysis with multiple runs. STOCHASTIC models always run their model-defined NUM_RUNS trajectories. UNCERTAINTY runs 30 trajectories on deterministic models.",
                 value_type=ValueType.SELECT,
                 default="DETERMINISTIC",
                 options=["DETERMINISTIC", "UNCERTAINTY"],
@@ -750,6 +782,84 @@ class Model(ABC):
             result[variable_name] = xp.array(vec)
 
         return result or None
+
+    def _source_config(self):
+        """Return the config object this model was constructed from.
+
+        Migrated models store it as ``self.config`` (set by
+        ``super().__init__``); some hand-written models (e.g. dengue) store
+        it as ``self.payload``.  Either can be re-fed to ``type(self)(...)``
+        to rebuild an equivalent model.
+        """
+        cfg = getattr(self, "config", None)
+        if cfg is None:
+            cfg = getattr(self, "payload", None)
+        return cfg
+
+    def build_overridden_config(self, params: dict[str, Any]):
+        """Deep-copy this model's source config and apply LHS uncertainty
+        overrides, returning the new config.
+
+        This is the basis for uncertainty sampling: instead of mutating a
+        constructed model (whose ``__init__`` may have already baked params
+        into derived constants like ``1/latent_period``), the runner rebuilds
+        the model from an overridden config so every value declared via
+        ``add_transmission_edge`` / ``add_disease_parameter`` /
+        ``add_intervention`` is re-derived from scratch.
+
+        Override keys are routed by kind, using the schema to disambiguate:
+
+        - ``"intervention.<id>.<field>"`` → ``intervention_dict[id][field]``
+          (values are fractions, matching ``create_intervention_dict``).
+        - a transmission-edge ``variable_name`` → ``transmission_dict[name]``
+          in **native units**, so ``_to_rate`` is applied on rebuild
+          (correct for RATE, DAYS, and PERCENTAGE edges alike).
+        - any other single-token key → the ``Disease`` dict (disease
+          parameters), again in native units.
+
+        Args:
+            params: ``{key: sampled_value}`` from ``generate_LHS_samples``.
+
+        Returns:
+            A deep-copied config object with overrides applied. Falls back to
+            returning the original config untouched if the model exposes no
+            source config (non-reconstructable model).
+        """
+        import copy
+
+        source = self._source_config()
+        if source is None:
+            return source
+
+        config = copy.deepcopy(source)
+        schema = type(self)._get_cached_schema()
+        edge_vars = (
+            {e.variable_name for e in schema.transmission_edges} if schema else set()
+        )
+
+        def _disease_dict():
+            # config.config is the validated config dict (holds "Disease");
+            # plain-dict configs hold "Disease" directly.
+            inner = getattr(config, "config", config)
+            return inner.setdefault("Disease", {})
+
+        for key, val in params.items():
+            parts = key.split(".")
+            if len(parts) == 3 and parts[0] == "intervention":
+                _, intervention_id, field_name = parts
+                config.intervention_dict.setdefault(intervention_id, {})[
+                    field_name
+                ] = val
+            elif len(parts) == 1:
+                name = parts[0]
+                if name in edge_vars:
+                    config.transmission_dict[name] = val
+                else:
+                    _disease_dict()[name] = val
+            else:
+                raise ValueError(f"Invalid uncertainty parameter key: {key}")
+
+        return config
 
     def get_params(self):
         """

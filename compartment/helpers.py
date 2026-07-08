@@ -600,6 +600,7 @@ def format_uncertainty_output(
     n_timesteps,
     step,
     avg_compartment_deltas,
+    intervention_dict=None,
 ):
 
     unique_id = str(uuid.uuid4())  # Generate unique id for gql
@@ -614,6 +615,7 @@ def format_uncertainty_output(
         "start_date": payload["start_date"],
         "end_date": payload["end_date"],
         "time_steps": payload["time_steps"],
+        "interventions": transform_interventions(intervention_dict or {}),
         "admin_zones": [],
         "compartment_deltas": avg_compartment_deltas,
         "parent_admin_total": [],
@@ -806,6 +808,93 @@ def build_uncertainty_params(transmission_edge_items: list, intervention_items: 
                         )
 
     return uncertainty_params
+
+
+def _section_items(section):
+    """Return the .items list from a config section that may be either a dict
+    or a Pydantic model (or None)."""
+    if not section:
+        return []
+    if isinstance(section, dict):
+        return section.get("items", [])
+    return getattr(section, "items", [])
+
+
+def extract_disease_variance_params(disease_section):
+    """Normalize disease-parameter variance configs from a local config's
+    Disease section into the {param, dist, min, max} shape used for LHS.
+
+    Mirrors the cloud path (gql.get_simulation_job), which derives the same
+    shape from SimulationJobCustomField FieldConfig records. Local configs
+    instead declare variance inline as Disease.variance_params[].
+
+    Args:
+        disease_section: the Disease dict from a loaded local config.
+    """
+    if not disease_section:
+        return []
+    return [
+        {
+            "param": vp["param"],
+            "dist": vp.get("dist", "uniform"),
+            "min": vp["min"],
+            "max": vp["max"],
+        }
+        for vp in disease_section.get("variance_params", [])
+    ]
+
+
+def collect_uncertainty_params(cleaned_config, disease_param_field_configs=None):
+    """Gather every variance/uncertainty parameter for a validated config into
+    a single flat list suitable for generate_LHS_samples.
+
+    Sources, all merged:
+      - TransmissionEdges.items[].FieldConfigs with has_variance
+      - Interventions.items[].FieldConfigs with has_variance
+      - disease_param_field_configs (disease custom fields, already normalized
+        by extract_disease_variance_params for local or gql for cloud)
+
+    Args:
+        cleaned_config: the validated Pydantic config.
+        disease_param_field_configs: pre-extracted disease variance configs.
+    """
+    transmission_edge_items = _section_items(
+        getattr(cleaned_config, "TransmissionEdges", None)
+    )
+    intervention_items = _section_items(
+        getattr(cleaned_config, "Interventions", None)
+    )
+
+    params = build_uncertainty_params(
+        as_dict_list(transmission_edge_items),
+        as_dict_list(intervention_items),
+    )
+    if disease_param_field_configs:
+        params.extend(disease_param_field_configs)
+    return params
+
+
+def resolve_run_mode(model_class, uncertainty_params):
+    """Determine the effective run mode entirely from the model and its params.
+
+    The run_mode field from the frontend config is intentionally ignored — the
+    model class is the authoritative source for STOCHASTIC, and relying on the
+    frontend value would create edge cases (e.g. UNCERTAINTY with no variance
+    params running 30 identical deterministic trajectories).
+
+    Priority order:
+    1. STOCHASTIC — model class declares ``STOCHASTIC = True``.  Always runs 30
+       trajectories.  If variance parameters are also present they are spread
+       across those same 30 runs rather than adding additional runs.
+    2. UNCERTAINTY — any variance parameter is declared on an edge, intervention,
+       or disease param.
+    3. DETERMINISTIC — otherwise.
+    """
+    if getattr(model_class, "STOCHASTIC", False):
+        return "STOCHASTIC"
+    if uncertainty_params:
+        return "UNCERTAINTY"
+    return "DETERMINISTIC"
 
 
 def extract_admin_units(case_file):

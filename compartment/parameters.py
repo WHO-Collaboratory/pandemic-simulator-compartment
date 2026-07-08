@@ -38,6 +38,17 @@ class ValueType(str, Enum):
     COORDINATE = "coordinate"  # lat/lon
 
 
+MAX_DEMOGRAPHIC_GROUPS = 20
+"""Hard upper bound on the number of demographic groups per schema.
+
+Prem 2021 source matrices are 16×16, so beyond ~16 age-ranged bands the
+aggregated contact matrix becomes meaningless.  The limit is set slightly
+higher (20) to accommodate models that mix ranged and unranged groups, while
+still preventing accidental runaway declarations that would silently produce
+enormous population tensors.
+"""
+
+
 # ---------------------------------------------------------------------------
 # Core parameter definition
 # ---------------------------------------------------------------------------
@@ -68,6 +79,7 @@ class ParameterDef:
     required: bool = True
     unit: Optional[str] = None  # display unit: "per day", "%"
     options: Optional[list[str]] = None  # for SELECT type
+    enable_variance: bool = True  # set False to hide the variance checkbox in the UI
 
     def to_dict(self) -> dict:
         """Serialize to a plain dict (None values omitted).
@@ -112,6 +124,8 @@ class ParameterDef:
             "name": self.name,
             "required": self.required,
             "unit": self.unit,
+            # Only emit when explicitly disabled so the artifact stays clean.
+            "enable_variance": None if self.enable_variance else False,
         }
         return {k: v for k, v in d.items() if v is not None}
 
@@ -633,8 +647,8 @@ class ModelParameterSchema:
     - example config JSON  (for testing / docs)
     """
 
-    disease_type: str  # "MONKEYPOX"
-    disease_label: str  # "Monkeypox"
+    disease_type: str  # "MPOX"
+    disease_label: str  # "MPOX"
     description: str  # model description
 
     compartments: list[CompartmentDef]
@@ -658,6 +672,22 @@ class ModelParameterSchema:
     # demographics leave these empty and the framework is unaffected)
     demographic_groups: list[DemographicGroupDef] = field(default_factory=list)
     contact_matrix_overrides: list[ContactOverrideDef] = field(default_factory=list)
+
+    # Ordered list of grouped display keys for the results sidebar.
+    # Derived automatically from COMPARTMENT_DELTA_GROUPING when
+    # available, otherwise defaults to the raw compartment IDs
+    # (excluding cumulative _total entries).
+    compartment_display_order: list[str] = field(default_factory=list)
+
+    # Model-level run mode: DETERMINISTIC or STOCHASTIC.
+    # Derived from the model class's STOCHASTIC attribute.
+    run_mode: str = "DETERMINISTIC"
+
+    # Number of stochastic/uncertainty trajectories for this model.
+    # Overrides the global default of 30 when set on the model class as NUM_RUNS.
+    num_runs: int = 30
+    num_runs_min: int = 1
+    num_runs_max: int = 100
 
     # ---------------------------------------------------------------
     # Serialization helpers
@@ -725,15 +755,33 @@ class ModelParameterSchema:
                 sim_params.append(self._wrap_parameter(param, len(sim_params) + 1))
 
         # -- Assemble -------------------------------------------------------
+        compartment_dicts = [
+            c.to_dict(order=idx) for idx, c in enumerate(self.compartments, start=1)
+        ]
+        # Display order for the UI. Prefer an explicit order derived from the
+        # model's COMPARTMENT_DELTA_GROUPING (the grouped/display compartments
+        # that actually appear in time series + deltas — set on the schema in
+        # Model.__init_subclass__); otherwise fall back to declared compartment
+        # ids, excluding auto-generated cumulative (_total) compartments (which
+        # the time-series/delta builders also drop). The frontend reads this
+        # from the stored artifact JSON instead of hardcoding per-disease lists.
+        display_order = getattr(self, "compartment_display_order", None) or [
+            c["id"] for c in compartment_dicts if not c["id"].endswith("_total")
+        ]
         result: dict[str, Any] = {
             # ModelArtifact identity
             "disease_type": self.disease_type,
             "name": self.disease_label,
             "definition": self.description,
+            "run_mode": self.run_mode,
+            # num_runs is surfaced solely as a "disease_parameter" custom field
+            # (with default_value/min/max in its metadata) — declare it via
+            # schema.add_disease_parameter(name="num_runs", ...). It is
+            # intentionally NOT emitted at the artifact root; the runtime falls
+            # back to the model-class NUM_RUNS default when no value is provided.
             # Compartment graph
-            "compartments": [
-                c.to_dict(order=idx) for idx, c in enumerate(self.compartments, start=1)
-            ],
+            "compartments": compartment_dicts,
+            "compartment_display_order": display_order,
             "transmission_edges": edges,
             # Interventions
             "interventions": [i.to_dict() for i in self.interventions],
@@ -867,7 +915,7 @@ class ParameterSchemaBuilder:
 
         @classmethod
         def define_parameters(cls, schema):
-            schema.set_model_info("MONKEYPOX", "Monkeypox", "SIR model for Monkeypox")
+            schema.set_model_info("MPOX", "MPOX", "SIR model for MPOX")
 
             schema.add_compartment("S", "Susceptible", "Population susceptible to infection")
             schema.add_compartment("I", "Infected", "Currently infected population")
@@ -894,6 +942,9 @@ class ParameterSchemaBuilder:
         self._simulation_parameters: list[ParameterDef] = []
         self._demographic_groups: list[DemographicGroupDef] = []
         self._contact_overrides: list[ContactOverrideDef] = []
+        self._num_runs: int = 30
+        self._num_runs_min: int = 1
+        self._num_runs_max: int = 100
 
     # ----- Identity --------------------------------------------------------
 
@@ -907,8 +958,8 @@ class ParameterSchemaBuilder:
         Set the disease model identity.  Must be called exactly once.
 
         Args:
-            disease_type: Machine identifier (e.g. ``"MONKEYPOX"``).
-            label: Human-readable name (e.g. ``"Monkeypox"``).
+            disease_type: Machine identifier (e.g. ``"MPOX"``).
+            label: Human-readable name (e.g. ``"MPOX"``).
             description: Short description shown in the UI.
         """
         if self._disease_type is not None:
@@ -1204,6 +1255,30 @@ class ParameterSchemaBuilder:
         )
         self._travel_volume = tv
 
+    # ----- Number of runs (stochastic models only) -------------------------
+
+    def set_num_runs(
+        self,
+        default: int,
+        min_value: int = 1,
+        max_value: int = 100,
+    ) -> None:
+        """
+        Set the number of stochastic trajectories for this model.
+
+        Only meaningful for models with ``STOCHASTIC = True``.  Omit this
+        call on deterministic models — they always run once.
+
+        Args:
+            default: Default trajectory count used when no per-run override is
+                provided (e.g. ``10`` for a large model, ``30`` for a small one).
+            min_value: Hard lower bound enforced by the UI.
+            max_value: Hard upper bound enforced by the UI.
+        """
+        self._num_runs = default
+        self._num_runs_min = min_value
+        self._num_runs_max = max_value
+
     # ----- Custom fields (enforced contract) --------------------------------
 
     def add_admin_zone_field(
@@ -1271,6 +1346,7 @@ class ParameterSchemaBuilder:
         unit: str | None = None,
         required: bool = True,
         options: list[str] | None = None,
+        enable_variance: bool = True,
     ) -> None:
         """
         Add a disease-specific top-level parameter.
@@ -1291,6 +1367,8 @@ class ParameterSchemaBuilder:
             unit: Display unit (e.g. ``"days"``, ``"per day"``).
             required: Whether this parameter is required in the config.
             options: Valid choices for ``ValueType.SELECT`` fields.
+            enable_variance: Set ``False`` to hide the variance checkbox for this
+                parameter in the UI (e.g. for integer count fields like num_runs).
         """
         self._disease_parameters.append(
             ParameterDef(
@@ -1306,6 +1384,7 @@ class ParameterSchemaBuilder:
                 unit=unit,
                 required=required,
                 options=options,
+                enable_variance=enable_variance,
             )
         )
 
@@ -1346,6 +1425,12 @@ class ParameterSchemaBuilder:
             raise ValueError(
                 f"Duplicate demographic group id '{id}'. "
                 f"Already registered: {sorted(existing_ids)}"
+            )
+        if len(self._demographic_groups) >= MAX_DEMOGRAPHIC_GROUPS:
+            raise ValueError(
+                f"Too many demographic groups: the maximum is {MAX_DEMOGRAPHIC_GROUPS}. "
+                f"Attempted to add '{id}' but {MAX_DEMOGRAPHIC_GROUPS} groups are already "
+                f"registered: {sorted(existing_ids)}"
             )
         if age_range is not None:
             if (
@@ -1431,6 +1516,19 @@ class ParameterSchemaBuilder:
                         f"Age ranges must be non-overlapping."
                     )
 
+        # If a disease parameter named "num_runs" was declared via
+        # add_disease_parameter(), use its default/min/max to populate the
+        # artifact-level fields so ModelArtifact.num_runs stays accurate.
+        num_runs_param = next(
+            (p for p in self._disease_parameters if p.name == "num_runs"), None
+        )
+        if num_runs_param is not None:
+            self._num_runs = int(num_runs_param.default or self._num_runs)
+            if num_runs_param.min_value is not None:
+                self._num_runs_min = int(num_runs_param.min_value)
+            if num_runs_param.max_value is not None:
+                self._num_runs_max = int(num_runs_param.max_value)
+
         return ModelParameterSchema(
             disease_type=self._disease_type,
             disease_label=self._disease_label or "",
@@ -1444,4 +1542,7 @@ class ParameterSchemaBuilder:
             simulation_parameters=self._simulation_parameters,
             demographic_groups=self._demographic_groups,
             contact_matrix_overrides=self._contact_overrides,
+            num_runs=self._num_runs,
+            num_runs_min=self._num_runs_min,
+            num_runs_max=self._num_runs_max,
         )
