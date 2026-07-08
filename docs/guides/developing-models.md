@@ -13,22 +13,23 @@ You only need to write code for the parts that are genuinely model-specific: the
 
 | Concern | File | Notes |
 |---|---|---|
-| Base `Model` class | [compartment/model.py](../compartment/model.py) | Auto-wires the schema, contact matrix, interventions, helpers like `_compute_derivatives()` |
-| Schema builder + types | [compartment/parameters.py](../compartment/parameters.py) | `ParameterSchemaBuilder`, `ValueType`, `CompartmentDef`, `TransmissionEdgeDef`, etc. |
-| Auto model registry | [compartment/registry.py](../compartment/registry.py) | Discovers every `Model` subclass with a `DISEASE_TYPE` — no manual mapping |
-| Pydantic config generator | [compartment/schema_generator.py](../compartment/schema_generator.py) | Builds the `BaseDiseaseConfig` subclass from your schema |
-| Validation post-processor | [compartment/validation/post_processor.py](../compartment/validation/post_processor.py) | Computes `compartment_list`, `initial_population`, `transmission_dict`, etc. |
-| Simulation loop | [compartment/simulation_manager.py](../compartment/simulation_manager.py) | Defaults to JAX `odeint`; `STOCHASTIC = True` (or `SOLVER = "euler"`) switches to fixed-step Euler |
-| Output formatter | [compartment/simulation_postprocessor.py](../compartment/simulation_postprocessor.py) | Aggregates age groups, applies `COMPARTMENT_DELTA_GROUPING`, emits `_total` deltas |
-| Generic driver / CLI plumbing | [compartment/driver.py](../compartment/driver.py) | `drive_simulation(model_class, args)` — your `main.py` is just a thin wrapper |
-| Artifact generator CLI | [compartment/generate_artifact.py](../compartment/generate_artifact.py) | `python -m compartment.generate_artifact <DISEASE_TYPE> [--example-config]` |
+| Base `Model` class | [compartment/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/model.py) | Auto-wires the schema, contact matrix, interventions, helpers like `_compute_derivatives()` |
+| Schema builder + types | [compartment/parameters.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/parameters.py) | `ParameterSchemaBuilder`, `ValueType`, `CompartmentDef`, `TransmissionEdgeDef`, etc. |
+| Auto model registry | [compartment/registry.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/registry.py) | Discovers every `Model` subclass with a `DISEASE_TYPE` — no manual mapping |
+| Pydantic config generator | [compartment/schema_generator.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/schema_generator.py) | Builds the `BaseDiseaseConfig` subclass from your schema |
+| Validation post-processor | [compartment/validation/post_processor.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/validation/post_processor.py) | Computes `compartment_list`, `initial_population`, `transmission_dict`, etc. |
+| Simulation loop | [compartment/simulation_manager.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/simulation_manager.py) | Defaults to JAX `odeint`; `STOCHASTIC = True` (or `SOLVER = "euler"`) switches to fixed-step Euler |
+| Output formatter | [compartment/simulation_postprocessor.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/simulation_postprocessor.py) | Aggregates age groups, applies `COMPARTMENT_DELTA_GROUPING`, emits `_total` deltas |
+| Generic driver / CLI plumbing | [compartment/driver.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/driver.py) | `drive_simulation(model_class, args)` — your `main.py` is just a thin wrapper |
+| Artifact generator CLI | [compartment/generate_artifact.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/generate_artifact.py) | `python -m compartment.generate_artifact <DISEASE_TYPE> [--example-config]` |
 
 Existing models to copy from:
-- Minimal SIR with mobility: [compartment/models/mpox_jax_model/model.py](../compartment/models/mpox_jax_model/model.py)
-- Age-stratified SEIHDR with variants: [compartment/models/covid_jax_model/model.py](../compartment/models/covid_jax_model/model.py) and [variants.py](../compartment/models/covid_jax_model/variants.py)
-- 4-serotype vector-borne with cumulative groupings: [compartment/models/dengue_jax_model/model.py](../compartment/models/dengue_jax_model/model.py)
-- Stochastic SIR (tau-leaping): [compartment/models/test_covid_sir_stochastic/model.py](../compartment/models/test_covid_sir_stochastic/model.py)
-- Multi-dimensional AMR model: [compartment/models/test_klebsiella_amr_model/model.py](../compartment/models/test_klebsiella_amr_model/model.py)
+
+- Minimal SIR with mobility: [compartment/models/mpox_jax_model/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/mpox_jax_model/model.py)
+- Age-stratified SEIHDR with variants: [compartment/models/covid_jax_model/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/covid_jax_model/model.py) and [variants.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/covid_jax_model/variants.py)
+- 4-serotype vector-borne with cumulative groupings: [compartment/models/dengue_jax_model/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/dengue_jax_model/model.py)
+- Stochastic SIR (tau-leaping): [compartment/models/test_covid_sir_stochastic/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/test_covid_sir_stochastic/model.py)
+- Multi-dimensional AMR model: [compartment/models/test_klebsiella_amr_model/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/test_klebsiella_amr_model/model.py)
 
 ## File layout
 
@@ -57,7 +58,7 @@ The base class handles `disease_type`, `COMPARTMENT_LIST`, `COMPARTMENTS` (attri
 
 ### `define_parameters()`
 
-Called once when the class is defined. Use the builder API (full reference in [parameters.py](../compartment/parameters.py)):
+Called once when the class is defined. Use the builder API (full reference in [parameters.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/parameters.py)):
 
 ```python
 from compartment.model import Model
@@ -151,6 +152,7 @@ class MyModel(Model):
 ```
 
 What the base class does for you after `define_parameters()`:
+
 - `cls.DISEASE_TYPE` — set from `schema.set_model_info()` if not already declared.
 - `cls.COMPARTMENT_LIST` — a plain ordered `list[str]` of compartment IDs.
 - `cls.COMPARTMENTS` — a `CompartmentRegistry` exposing attribute-style access (`cls.COMPARTMENTS.S` → `"S"`) and an `infective_ids` property.
@@ -159,6 +161,7 @@ What the base class does for you after `define_parameters()`:
 ### `__init__(self, config)`
 
 For typical models, **call `super().__init__(config)` first**. It handles:
+
 - `self.population_matrix` (jax array of shape `(K, R)` — compartments × regions)
 - `self.compartment_list`, `self.start_date`, `self.start_date_ordinal`, `self.n_timesteps`, `self.admin_units`, `self.payload`
 - Transmission rate attributes (`self.beta`, `self.gamma`, …) loaded from `config["transmission_dict"]` and converted to per-day rates based on each edge's `value_type`
@@ -167,13 +170,14 @@ For typical models, **call `super().__init__(config)` first**. It handles:
 - `self.contact_matrix` (built from declared demographic groups + config overrides)
 - `self._rate_vectors` (per-demographic absolute rate vectors when `demographic_rate_overrides` is present)
 
-Then set whatever else your model needs (travel matrix, demographics, temperature, etc.). Look at [CovidJaxModel.__init__](../compartment/models/covid_jax_model/model.py) for a typical migrated `__init__`.
+Then set whatever else your model needs (travel matrix, demographics, temperature, etc.). Look at [CovidJaxModel.__init__](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/covid_jax_model/model.py) for a typical migrated `__init__`.
 
 If your model genuinely cannot use `super().__init__()` (e.g. dengue's hand-rolled disease parameters), you can still extract the same fields manually — but keep `self.compartment_list = list(self.COMPARTMENTS)` so downstream code finds the canonical order.
 
 ### `prepare_initial_state()` → `(state, compartment_list)`
 
 Return the state array used by the ODE solver. Supported shapes:
+
 - `(K, R)` — compartments × regions (default)
 - `(K, A, R)` — compartments × demographic groups × regions (call `self._prepare_demographic_state()` to expand from `(K, R)` and append zero rows for `_total` compartments)
 
@@ -229,24 +233,25 @@ For these, the pattern is:
 2. Skip the corresponding edge in `_compute_derivatives()` (or just don't declare it) and apply the flow manually with `self._apply_flow(derivs, source_id, target_id, flow)`.
 3. **Declare the target's `*_total` compartment by hand** with `schema.add_compartment("X_total", ...)` if you want cumulative tracking. The framework only auto-generates `*_total` for compartments that are the target of at least one declared edge — flows applied via `_apply_flow()` will populate the `_total` counter, but only if it exists.
 
-Hantavirus is the canonical example here: `Em` and `Ef` are not edge targets, the three β rates are `disease_parameter`s, and `Em_total` / `Ef_total` are declared manually. See [hantavirus_jax_model/model.py](../compartment/models/hantavirus_jax_model/model.py).
+Hantavirus is the canonical example here: `Em` and `Ef` are not edge targets, the three β rates are `disease_parameter`s, and `Em_total` / `Ef_total` are declared manually. See [hantavirus_jax_model/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/hantavirus_jax_model/model.py).
 
 ### Cumulative `_total` compartments
 
 The framework appends a `<target>_total` compartment for every edge target the first time it sees one. You don't declare them. They:
+
 - Track the cumulative inflow into the target compartment.
 - Are excluded from API outputs by the post-processor.
 - Are used to compute correct compartment deltas (the delta key is the bare name, e.g. `I`, even though the underlying counter is `I_total`).
 
-If you want different aggregation (e.g. one `_total` per group of compartments instead of per-edge), override `_add_total_compartments()` as a no-op and declare your own (see [DengueJaxModel](../compartment/models/dengue_jax_model/model.py)).
+If you want different aggregation (e.g. one `_total` per group of compartments instead of per-edge), override `_add_total_compartments()` as a no-op and declare your own (see [DengueJaxModel](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/dengue_jax_model/model.py)).
 
 ### Contact matrices
 
 Age-stratified models need an NxN contact matrix where N is the number of demographic groups. The framework supports three ways of supplying one, in order of precedence (later wins over earlier).
 
-> **📚 For a comprehensive guide to contact matrices**, see **[CONTACT_MATRICES.md](./CONTACT_MATRICES.md)** — detailed documentation on how contact matrices are loaded, aggregated, and used in the platform.
+> **📚 For a comprehensive guide to contact matrices**, see **[CONTACT_MATRICES.md](./contact-matrices.md)** — detailed documentation on how contact matrices are loaded, aggregated, and used in the platform.
 
-1. **Country-aware Prem 2021 default** (recommended). Declare an inclusive `age_range=(low, high)` on every demographic group. At model instantiation the framework reads the run's `admin_unit_id`, takes the ISO3 prefix (split on `.`), and looks up that country's synthetic 16×16 contact matrix from a bundled dataset of 177 countries (Prem 2021). It then aggregates the matrix down to your declared bands using fractional age-year membership: row direction mean-averages (the contactor is a typical person sampled from the band), column direction sums (total contacts with everyone in the band). Aggregating Prem back to its own 16 bands is an exact identity. If the ISO3 isn't in the bundle, the framework falls back to the mean across all 177 country matrices (`default_matrix()`). Code lives in [compartment/contact_matrices/](../compartment/contact_matrices/).
+1. **Country-aware Prem 2021 default** (recommended). Declare an inclusive `age_range=(low, high)` on every demographic group. At model instantiation the framework reads the run's `admin_unit_id`, takes the ISO3 prefix (split on `.`), and looks up that country's synthetic 16×16 contact matrix from a bundled dataset of 177 countries (Prem 2021). It then aggregates the matrix down to your declared bands using fractional age-year membership: row direction mean-averages (the contactor is a typical person sampled from the band), column direction sums (total contacts with everyone in the band). Aggregating Prem back to its own 16 bands is an exact identity. If the ISO3 isn't in the bundle, the framework falls back to the mean across all 177 country matrices (`default_matrix()`). Code lives in [compartment/contact_matrices/](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/contact_matrices/).
 
    ```python
    schema.add_demographic_group("age_0_17",    "Children", default_weight=33.3, age_range=(0, 17))
@@ -276,7 +281,7 @@ If a model declares demographic groups but supplies neither `age_range` nor any 
 
 Multi-region models use **gravity models** to generate travel matrices describing population flows between administrative zones. The travel matrix `T[i,j]` represents the fraction of region i's population present in region j.
 
-> **📚 For comprehensive documentation on gravity models**, see **[GRAVITY_MODEL.md](./GRAVITY_MODEL.md)** — detailed explanation of spatial mobility, distance-decay functions, and how travel matrices work in disease models.
+> **📚 For comprehensive documentation on gravity models**, see **[GRAVITY_MODEL.md](./gravity-model.md)** — detailed explanation of spatial mobility, distance-decay functions, and how travel matrices work in disease models.
 
 **Quick overview:**
 
@@ -303,7 +308,7 @@ omega = contact_matrix @ BETA  # (R, A)
 foi = S * omega
 ```
 
-See [GRAVITY_MODEL.md](./GRAVITY_MODEL.md) for detailed mathematical explanation and usage patterns.
+See [GRAVITY_MODEL.md](./gravity-model.md) for detailed mathematical explanation and usage patterns.
 
 ### Compartment delta grouping
 
@@ -328,7 +333,7 @@ class MyModel(Model):
     STOCHASTIC = True       # or: SOLVER = "euler"
 ```
 
-This switches the integrator to a fixed-step Euler loop where `derivative()` returns the **delta per timestep**, not the instantaneous rate. See [test_covid_sir_stochastic/model.py](../compartment/models/test_covid_sir_stochastic/model.py) for a tau-leaping example.
+This switches the integrator to a fixed-step Euler loop where `derivative()` returns the **delta per timestep**, not the instantaneous rate. See [test_covid_sir_stochastic/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/test_covid_sir_stochastic/model.py) for a tau-leaping example.
 
 ### Variants (multiple disease types from one model class)
 
@@ -403,7 +408,7 @@ The validation layer auto-generates a Pydantic model from your schema and valida
 
 ## Generating model artifacts
 
-Artifacts are JSON descriptions of the model — consumed by the UI, DB seeding, and downstream Zod schema generation. The CLI lives at [compartment/generate_artifact.py](../compartment/generate_artifact.py):
+Artifacts are JSON descriptions of the model — consumed by the UI, DB seeding, and downstream Zod schema generation. The CLI lives at [compartment/generate_artifact.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/generate_artifact.py):
 
 ```bash
 # List models that support artifact generation
@@ -437,17 +442,17 @@ python -m compartment.models.your_model.main \
 
 `run_simulation` runs your model **twice in parallel** — once with interventions and once without (the "control run") — and writes both into the output JSON. In `UNCERTAINTY` mode (set `run_mode` in the config) it draws Latin Hypercube samples over edge variances and produces median + CI bands.
 
-> **📚 For comprehensive documentation on uncertainty quantification**, see **[UNCERTAINTY_QUANTIFICATION.md](./UNCERTAINTY_QUANTIFICATION.md)** — detailed guide to parameter uncertainty, Latin Hypercube Sampling, supported distributions, and interpreting results.
+> **📚 For comprehensive documentation on uncertainty quantification**, see **[UNCERTAINTY_QUANTIFICATION.md](./uncertainty-quantification.md)** — detailed guide to parameter uncertainty, Latin Hypercube Sampling, supported distributions, and interpreting results.
 
 ## Tests
 
-Smoke tests in [tests/test_smoke.py](../tests/test_smoke.py) automatically discover any model directory that contains both a `model.py` and an `example-config.json`. Adding your model to the test sweep requires nothing beyond those two files — the suite picks it up on the next run:
+Smoke tests in [tests/test_smoke.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_smoke.py) automatically discover any model directory that contains both a `model.py` and an `example-config.json`. Adding your model to the test sweep requires nothing beyond those two files — the suite picks it up on the next run:
 
 ```bash
 python -m pytest tests/test_smoke.py -v -m integration -k "your_model"
 ```
 
-There's also [tests/test_artifact.py](../tests/test_artifact.py) for artifact generation and [tests/test_generate_artifact_model_dir.py](../tests/test_generate_artifact_model_dir.py) for `--model-dir` discovery.
+There's also [tests/test_artifact.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_artifact.py) for artifact generation and [tests/test_generate_artifact_model_dir.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_generate_artifact_model_dir.py) for `--model-dir` discovery.
 
 ## Quality checklist before opening a PR
 
@@ -465,12 +470,12 @@ There's also [tests/test_artifact.py](../tests/test_artifact.py) for artifact ge
 
 ## Where to look when in doubt
 
-- Minimal SIR: [mpox_jax_model](../compartment/models/mpox_jax_model/model.py).
-- Age-stratified respiratory with variants: [covid_jax_model](../compartment/models/covid_jax_model/model.py) + [variants.py](../compartment/models/covid_jax_model/variants.py).
-- Vector-borne with custom totals & disease-specific params: [dengue_jax_model](../compartment/models/dengue_jax_model/model.py).
-- Multi-rate FOI / demographic births / density-dependent deaths (flows without an edge): [hantavirus_jax_model](../compartment/models/hantavirus_jax_model/model.py).
-- Stochastic / Euler-integrated: [test_covid_sir_stochastic](../compartment/models/test_covid_sir_stochastic/model.py).
-- Multi-axis structure (settings × strains × treatment): [test_klebsiella_amr_model](../compartment/models/test_klebsiella_amr_model/model.py).
+- Minimal SIR: [mpox_jax_model](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/mpox_jax_model/model.py).
+- Age-stratified respiratory with variants: [covid_jax_model](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/covid_jax_model/model.py) + [variants.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/covid_jax_model/variants.py).
+- Vector-borne with custom totals & disease-specific params: [dengue_jax_model](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/dengue_jax_model/model.py).
+- Multi-rate FOI / demographic births / density-dependent deaths (flows without an edge): [hantavirus_jax_model](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/hantavirus_jax_model/model.py).
+- Stochastic / Euler-integrated: [test_covid_sir_stochastic](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/test_covid_sir_stochastic/model.py).
+- Multi-axis structure (settings × strains × treatment): [test_klebsiella_amr_model](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/test_klebsiella_amr_model/model.py).
 
 ## Support
 

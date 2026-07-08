@@ -15,6 +15,7 @@ The framework supports three approaches for defining contact matrices, in order 
 ### 1. Country-Aware Prem 2021 Default (Recommended)
 
 **How it works:**
+
 - Declare an inclusive `age_range=(low, high)` on every demographic group in your model schema
 - At model instantiation, the framework:
   1. Reads the simulation's `admin_unit_id` (e.g., `"USA"`, `"DEU.1_1"`)
@@ -53,11 +54,13 @@ If the country is not in the Prem dataset, the framework falls back to a **globa
 ### 2. Schema-Level Overrides
 
 **How it works:**
+
 - Use `schema.set_contact_override(from_group, to_group, value)` in `define_parameters()`
 - When **any** schema-level override is declared, the framework **does not** load the Prem matrix
 - All unspecified cells default to identity (1.0 on diagonal, 0.0 elsewhere)
 
-**When to use:** 
+**When to use:**
+
 - Your model has bespoke contact values (e.g., from POLYMOD or other empirical studies) that should be used regardless of country
 - You want to bake specific mixing assumptions into the model itself
 
@@ -78,10 +81,12 @@ def define_parameters(cls):
 ### 3. Per-Run Config Overrides
 
 **How it works:**
+
 - Add `contact_matrix_overrides` to your simulation config JSON
 - These overrides beat both Prem defaults and schema overrides for the cells they specify
 
 **When to use:**
+
 - Sensitivity analyses
 - Exploring non-default mixing scenarios without modifying the model code
 - Testing counterfactual contact patterns (e.g., school closures reducing child-child contacts)
@@ -107,15 +112,18 @@ def define_parameters(cls):
 ## How Contact Matrices Work
 
 A contact matrix is an **A×A** array (where A = number of demographic groups) where:
+
 - **`matrix[i, j]`** = mean daily contacts per person in group *i* with all people in group *j*
 
 ### Asymmetric Semantics
 
 Contact matrices are **asymmetric by design**:
+
 - **Rows (i):** Each row represents a typical person in group *i* and shows their mean contacts with each group
 - **Columns (j):** Each column sums the total contacts flowing into group *j* from all other groups
 
 This asymmetry is critical for force-of-infection calculations because:
+
 - A small group (e.g., elderly) may have fewer total contacts
 - But they may contact larger groups (e.g., working-age caregivers) frequently
 - The FOI on the elderly depends on the **prevalence** in those working-age groups **times** the contact rate
@@ -132,6 +140,7 @@ Elderly      2.0     3.0     5.0
 ```
 
 **Reading the matrix:**
+
 - Children have 12 contacts/day with other children, 4 with adults, 1 with elderly
 - Adults have 6 contacts/day with children, 8 with other adults, 2 with elderly
 - The matrix is **not symmetric** — adults contact children at rate 6.0, but children contact adults at rate 4.0
@@ -149,6 +158,7 @@ M_agg = W @ M @ U^T
 ```
 
 Where:
+
 - **W** (A × 16): Row-normalized overlap fractions. Each row sums to 1. This **averages** across source bands within each target band.
 - **U** (A × 16): Raw (un-normalized) overlap fractions. This **sums** across source bands for each target band.
 
@@ -164,6 +174,7 @@ The asymmetric row/column treatment preserves the "mean total contacts per perso
 ### Fractional Membership Example
 
 If your model has a group `age_0_17` (0-17 years), it overlaps Prem bands:
+
 - **(0-4):** 5 years out of 18 → weight = 5/18
 - **(5-9):** 5 years out of 18 → weight = 5/18  
 - **(10-14):** 5 years out of 18 → weight = 5/18
@@ -283,6 +294,7 @@ The framework validates and warns about common issues:
 
 ### Warning: Identity Matrix Default
 If demographics are provided but:
+
 - No `age_range` is declared on any group, AND
 - No schema overrides are present, AND  
 - No config overrides are present
@@ -323,7 +335,8 @@ If a target age range has **no overlap** with the Prem source bands (0-120), the
 
 **Effect:** Framework falls back to global-average matrix and logs an info message. The model still runs.
 
-**Fix (if needed):** 
+**Fix (if needed):**
+
 - Check the list of available countries: `from compartment.contact_matrices import available_countries; print(available_countries())`
 - Use a neighboring country's ISO3 code in your config for testing
 
@@ -344,11 +357,11 @@ print("Prevalence shape:", prevalence.shape)
 
 ## Related Documentation
 
-- **[DEVELOPING_MODELS.md](./DEVELOPING_MODELS.md)** — General guide to authoring new models, includes contact matrix section
-- **[.claude/MODEL_AUTHORING_REFERENCE.md](../.claude/MODEL_AUTHORING_REFERENCE.md)** — Internal reference for model development patterns and pitfalls
-- **[compartment/contact_matrices/](../compartment/contact_matrices/)** — Source code for loader, aggregator, and bundled data
-- **[tests/test_contact_matrices.py](../tests/test_contact_matrices.py)** — Unit tests demonstrating aggregation behavior
-- **[tests/test_demographics.py](../tests/test_demographics.py)** — Integration tests for `_build_contact_matrix()`
+- **[DEVELOPING_MODELS.md](./developing-models.md)** — General guide to authoring new models, includes contact matrix section
+- **[.claude/MODEL_AUTHORING_REFERENCE.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/.claude/MODEL_AUTHORING_REFERENCE.md)** — Internal reference for model development patterns and pitfalls
+- **[compartment/contact_matrices/](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/contact_matrices/)** — Source code for loader, aggregator, and bundled data
+- **[tests/test_contact_matrices.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_contact_matrices.py)** — Unit tests demonstrating aggregation behavior
+- **[tests/test_demographics.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_demographics.py)** — Integration tests for `_build_contact_matrix()`
 
 ## References
 
