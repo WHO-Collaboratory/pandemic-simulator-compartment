@@ -1,7 +1,6 @@
-# COVID SIHDR Model
+# Novel Respiratory (SIHDR)
 
-An SIHDR compartmental model for novel respiratory diseases with age-stratified
-transmission.
+An SIHDR compartmental model for novel respiratory diseases with age-stratified transmission
 
 ::: compartment.models.covid_jax_model.variants.CovidSIHDRModel
     options:

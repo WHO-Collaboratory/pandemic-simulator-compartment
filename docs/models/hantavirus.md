@@ -1,6 +1,6 @@
-# Hantavirus (Rodent) Model
+# Hantavirus (spatial spillover)
 
-Spatial rodent-to-human hantavirus spillover (urban / rural-pop / rural-empty) following Cornejo-Donoso et al. 2023.
+Three-sector (urban / rural-populated / rural-empty) rodent-to-human hantavirus spillover model with explicit human and rodent commuting and residence-by-infection-site case bookkeeping (Cornejo-Donoso et al., PMC10536976).
 
 ::: compartment.models.hantavirus_jax_model.model.HantavirusJaxModel
     options:

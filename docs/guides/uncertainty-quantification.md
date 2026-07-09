@@ -421,7 +421,7 @@ Three values per compartment per timestep:
 - "On day 19, we expect **550 infections** (median)"
 - "We're 95% confident the true value is between **450 and 680**"
 
-> **Visualizing bands:** `python tools/view_results.py results/<output>.json` plots the `mean` line and shades the `lower`–`upper` band for each compartment, with the intervention and control runs side by side. See [tools/README.md](../tools/README.md).
+> **Visualizing bands:** `python tools/view_results.py results/<output>.json` plots the `mean` line and shades the `lower`–`upper` band for each compartment, with the intervention and control runs side by side. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md).
 
 ### Confidence Interval (CI)
 

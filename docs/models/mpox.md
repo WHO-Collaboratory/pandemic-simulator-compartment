@@ -1,6 +1,6 @@
-# Mpox Model
+# MPOX
 
-A simple SIRS compartmental model for MPOX with spatial mobility.
+A simple SIR compartmental model for MPOX
 
 ::: compartment.models.mpox_jax_model.model.MpoxJaxModel
     options:

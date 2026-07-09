@@ -1,6 +1,6 @@
-# Dengue Model
+# Dengue (4-serotype)
 
-4-serotype vector-borne dengue model with temperature-driven mosquito dynamics.
+A 4-serotype vector-borne dengue model with temperature-driven mosquito dynamics
 
 ::: compartment.models.dengue_jax_model.model.DengueJaxModel
     options:

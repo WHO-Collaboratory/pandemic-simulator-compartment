@@ -303,7 +303,7 @@ After social_isolation (40% × 50%): beta = 0.3 * (1 - 0.4*0.5) = 0.24
 After mask_wearing (60% × 30%):     beta = 0.24 * (1 - 0.6*0.3) = 0.1968
 ```
 
-> **Visualizing interventions:** after a run completes, `python tools/view_results.py results/<output>.json` plots the with- and without-intervention runs side by side and draws a vertical line at each intervention's start (dashed) and stop (dotted) date, so the effect is visible at a glance. Threshold-triggered interventions (no fixed date) are noted on the panel instead. See [tools/README.md](../tools/README.md).
+> **Visualizing interventions:** after a run completes, `python tools/view_results.py results/<output>.json` plots the with- and without-intervention runs side by side and draws a vertical line at each intervention's start (dashed) and stop (dotted) date, so the effect is visible at a glance. Threshold-triggered interventions (no fixed date) are noted on the panel instead. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md).
 
 ## Reduction Formula
 

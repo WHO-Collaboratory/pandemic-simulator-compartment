@@ -1,6 +1,6 @@
-# Hantavirus (Human) Model
+# Hantavirus (person-to-person + risk perception)
 
-SEIR hantavirus model with person-to-person transmission and endogenous risk-perception state.
+SEIR hantavirus model coupling rodent-to-human spillover with Andes-virus person-to-person transmission and a dynamic risk-perception state that modulates both betas (Gutiérrez Jara & Muñoz Quezada, Medwave 2022).
 
 ::: compartment.models.hantavirus_human_jax_model.model.HantavirusHumanJaxModel
     options:

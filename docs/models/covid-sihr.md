@@ -1,7 +1,6 @@
-# COVID SIHR Model
+# Novel Respiratory (SIHR)
 
-An SIHR compartmental model for novel respiratory diseases with age-stratified
-transmission.
+An SIHR compartmental model for novel respiratory diseases with age-stratified transmission
 
 ::: compartment.models.covid_jax_model.variants.CovidSIHRModel
     options:

@@ -1,6 +1,6 @@
-# Klebsiella AMR Model (Test)
+# Klebsiella pneumoniae AMR
 
-Compartmental model for multidrug-resistant Klebsiella pneumoniae, based on Kachalov et al. (2021).
+Compartmental model for ESBL and carbapenem-resistant K. pneumoniae transmission across hospital and community settings (Kachalov et al. 2021)
 
 ::: compartment.models.test_klebsiella_amr_model.model.KlebsiellaAmrModel
     options:

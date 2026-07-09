@@ -18,5 +18,8 @@ CLAUDE.md
 # MkDocs build output
 site/
 
+# Auto-generated model doc pages (created by docs/generate_model_pages.py hook)
+docs/models/
+
 # Platform integration notes (local / Cursor only; not distributed with the package)
 .cursor/MII_PUBLICATION.md

@@ -1,7 +1,6 @@
-# COVID SIR Model
+# Novel Respiratory (SIR)
 
-An SIR compartmental model for novel respiratory diseases with age-stratified
-transmission.
+An SIR compartmental model for novel respiratory diseases with age-stratified transmission
 
 ::: compartment.models.covid_jax_model.variants.CovidSIRModel
     options:

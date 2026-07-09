@@ -1,7 +1,6 @@
-# COVID SEIR Model
+# Novel Respiratory (SEIR)
 
-An SEIR compartmental model for novel respiratory diseases with age-stratified
-transmission.
+An SEIR compartmental model for novel respiratory diseases with age-stratified transmission
 
 ::: compartment.models.covid_jax_model.variants.CovidSEIRModel
     options:

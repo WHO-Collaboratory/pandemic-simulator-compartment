@@ -1,6 +1,6 @@
-# COVID SIR Stochastic Model (Test)
+# COVID-19 Stochastic SIR
 
-A simple stochastic SIR compartmental model for COVID-19 using tau-leaping.
+A simple stochastic SIR model for COVID-19
 
 ::: compartment.models.test_covid_sir_stochastic.model.CovidSirStochasticModel
     options:

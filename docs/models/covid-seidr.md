@@ -1,7 +1,6 @@
-# COVID SEIDR Model
+# Novel Respiratory (SEIDR)
 
-An SEIDR compartmental model for novel respiratory diseases with age-stratified
-transmission.
+An SEIDR compartmental model for novel respiratory diseases with age-stratified transmission
 
 ::: compartment.models.covid_jax_model.variants.CovidSEIDRModel
     options:

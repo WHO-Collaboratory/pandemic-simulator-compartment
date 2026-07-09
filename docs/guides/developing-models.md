@@ -511,7 +511,7 @@ To eyeball a run, use the local results viewer:
 python tools/view_results.py results/test_run.json
 ```
 
-It plots the whole-population (`parent_admin_total`) compartment time series for the **with-interventions** and **control** runs side by side, drops a vertical line at each intervention's start/stop date, shades the uncertainty bands for `UNCERTAINTY` output, and lists each run's `compartment_deltas` (cumulative per-compartment totals) as a metric table using the frontend's compartment names. See [tools/README.md](../tools/README.md) for flags (compartment subset, log scale, `--no-deltas`, saving to an image).
+It plots the whole-population (`parent_admin_total`) compartment time series for the **with-interventions** and **control** runs side by side, drops a vertical line at each intervention's start/stop date, shades the uncertainty bands for `UNCERTAINTY` output, and lists each run's `compartment_deltas` (cumulative per-compartment totals) as a metric table using the frontend's compartment names. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md) for flags (compartment subset, log scale, `--no-deltas`, saving to an image).
 
 ## Tests
 

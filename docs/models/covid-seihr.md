@@ -1,7 +1,6 @@
-# COVID SEIHR Model
+# Novel Respiratory (SEIHR)
 
-An SEIHR compartmental model for novel respiratory diseases with age-stratified
-transmission.
+An SEIHR compartmental model for novel respiratory diseases with age-stratified transmission
 
 ::: compartment.models.covid_jax_model.variants.CovidSEIHRModel
     options:

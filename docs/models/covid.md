@@ -1,6 +1,6 @@
-# COVID SEIHDR Model
+# Novel Respiratory (SEIHDR)
 
-SEIHDR compartmental model with age-stratified transmission and spatial mobility.
+An SEIHDR compartmental model for novel respiratory diseases with age-stratified transmission
 
 ::: compartment.models.covid_jax_model.model.CovidJaxModel
     options:
