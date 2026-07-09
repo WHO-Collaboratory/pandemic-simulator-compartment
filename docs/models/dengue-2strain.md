@@ -2,7 +2,7 @@
 
 Test model implementing a 2-strain dengue variant.
 
-::: compartment.models.test_dengue_2strain.model.Dengue2StrainModel
+::: compartment.models.dengue_2strain_jax_model.model.Dengue2StrainModel
     options:
       show_root_heading: true
       members_order: source
