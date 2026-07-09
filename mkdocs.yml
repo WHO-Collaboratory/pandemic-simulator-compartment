@@ -62,11 +62,19 @@ nav:
     - Base Model: api/model.md
     - Interventions: api/interventions.md
   - Disease Models:
-    - Dengue: models/dengue.md
     - COVID SEIHDR: models/covid.md
-    - Mpox: models/mpox.md
+    - COVID SEIHR: models/covid-seihr.md
+    - COVID SEIDR: models/covid-seidr.md
+    - COVID SEIR: models/covid-seir.md
+    - COVID SIHDR: models/covid-sihdr.md
+    - COVID SIHR: models/covid-sihr.md
+    - COVID SIDR: models/covid-sidr.md
+    - COVID SIR: models/covid-sir.md
+    - Dengue (4-Serotype): models/dengue.md
+    - Dengue (2-Strain): models/dengue-2strain.md
+    - Ebola: models/ebola.md
     - Hantavirus (Rodent): models/hantavirus.md
     - Hantavirus (Human): models/hantavirus-human.md
+    - Mpox: models/mpox.md
     - "Test: COVID SIR Stochastic": models/covid-sir-stochastic.md
-    - "Test: Dengue 2-Strain": models/dengue-2strain.md
     - "Test: Klebsiella AMR": models/klebsiella-amr.md

@@ -1,6 +1,7 @@
-# Dengue 2-Strain Model (Test)
+# Dengue 2-Strain Model
 
-Test model implementing a 2-strain dengue variant.
+Two-strain dengue model with seasonal forcing, temporary cross-immunity,
+and antibody-dependent enhancement (ADE) of secondary infections.
 
 ::: compartment.models.dengue_2strain_jax_model.model.Dengue2StrainModel
     options:
