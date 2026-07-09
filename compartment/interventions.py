@@ -1,3 +1,22 @@
+"""
+JAX-compatible intervention functions for modifying transmission rates.
+
+This module provides two intervention dispatch strategies that can be
+applied during simulation:
+
+- **Proportion-based** (``jax_prop_intervention``): activates or
+  deactivates interventions when the proportion of infective individuals
+  crosses configurable thresholds.
+- **Timestep-based** (``jax_timestep_intervention``): activates
+  interventions within a calendar date window specified as ordinal days.
+
+Both functions support Dengue vector-borne interventions (physical /
+chemical, targeting ``b_V_T`` / ``s_V_T`` rates) and COVID-style
+interventions (social isolation, vaccination, mask wearing targeting
+``beta``, plus lockdown which replaces the travel matrix with an
+identity matrix).
+"""
+
 import logging
 from compartment.helpers import setup_logging
 import jax.numpy as jnp
@@ -15,7 +34,41 @@ def jax_prop_intervention(intervention_dict,
                                    rates: dict,
                                    intervention_statuses: dict,
                                    travel_matrix: jnp.ndarray):
-    # private helper that returns (new_rate, new_status)
+    """Apply proportion-based interventions that trigger on infection prevalence.
+
+    Each intervention activates when ``prop_infectives`` rises above its
+    ``start_threshold`` and deactivates when it falls below its
+    ``end_threshold``.  While active, the targeted transmission rate is
+    reduced by ``adherence_min * transmission_percentage``.
+
+    Supported intervention keys (looked up in *intervention_dict*):
+
+    - ``"physical"`` / ``"chemical"`` -- Dengue vector-borne interventions
+      targeting the ``b_V_T`` (biting) and ``s_V_T`` (spraying) rates.
+    - ``"social_isolation"`` / ``"vaccination"`` / ``"mask_wearing"`` --
+      COVID-style interventions targeting the ``beta`` rate.
+    - ``"lock_down"`` -- replaces the travel matrix with an identity
+      matrix to eliminate inter-zone movement.
+
+    Args:
+        intervention_dict: Mapping of intervention name to its config dict.
+            Each config must contain ``adherence_min`` and
+            ``transmission_percentage``, and optionally ``start_threshold``
+            and ``end_threshold``.
+        prop_infectives: Current proportion of infective individuals in
+            the population (0.0--1.0).
+        rates: Mutable dict of current transmission rate values keyed by
+            variable name (e.g. ``"beta"``, ``"b_V_T"``).
+        intervention_statuses: Mutable dict tracking the on/off boolean
+            status of each intervention by name.
+        travel_matrix: Square JAX array representing inter-zone travel.
+            Replaced with an identity matrix when lockdown is active.
+
+    Returns:
+        A 3-tuple of ``(rates, intervention_statuses, travel_matrix)``
+        with updated values reflecting any interventions that were
+        activated or deactivated this step.
+    """
     def _update_one(comp_rate, status, cfg):
         start_th = cfg.get("start_threshold")
         end_th   = cfg.get("end_threshold")
@@ -99,7 +152,38 @@ def jax_timestep_intervention(intervention_dict: dict,
                               rates: dict,
                               intervention_statuses: dict,
                               travel_matrix: jnp.ndarray):
-    # private helper that returns (new_rate, new_status)
+    """Apply date-window interventions that activate within a calendar range.
+
+    Each intervention is active when *current_ordinal_day* falls within
+    its ``[start_date_ordinal, end_date_ordinal]`` window.  While active
+    the targeted transmission rate is reduced by
+    ``adherence_min * transmission_percentage``.
+
+    Supported intervention keys are the same as
+    :func:`jax_prop_intervention` (physical, chemical, social_isolation,
+    vaccination, mask_wearing, lock_down), but activation is driven by
+    calendar dates instead of prevalence thresholds.
+
+    Args:
+        intervention_dict: Mapping of intervention name to its config
+            dict.  Each config must contain ``adherence_min`` and
+            ``transmission_percentage``, and optionally
+            ``start_date_ordinal`` and ``end_date_ordinal`` (integer
+            ordinal day values).
+        current_ordinal_day: The current simulation day as an ordinal
+            integer (e.g. from ``date.toordinal()``).
+        rates: Mutable dict of current transmission rate values keyed by
+            variable name (e.g. ``"beta"``, ``"b_V_T"``).
+        intervention_statuses: Mutable dict tracking the on/off boolean
+            status of each intervention by name.
+        travel_matrix: Square JAX array representing inter-zone travel.
+            Replaced with an identity matrix when lockdown is active.
+
+    Returns:
+        A 3-tuple of ``(rates, intervention_statuses, travel_matrix)``
+        with updated values reflecting any interventions that were
+        activated or deactivated this step.
+    """
     def _update_date(comp_rate, status, cfg, current_ordinal_day):
         # Retrieve the intervention date bounds and parameters
         start_date_ordinal = cfg.get("start_date_ordinal")

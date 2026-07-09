@@ -35,6 +35,7 @@ Day 60: 7,800 infections (95% CI: 5,200-11,500)
 ```
 
 **Key benefits:**
+
 - **Honest uncertainty:** Reflects what we don't know
 - **Decision support:** "In the worst case, we'll have 11,500 infections"
 - **Sensitivity analysis:** Which parameters drive uncertainty the most?
@@ -53,6 +54,7 @@ The simulator supports two run modes:
 ```
 
 **Behavior:**
+
 - Runs model **once** with parameter point estimates
 - Returns a single trajectory for each compartment
 - Fast (seconds to minutes)
@@ -68,6 +70,7 @@ The simulator supports two run modes:
 ```
 
 **Behavior:**
+
 - Runs model **N times** with sampled parameters (default: 30)
 - Returns **median, lower bound (2.5%), upper bound (97.5%)** for each compartment
 - Slower (minutes to hours, depending on N and model complexity)
@@ -123,6 +126,7 @@ The framework supports **five probability distributions** for parameter uncertai
 ```
 
 **Characteristics:**
+
 - Flat probability density
 - Simple, interpretable
 - Conservative (gives equal weight to extremes)
@@ -145,6 +149,7 @@ The framework supports **five probability distributions** for parameter uncertai
 ```
 
 **Characteristics:**
+
 - Symmetric bell curve
 - Most values near the mean
 - Can produce negative values (clamp if needed)
@@ -168,6 +173,7 @@ The framework supports **five probability distributions** for parameter uncertai
 ```
 
 **Characteristics:**
+
 - Asymmetric triangle
 - Mode at `min + (max - min) * probability_mode`
 - More realistic than uniform (acknowledges a "best guess")
@@ -175,6 +181,7 @@ The framework supports **five probability distributions** for parameter uncertai
 **Example:** "Beta is most likely 0.3, but could range from 0.2 to 0.4"
 
 **Note:** `probability_mode` must be in [0, 1]. It's the **position** of the peak, not the value.
+
 - `probability_mode=0.0` → peak at min
 - `probability_mode=0.5` → peak at midpoint
 - `probability_mode=1.0` → peak at max
@@ -195,6 +202,7 @@ The framework supports **five probability distributions** for parameter uncertai
 ```
 
 **Characteristics:**
+
 - Bounded to [0, 1]
 - Flexible shapes (U-shaped, bell-shaped, uniform)
 - Used for probabilities and proportions
@@ -202,6 +210,7 @@ The framework supports **five probability distributions** for parameter uncertai
 **Example:** "Intervention adherence has a beta(2, 5) distribution"
 
 **Shape guide:**
+
 - `alpha = beta = 1` → Uniform(0, 1)
 - `alpha > beta` → Skewed right (most values near 1)
 - `alpha < beta` → Skewed left (most values near 0)
@@ -223,6 +232,7 @@ The framework supports **five probability distributions** for parameter uncertai
 ```
 
 **Characteristics:**
+
 - Always positive
 - Right-skewed (long tail)
 - Natural for duration and rate parameters
@@ -322,6 +332,7 @@ Add `variance_params` to intervention parameters:
 ```
 
 **Guidelines:**
+
 - **10-30:** Quick exploration, rough CI estimates
 - **30-100:** Standard for reporting (default: 30)
 - **100-500:** High-confidence CIs, sensitivity analysis
@@ -400,15 +411,17 @@ Single value per compartment per timestep.
 ```
 
 Three values per compartment per timestep:
+
 - **mean:** Median across all simulation runs (50th percentile)
 - **lower:** Lower bound of 95% CI (2.5th percentile)
 - **upper:** Upper bound of 95% CI (97.5th percentile)
 
 **Interpretation:**
+
 - "On day 19, we expect **550 infections** (median)"
 - "We're 95% confident the true value is between **450 and 680**"
 
-> **Visualizing bands:** `python tools/view_results.py results/<output>.json` plots the `mean` line and shades the `lower`–`upper` band for each compartment, with the intervention and control runs side by side. See [tools/README.md](../tools/README.md).
+> **Visualizing bands:** `python tools/view_results.py results/<output>.json` plots the `mean` line and shades the `lower`–`upper` band for each compartment, with the intervention and control runs side by side. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md).
 
 ### Confidence Interval (CI)
 
@@ -417,11 +430,13 @@ The framework uses a **95% confidence interval** by default:
 - **upper:** 97.5th percentile of simulation results
 
 This means:
+
 - **95% of simulation runs** fall within [lower, upper]
 - **2.5% are below** lower bound
 - **2.5% are above** upper bound
 
 **CI width** reflects uncertainty:
+
 - **Narrow CI:** Parameters well-constrained
 - **Wide CI:** Large parameter uncertainty or high sensitivity
 
@@ -447,6 +462,7 @@ Start with a deterministic run to validate your model:
 ```
 
 **Check:**
+
 - Does the model run without errors?
 - Are trajectories reasonable?
 - Do interventions have the expected effect?
@@ -456,12 +472,14 @@ Start with a deterministic run to validate your model:
 Ask: **Which parameters am I most uncertain about?**
 
 **Good candidates:**
+
 - **Transmission rates (beta)** — varies by setting, behavior, season
 - **Initial infections** — often poorly known early in an outbreak
 - **Intervention effectiveness** — depends on adherence and implementation
 - **Recovery/removal rates** — clinical heterogeneity
 
 **Poor candidates:**
+
 - **Well-known biological constants** (e.g., human lifespan)
 - **Structural parameters** (e.g., number of regions)
 - **Fixed policy choices** (e.g., lockdown start date)
@@ -471,6 +489,7 @@ Ask: **Which parameters am I most uncertain about?**
 Find plausible ranges from literature:
 
 **Example sources:**
+
 - Meta-analyses (e.g., "R0 for COVID-19: 2.5-5.0" → beta ranges)
 - Clinical studies (e.g., "Incubation period: 5-7 days")
 - Empirical intervention effectiveness (e.g., "Masks reduce transmission by 20-50%")
@@ -513,6 +532,7 @@ python -m compartment.models.covid_jax_model.main \
 ```
 
 **Examine output:**
+
 - Is the median similar to your deterministic baseline?
 - Are CIs reasonable (not too wide or too narrow)?
 - Do CIs widen over time (typical — uncertainty compounds)?
@@ -522,6 +542,7 @@ python -m compartment.models.covid_jax_model.main \
 Which parameters drive uncertainty the most?
 
 **Method:**
+
 1. Run uncertainty with **only beta varying**
 2. Run uncertainty with **only gamma varying**
 3. Compare CI widths
@@ -646,6 +667,7 @@ Which parameters drive uncertainty the most?
 - 500 simulations: 1-2 hours
 
 **Factors affecting runtime:**
+
 - Number of simulations (n_simulations)
 - Model complexity (compartments, regions, age groups)
 - Simulation duration (time_steps)
@@ -694,6 +716,7 @@ low_level_workers = 2  # parallel UQ runs within each
 ### CIs Are Too Wide
 
 **Symptoms:**
+
 - Output ranges span orders of magnitude
 - CIs include implausible values (e.g., negative populations)
 
@@ -716,6 +739,7 @@ low_level_workers = 2  # parallel UQ runs within each
 ### CIs Are Too Narrow
 
 **Symptoms:**
+
 - CIs barely wider than a deterministic run
 - Unrealistic confidence
 
@@ -734,6 +758,7 @@ low_level_workers = 2  # parallel UQ runs within each
 ### NaN or Inf in Output
 
 **Symptoms:**
+
 - Output contains `NaN` or `inf` values
 - Some simulation runs crash
 
@@ -757,6 +782,7 @@ low_level_workers = 2  # parallel UQ runs within each
 ### Slow Performance
 
 **Symptoms:**
+
 - UQ runs take hours
 
 **Possible causes:**
@@ -816,38 +842,38 @@ LHS assumes **independence** between parameters. To model correlation:
 
 ## Related Documentation
 
-- **[INTERVENTIONS.md](./INTERVENTIONS.md)** — Varying intervention effectiveness
-- **[DEVELOPING_MODELS.md](./DEVELOPING_MODELS.md)** — Model development guide
-- **[tools/view_results.py](../tools/view_results.py)** — Local results viewer; shades the mean/lower/upper uncertainty bands from UNCERTAINTY output
-- **[compartment/run_simulation.py](../compartment/run_simulation.py)** — UQ orchestration code
-- **[compartment/helpers.py](../compartment/helpers.py)** — LHS implementation (`generate_LHS_samples`)
-- **[compartment/batch_simulation_manager.py](../compartment/batch_simulation_manager.py)** — Parallel simulation runner
+- **[INTERVENTIONS.md](./interventions.md)** — Varying intervention effectiveness
+- **[DEVELOPING_MODELS.md](./developing-models.md)** — Model development guide
+- **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; shades the mean/lower/upper uncertainty bands from UNCERTAINTY output
+- **[compartment/run_simulation.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/run_simulation.py)** — UQ orchestration code
+- **[compartment/helpers.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/helpers.py)** — LHS implementation (`generate_LHS_samples`)
+- **[compartment/batch_simulation_manager.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/batch_simulation_manager.py)** — Parallel simulation runner
 
 ## References
 
 ### Latin Hypercube Sampling
 
 - **McKay et al. (1979).** "A comparison of three methods for selecting values of input variables in the analysis of output from a computer code." *Technometrics* 21(2): 239-245.
-  - Original LHS paper
+    - Original LHS paper
 
 - **Iman & Conover (1982).** "A distribution-free approach to inducing rank correlation among input variables." *Communications in Statistics* 11(3): 311-334.
-  - LHS with correlation
+    - LHS with correlation
 
 ### Uncertainty Quantification in Epidemiology
 
 - **Ferguson et al. (2020).** "Report 9: Impact of non-pharmaceutical interventions (NPIs) to reduce COVID-19 mortality and healthcare demand." *Imperial College COVID-19 Response Team*.
-  - Influential UQ study with wide CIs
+    - Influential UQ study with wide CIs
 
 - **Jewell et al. (2020).** "Predictive mathematical models of the COVID-19 pandemic: Underlying principles and value of projections." *JAMA* 323(19): 1893-1894.
-  - Discussion of model uncertainty
+    - Discussion of model uncertainty
 
 - **Holmdahl & Buckee (2020).** "Wrong but Useful — What Covid-19 Epidemiologic Models Can and Cannot Tell Us." *New England Journal of Medicine* 383(4): 303-305.
-  - Limitations and appropriate use of uncertain models
+    - Limitations and appropriate use of uncertain models
 
 ### Distribution Selection
 
 - **Vose (2008).** *Risk Analysis: A Quantitative Guide* (3rd ed.). John Wiley & Sons.
-  - Comprehensive guide to probability distributions for uncertainty
+    - Comprehensive guide to probability distributions for uncertainty
 
 ---
 

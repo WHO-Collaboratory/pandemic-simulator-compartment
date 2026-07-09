@@ -5,6 +5,7 @@ This document explains how interventions (public health measures) are defined, c
 ## Overview
 
 **Interventions** represent public health measures that modify disease transmission or population behavior during a simulation. Examples include:
+
 - **Social distancing** / physical distancing
 - **Mask wearing**
 - **Vaccination campaigns**
@@ -13,6 +14,7 @@ This document explains how interventions (public health measures) are defined, c
 - **Vector control** (for vector-borne diseases)
 
 Interventions can activate based on:
+
 1. **Calendar dates** ("start on day X, end on day Y")
 2. **Infection thresholds** ("activate when 5% infected, deactivate when below 1%")
 3. **Both** (date window with threshold-based hysteresis)
@@ -64,9 +66,7 @@ Models declare supported interventions in `define_parameters()`:
 
 ```python
 @classmethod
-def define_parameters(cls):
-    schema = ParameterSchemaBuilder()
-    
+def define_parameters(cls, schema):
     # ... compartments and edges ...
     
     # Declare interventions
@@ -87,8 +87,6 @@ def define_parameters(cls):
         adherence=60.0,
         transmission_reduction=30.0,
     )
-    
-    return schema
 ```
 
 ### Intervention Parameters
@@ -96,8 +94,8 @@ def define_parameters(cls):
 #### Required Parameters
 
 - **`id`** (string): Machine identifier (e.g., `"social_isolation"`, `"vaccination"`)
-  - Used to reference the intervention in config files
-  - Must be unique within a model
+    - Used to reference the intervention in config files
+    - Must be unique within a model
 
 - **`label`** (string): Human-readable name displayed in UIs (e.g., `"Social Isolation"`)
 
@@ -106,21 +104,21 @@ def define_parameters(cls):
 #### Optional Parameters
 
 - **`target_rates`** (list[string]): Transmission edge variable names to modify
-  - Example: `["beta"]` for respiratory diseases
-  - Example: `["b_V_T", "s_V_T"]` for vector-borne diseases
-  - Default: `[]` (no rate modification — used for lockdowns that only affect travel)
+    - Example: `["beta"]` for respiratory diseases
+    - Example: `["b_V_T", "s_V_T"]` for vector-borne diseases
+    - Default: `[]` (no rate modification — used for lockdowns that only affect travel)
 
 - **`modifies_travel`** (bool): If `True`, replaces travel matrix with identity when active
-  - Default: `False`
-  - Set to `True` for lockdown interventions
+    - Default: `False`
+    - Set to `True` for lockdown interventions
 
 - **`adherence`** (float, 0-100): Default population adherence percentage
-  - Default: `50.0`
-  - What fraction of the population follows the intervention
+    - Default: `50.0`
+    - What fraction of the population follows the intervention
 
 - **`transmission_reduction`** (float, 0-100): Default transmission reduction percentage
-  - Default: `5.0`  
-  - How much transmission is reduced among adherent individuals
+    - Default: `5.0`
+    - How much transmission is reduced among adherent individuals
 
 ### Lockdown Example
 
@@ -181,16 +179,19 @@ Activate during a specific time window:
 ```
 
 **Behavior:**
+
 - Activates on `2025-11-18`
 - Remains active through `2025-12-31`
 - Deactivates on `2026-01-01`
 - Rate reduction applies **only during the window**
 
 **Required fields:**
+
 - `id`: Must match a declared intervention
 - `start_date`: ISO date string (YYYY-MM-DD)
 
 **Optional fields:**
+
 - `end_date`: ISO date string (omit for "never ending")
 - `adherence_min`: Override model default
 - `transmission_percentage`: Override model default
@@ -214,16 +215,19 @@ Activate when infection levels cross thresholds:
 ```
 
 **Behavior:**
+
 - Activates when `prop_infective >= 0.05` (5% infected)
 - Remains active until `prop_infective <= 0.01` (1% infected)
 - Uses **hysteresis** to prevent oscillation
 - Rate reduction persists as long as status is active
 
 **Required fields:**
+
 - `id`
 - `start_threshold`: Proportion (0.0-1.0) that triggers activation
 
 **Optional fields:**
+
 - `end_threshold`: Proportion that triggers deactivation (omit for "never deactivate")
 - `adherence_min`
 - `transmission_percentage`
@@ -249,6 +253,7 @@ Use both activation mechanisms:
 ```
 
 **Behavior:**
+
 - **Pass 1 (date):** Reduces rate while inside `[start_date, end_date]`
 - **Pass 2 (threshold):** Reduces rate again if `prop_infective >= start_threshold`
 - Result: Double reduction is possible during the date window when threshold is also active
@@ -287,6 +292,7 @@ Apply several interventions at once:
 ```
 
 **Interaction:**
+
 - Interventions are applied **sequentially** in the order they appear
 - Each one modifies the rate(s) from the previous step
 - Reductions are **multiplicative**, not additive:
@@ -297,7 +303,7 @@ After social_isolation (40% × 50%): beta = 0.3 * (1 - 0.4*0.5) = 0.24
 After mask_wearing (60% × 30%):     beta = 0.24 * (1 - 0.6*0.3) = 0.1968
 ```
 
-> **Visualizing interventions:** after a run completes, `python tools/view_results.py results/<output>.json` plots the with- and without-intervention runs side by side and draws a vertical line at each intervention's start (dashed) and stop (dotted) date, so the effect is visible at a glance. Threshold-triggered interventions (no fixed date) are noted on the panel instead. See [tools/README.md](../tools/README.md).
+> **Visualizing interventions:** after a run completes, `python tools/view_results.py results/<output>.json` plots the with- and without-intervention runs side by side and draws a vertical line at each intervention's start (dashed) and stop (dotted) date, so the effect is visible at a glance. Threshold-triggered interventions (no fixed date) are noted on the panel instead. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md).
 
 ## Reduction Formula
 
@@ -308,6 +314,7 @@ reduced_rate = rate * (1 - adherence * transmission_reduction)
 ```
 
 Where:
+
 - **adherence** and **transmission_reduction** are fractions (0.0-1.0), converted from percentages
 - **adherence** = fraction of population following the intervention
 - **transmission_reduction** = fractional reduction in transmission among adherent individuals
@@ -328,6 +335,7 @@ new_beta = 0.3 * (1 - 0.20) = 0.24
 ```
 
 **Interpretation:**
+
 - 40% of the population reduces their contacts by 50%
 - Net effect: 20% reduction in transmission rate
 
@@ -459,11 +467,13 @@ Intervention parameters can vary during uncertainty analysis:
 ```
 
 **Behavior in `UNCERTAINTY` mode:**
+
 - Latin Hypercube Sampling draws values from specified ranges
 - Each simulation run gets a different `(adherence, transmission_reduction)` pair
 - Output includes median and confidence intervals across runs
 
 **Why vary interventions?**
+
 - **Adherence uncertainty:** How many people will actually follow guidelines?
 - **Efficacy uncertainty:** How effective is mask-wearing really?
 - **Policy scenario analysis:** What's the range of possible outcomes?
@@ -481,10 +491,12 @@ self.intervention_statuses = {
 ```
 
 **Updated every timestep:**
+
 - `False` → intervention is inactive
 - `True` → intervention is active
 
 **Used for:**
+
 - Hysteresis in threshold interventions (prevent oscillation)
 - Logging/debugging intervention activation times
 - Conditional logic in custom interventions
@@ -595,6 +607,7 @@ With `end_threshold`, it stays active until infections drop to 1%, preventing os
 ### Intervention Not Activating
 
 **Symptoms:**
+
 - Output identical with/without intervention in config
 - No change in transmission rates
 
@@ -627,6 +640,7 @@ With `end_threshold`, it stays active until infections drop to 1%, preventing os
 ### Intervention Too Strong/Weak
 
 **Symptoms:**
+
 - Epidemic completely suppressed (R < 1 immediately)
 - Or no noticeable effect
 
@@ -651,6 +665,7 @@ With `end_threshold`, it stays active until infections drop to 1%, preventing os
 ### Intervention Oscillation
 
 **Symptoms:**
+
 - Intervention repeatedly activates/deactivates
 - Unstable output with rapid fluctuations
 
@@ -675,6 +690,7 @@ Set `end_threshold` significantly below `start_threshold` to create a buffer zon
 ### Lockdown Not Stopping Travel
 
 **Symptoms:**
+
 - Spatial spread continues despite lockdown
 
 **Possible causes:**
@@ -698,34 +714,34 @@ Set `end_threshold` significantly below `start_threshold` to create a buffer zon
 
 ## Related Documentation
 
-- **[DEVELOPING_MODELS.md](./DEVELOPING_MODELS.md)** — General model development guide
-- **[tools/view_results.py](../tools/view_results.py)** — Local results viewer; draws intervention start/stop lines on the compartment time series
-- **[GRAVITY_MODEL.md](./GRAVITY_MODEL.md)** — How travel matrices work (relevant for lockdowns)
-- **[CONTACT_MATRICES.md](./CONTACT_MATRICES.md)** — Age-specific mixing (interventions can target by age)
-- **[compartment/interventions.py](../compartment/interventions.py)** — Legacy implementation (being replaced by runtime.py)
-- **[compartment/runtime.py](../compartment/runtime.py)** — New `Intervention` class with JAX-compatible logic
-- **[compartment/model.py](../compartment/model.py)** — `_apply_interventions()` implementation
+- **[DEVELOPING_MODELS.md](./developing-models.md)** — General model development guide
+- **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; draws intervention start/stop lines on the compartment time series
+- **[GRAVITY_MODEL.md](./gravity-model.md)** — How travel matrices work (relevant for lockdowns)
+- **[CONTACT_MATRICES.md](./contact-matrices.md)** — Age-specific mixing (interventions can target by age)
+- **[compartment/interventions.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/interventions.py)** — Legacy implementation (being replaced by runtime.py)
+- **[compartment/runtime.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/runtime.py)** — New `Intervention` class with JAX-compatible logic
+- **[compartment/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/model.py)** — `_apply_interventions()` implementation
 
 ## References
 
 ### Intervention Effectiveness Studies
 
 - **Flaxman et al. (2020).** "Estimating the effects of non-pharmaceutical interventions on COVID-19 in Europe." *Nature* 584: 257-261.
-  - Empirical estimates of NPI effectiveness (lockdowns, school closures, etc.)
+    - Empirical estimates of NPI effectiveness (lockdowns, school closures, etc.)
 
 - **Chu et al. (2020).** "Physical distancing, face masks, and eye protection to prevent person-to-person transmission of SARS-CoV-2." *The Lancet* 395: 1973-1987.
-  - Meta-analysis of mask effectiveness and physical distancing
+    - Meta-analysis of mask effectiveness and physical distancing
 
 - **Haug et al. (2020).** "Ranking the effectiveness of worldwide COVID-19 government interventions." *Nature Human Behaviour* 4: 1303-1312.
-  - Comparative effectiveness of 6,000 interventions across 79 countries
+    - Comparative effectiveness of 6,000 interventions across 79 countries
 
 ### Adherence and Compliance
 
 - **Betsch et al. (2020).** "Social and behavioral consequences of mask policies during the COVID-19 pandemic." *PNAS* 117(36): 21851-21853.
-  - Adherence rates for mask-wearing mandates
+    - Adherence rates for mask-wearing mandates
 
 - **Huynh (2020).** "The COVID-19 containment in Vietnam: What are we doing?" *Journal of Global Health* 10(1): 010338.
-  - Case study of high-adherence interventions in Vietnam
+    - Case study of high-adherence interventions in Vietnam
 
 ---
 
