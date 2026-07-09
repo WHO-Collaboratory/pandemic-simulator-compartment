@@ -365,21 +365,17 @@ Models can declare travel parameters in `define_parameters()`:
 
 ```python
 @classmethod
-def define_parameters(cls):
-    schema = ParameterSchemaBuilder()
-    
+def define_parameters(cls, schema):
     # Set default travel rate
-    schema.set_travel_volume(default_leaving=0.2)
+    schema.set_travel_volume(leaving_default=0.2)
     
     # Models can also define custom mobility parameters
     schema.add_disease_parameter(
         "mobility_scale_km",
         description="Distance scale for exponential decay (km)",
         default=500.0,
-        value_type=ValueType.RATE
+        value_type=ValueType.RATE,
     )
-    
-    return schema
 ```
 
 ## Validation and Edge Cases

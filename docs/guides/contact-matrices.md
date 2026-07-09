@@ -27,25 +27,25 @@ The framework supports three approaches for defining contact matrices, in order 
 
 **Example:**
 ```python
-def define_parameters(cls):
-    schema = ParameterSchemaBuilder()
+@classmethod
+def define_parameters(cls, schema):
     schema.set_model_info(disease_type="RESPIRATORY_AGE_STRUCTURED", ...)
     
     # Declare age ranges for automatic Prem matrix loading
     schema.add_demographic_group(
-        id="age_0_17",
-        default_population_fraction=25.0,
-        age_range=(0, 17)  # This enables Prem auto-loading
+        "age_0_17", "Children (0-17)",
+        default_weight=25.0,
+        age_range=(0, 17),  # This enables Prem auto-loading
     )
     schema.add_demographic_group(
-        id="age_18_55",
-        default_population_fraction=50.0,
-        age_range=(18, 55)
+        "age_18_55", "Adults (18-55)",
+        default_weight=50.0,
+        age_range=(18, 55),
     )
     schema.add_demographic_group(
-        id="age_56_plus",
-        default_population_fraction=25.0,
-        age_range=(56, 120)
+        "age_56_plus", "Elderly (56+)",
+        default_weight=25.0,
+        age_range=(56, 120),
     )
 ```
 
@@ -66,10 +66,10 @@ If the country is not in the Prem dataset, the framework falls back to a **globa
 
 **Example:**
 ```python
-def define_parameters(cls):
-    schema = ParameterSchemaBuilder()
-    schema.add_demographic_group(id="children")
-    schema.add_demographic_group(id="adults")
+@classmethod
+def define_parameters(cls, schema):
+    schema.add_demographic_group("children", "Children", default_weight=50.0)
+    schema.add_demographic_group("adults", "Adults", default_weight=50.0)
     
     # Schema-level overrides suppress Prem auto-loading
     schema.set_contact_override("children", "children", 12.0)
@@ -232,30 +232,26 @@ The resulting matrix is stored in `self.contact_matrix` and used by the model's 
 
 ```python
 @classmethod
-def define_parameters(cls):
-    schema = ParameterSchemaBuilder()
-    
+def define_parameters(cls, schema):
     # 1. Declare demographic groups with age_range for Prem auto-loading
     schema.add_demographic_group(
-        id="age_0_17",
-        default_population_fraction=25.0,
-        age_range=(0, 17)
+        "age_0_17", "Children (0-17)",
+        default_weight=25.0,
+        age_range=(0, 17),
     )
     schema.add_demographic_group(
-        id="age_18_55",
-        default_population_fraction=50.0,
-        age_range=(18, 55)
+        "age_18_55", "Adults (18-55)",
+        default_weight=50.0,
+        age_range=(18, 55),
     )
     schema.add_demographic_group(
-        id="age_56_plus",
-        default_population_fraction=25.0,
-        age_range=(56, 120)
+        "age_56_plus", "Elderly (56+)",
+        default_weight=25.0,
+        age_range=(56, 120),
     )
     
     # 2. (Optional) Override specific cells if needed
     # schema.set_contact_override("age_0_17", "age_0_17", 10.0)
-    
-    return schema
 ```
 
 ### In `derivative()`

@@ -66,9 +66,7 @@ Models declare supported interventions in `define_parameters()`:
 
 ```python
 @classmethod
-def define_parameters(cls):
-    schema = ParameterSchemaBuilder()
-    
+def define_parameters(cls, schema):
     # ... compartments and edges ...
     
     # Declare interventions
@@ -89,8 +87,6 @@ def define_parameters(cls):
         adherence=60.0,
         transmission_reduction=30.0,
     )
-    
-    return schema
 ```
 
 ### Intervention Parameters
