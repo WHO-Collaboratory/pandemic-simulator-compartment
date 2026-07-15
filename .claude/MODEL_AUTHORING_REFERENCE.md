@@ -1,6 +1,6 @@
 # Claude reference: authoring a new compartmental model
 
-This file is for me (Claude) when the user asks for help adding or modifying a disease model. The companion user-facing doc is [docs/DEVELOPING_MODELS.md](../docs/DEVELOPING_MODELS.md). Use this file as the *authoring playbook*: concrete patterns, file paths, and pitfalls. Keep this terse and pattern-focused.
+This file is for me (Claude) when the user asks for help adding or modifying a disease model. The companion user-facing doc is [docs/guides/developing-models.md](../docs/guides/developing-models.md). Use this file as the *authoring playbook*: concrete patterns, file paths, and pitfalls. Keep this terse and pattern-focused.
 
 ## Mental model in three sentences
 
@@ -30,6 +30,7 @@ This file is for me (Claude) when the user asks for help adding or modifying a d
 | Intervention implementation code | [compartment/runtime.py](../compartment/runtime.py) `Intervention` class, [compartment/model.py](../compartment/model.py) `_apply_interventions()` |
 | **Uncertainty quantification: LHS, distributions, and CI interpretation** | [docs/UNCERTAINTY_QUANTIFICATION.md](../docs/UNCERTAINTY_QUANTIFICATION.md) — comprehensive guide |
 | UQ implementation code | [compartment/run_simulation.py](../compartment/run_simulation.py) orchestration, [compartment/helpers.py](../compartment/helpers.py) `generate_LHS_samples()` |
+| **External datasets (Bring-Your-Own-Dataset): declare in `datasets.yaml`, load in a hook** | [compartment/datasets/](../compartment/datasets/) — `loader.py` (load+cache), `resolver.py` (pins→path), `manifest.py`; CLI [compartment/datasets_cli.py](../compartment/datasets_cli.py) (`push`/`pull`/`list`) |
 
 When in doubt, *read the file* — the framework changes faster than this reference.
 
@@ -143,6 +144,33 @@ Three precedence layers, latest wins:
 
 The covid model currently keeps its hardcoded 9-cell POLYMOD overrides for backward compatibility — they take precedence over Prem. Removing them is a known follow-up.
 
+## External datasets (Bring-Your-Own-Dataset)
+
+A model that needs external data (mobility, case counts, temperature series) declares it in a `datasets.yaml` next to `model.py` and reads it through the `datasets` SDK — never a raw `pd.read_csv("mobility.csv")`, which works locally but silently breaks in the cloud (the Lambda has no access to the author's files).
+
+```yaml
+# datasets.yaml
+datasets:
+  - name: mobility/kenya      # logical id "<namespace>/<slug>", matches Dataset.slug
+    version: "2026-06-01"     # exact (reproducible) — or "latest" for own iteration
+    required: true
+    format: csv
+```
+
+```python
+def load_datasets(self):                              # the one-time hook
+    from compartment import datasets
+    self.mobility = datasets.load("mobility/kenya")   # DataFrame
+    # p = datasets.path_for("mobility/kenya")          # local Path for non-pandas readers
+```
+
+- **Where the hook fires:** once, at model init. For migrated models (that call `super().__init__()`), the base `Model.__init__` invokes `self.load_datasets()` automatically. For hand-written `__init__` models that skip `super()` (e.g. `test_klebsiella_amr_model`), add `self.load_datasets()` explicitly at the end of `__init__` — otherwise it never fires.
+- **Never** call `datasets.load()` at import time, inside `derivative()`, or in the parallel worker fan-out. Load once, stash on `self`.
+- **Parity is automatic.** `run_simulation` calls `datasets.configure(mode=…, pins=…, model_dir=…)` before the model is built. The identical `datasets.load()` resolves from `~/.cache/who-collaboratory/datasets/<slug>/<version>/` locally and from S3 (via frozen pins downloaded to `/tmp`, hash-verified) in the cloud. Nothing to wire per-model beyond the hook.
+- **Version precedence:** explicit arg → config `dataset_pins` (frozen reproducibility path, the runtime default) → `datasets.yaml` → newest in local cache (`latest`).
+- **Formats:** only `csv`/`tsv`/`json`/`ndjson` are read; the loader **never** `read_pickle`/`read_hdf` or any code-deserializing reader (this is a deliberate parser-exploit defense — do not add one). `generate_artifact` embeds `datasets.yaml` as `dataset_dependencies`; the platform freezes each dependency to a published `DatasetVersion` at job creation, and `GRAPHQL_QUERY` returns those pins.
+- **Getting data locally:** `python -m compartment.datasets pull <slug> --version <v>` populates the cache; `push` publishes a new immutable version (lands in quarantine, promoted after the scan gate). A cache miss errors with the exact `pull` command.
+
 ## Pitfalls I keep tripping on
 
 - **`super().__init__()` must be called when the model is "migrated"** (i.e. uses `define_parameters()`). It's what populates `self.beta`, `self.gamma`, contact matrix, intervention runtime objects. If I see `AttributeError: ... has no attribute 'beta'`, the cause is usually a forgotten `super().__init__()` or a typo in `variable_name`.
@@ -152,6 +180,7 @@ The covid model currently keeps its hardcoded 9-cell POLYMOD overrides for backw
 - **`infective=True` is critical for `frequency_dependent=True` edges**. Without it, the FOI sum is empty and the model produces zero flow. Mark every compartment that contributes infectious pressure (in dengue that's all primary `Ix` and all secondary `Ixy`).
 - **`value_type=ValueType.DAYS`** means `default=10.0` is interpreted as a 10-day mean ⇒ rate `0.1`. Do not pre-divide.
 - **Travel matrix must exist before `_apply_interventions()`** — it reads `self.travel_matrix`. Set it in `__init__` or `prepare_initial_state()` before the first `derivative()` call. Use `jnp.eye(R)` when there's no travel model.
+- **External data loads in `load_datasets()`, not in `derivative()`.** Reading a dataset inside the JAX-traced `derivative()` (or at import time) breaks tracing/perf and the cloud path. Declare it in `datasets.yaml`, read it once in `load_datasets()`, stash on `self`. Hand-written-`__init__` models (no `super().__init__()`) must call `self.load_datasets()` themselves — the base only auto-invokes it for migrated models.
 - **Variants** use `super().define_parameters(schema)` and then mutate. Removing a compartment cascades and removes any edges that reference it. To re-add an edge that the parent referenced via the removed compartment (e.g. an S→I beta after E is gone), call `schema.add_transmission_edge(**_BETA_SI)` — see covid `variants.py` for the canonical pattern.
 - **Stochastic / Euler models** must set `STOCHASTIC = True` (or `SOLVER = "euler"`) and have `derivative()` return the **per-step delta**, not the rate. Multiplying by `dt` happens inside `_euler_integrate`.
 - **The "short form" config loader** wraps top-level `admin_zones` and `demographics` into `case_file` automatically. Don't double-nest when writing example configs by hand.

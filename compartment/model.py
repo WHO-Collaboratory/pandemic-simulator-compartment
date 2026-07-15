@@ -248,6 +248,12 @@ class Model(ABC):
         self.contact_matrix = self._build_contact_matrix(config)
         self._rate_vectors = self._build_rate_vectors(config)
 
+        # One-time external dataset load (Bring-Your-Own-Dataset). No-op unless
+        # the model overrides load_datasets(). Must run here — once, at init,
+        # near where contact matrices load — never at import time or inside the
+        # JAX-traced derivative().
+        self.load_datasets()
+
     # ------------------------------------------------------------------
     # Schema-derived properties
     # ------------------------------------------------------------------
@@ -1216,6 +1222,28 @@ class Model(ABC):
                     self.compartment_list = self.compartment_list + [total_id]
                     active_set.add(total_id)
                     seen.add(tid)
+
+    def load_datasets(self) -> None:
+        """Optional hook: load external datasets once at model init.
+
+        Override to read Bring-Your-Own-Dataset files declared in the model's
+        ``datasets.yaml`` and stash them on ``self`` for use in
+        ``prepare_initial_state()`` / ``derivative()``::
+
+            def load_datasets(self):
+                from compartment import datasets
+                self.mobility = datasets.load("mobility/kenya")   # DataFrame
+
+        The identical ``datasets.load()`` call resolves from the local cache on
+        a laptop and from S3 (via frozen version pins) in the cloud, so the same
+        model code runs unchanged in both.
+
+        Invoked once from :meth:`Model.__init__`. Models with a hand-written
+        ``__init__`` that does not call ``super().__init__()`` must invoke
+        ``self.load_datasets()`` explicitly at the end of that ``__init__``.
+        Never call ``datasets.load()`` at import time or inside ``derivative()``.
+        """
+        pass
 
     def prepare_initial_state(self):
         pass

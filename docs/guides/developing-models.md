@@ -416,6 +416,95 @@ class MySEIRModel(MyBaseModel):
 
 Each variant gets its own `DISEASE_TYPE`, its own auto-generated `COMPARTMENT_LIST`, and its own artifact JSON. The shared `derivative()` works as long as it tolerates missing compartments (use `_compute_derivatives()` and check `if "E" in states` before referencing optional compartments — see CovidJaxModel.derivative). The auto-discovery registry picks up every variant in `variants.py` automatically.
 
+## Using external datasets (Bring-Your-Own-Dataset)
+
+If your model needs external data — mobility, temperature series, case counts for
+parameter fitting — **do not** read a file directly in your model:
+
+```python
+# DON'T: works on your laptop, silently breaks in the cloud (the model runs as a
+# Lambda with no access to your local files).
+self.mobility = pd.read_csv("mobility.csv")
+```
+
+Instead declare the dependency in a `datasets.yaml` next to your `model.py` and
+read it through the `datasets` SDK. The **same call resolves from a local cache
+on your laptop and from S3 in the cloud**, so your model code never changes
+between the two.
+
+### 1. Declare the dependency
+
+```yaml
+# compartment/models/<name>/datasets.yaml
+datasets:
+  - name: mobility/kenya      # logical id "<namespace>/<slug>"
+    version: "2026-06-01"     # an exact version (reproducible) or "latest"
+    required: true
+    format: csv               # csv | tsv | json | ndjson
+```
+
+Pin an **exact** version for a published model — you can always tell which data a
+model version used. Use `"latest"` only while iterating on your own machine.
+
+### 2. Read it in the `load_datasets()` hook
+
+```python
+def load_datasets(self):
+    from compartment import datasets
+
+    self.mobility = datasets.load("mobility/kenya")     # returns a pandas DataFrame
+    # For a non-pandas reader, get the file path instead:
+    # path = datasets.path_for("mobility/kenya")
+```
+
+`load_datasets()` is called **once**, when the model is initialised — the right
+place to read data and stash it on `self`. If your model calls
+`super().__init__(config)` (the usual case), the framework invokes the hook for
+you. If you hand-wrote `__init__` without calling `super()`, add
+`self.load_datasets()` yourself at the end of it.
+
+!!! warning "Never load data inside `derivative()`"
+    `derivative()` is JAX-traced and runs in a hot loop across parallel workers.
+    Reading a dataset there (or at import time) is slow and breaks tracing. Load
+    once in `load_datasets()`, use `self.mobility` in `derivative()`.
+
+### 3. Get the data into your local cache
+
+Datasets live in S3, not Git. Pull a published version into the local cache the
+SDK reads (`~/.cache/who-collaboratory/datasets/`, override with
+`WHO_DATASET_CACHE`):
+
+```bash
+python -m compartment.datasets pull mobility/kenya --version 2026-06-01
+```
+
+To publish your own dataset (uploads land in a quarantine bucket and are scanned
+before they become usable):
+
+```bash
+python -m compartment.datasets push \
+    --file mobility_kenya.csv --slug mobility/kenya \
+    --version 2026-06-01 --visibility private
+python -m compartment.datasets list --mine
+```
+
+If a dataset isn't in the cache, `datasets.load()` fails with the exact `pull`
+command to run.
+
+### How versions are resolved (and why runs reproduce)
+
+The SDK picks a version in this order: an explicit `version=` argument →
+the pin frozen on the simulation → your `datasets.yaml` version →
+the newest version in the cache (`latest`). `generate_artifact` records your
+`datasets.yaml` as `dataset_dependencies` in the model artifact, and at job
+creation the platform freezes each dependency to the exact published version,
+storing it on the job. Re-running a saved job re-reads those frozen pins — and
+therefore the identical bytes (verified by content hash) — even months later,
+after the dataset has newer versions. That is the reproducibility guarantee.
+
+Only `csv`, `tsv`, `json`, and `ndjson` are supported; the loader never opens
+pickle or other code-executing formats.
+
 ## `main.py`
 
 Boilerplate — copy from any existing model. The driver handles arg parsing for both modes:

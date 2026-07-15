@@ -93,6 +93,36 @@ def _list_available() -> list[str]:
     return available
 
 
+def _dataset_dependencies(model_class, model_dir=None) -> list[dict]:
+    """Read ``<model_dir>/datasets.yaml`` into an artifact ``dataset_dependencies``
+    list so the platform learns what datasets a deployed model needs — static
+    and discoverable, like ``define_parameters()``. Empty when no manifest.
+
+    The job-creation path resolves each dependency to the currently-published
+    ``DatasetVersion`` and freezes it into ``SimulationJob.dataset_pins``.
+    """
+    from compartment.datasets.manifest import load_manifest
+
+    directory = model_dir or str(Path(inspect.getfile(model_class)).parent)
+    return [
+        {
+            "name": d.name,
+            "version": d.version,
+            "required": d.required,
+            "format": d.format,
+        }
+        for d in load_manifest(directory).values()
+    ]
+
+
+def _augment_with_dependencies(artifact: dict, model_class, model_dir=None) -> dict:
+    """Add ``dataset_dependencies`` to an artifact dict when the model declares any."""
+    deps = _dataset_dependencies(model_class, model_dir)
+    if deps:
+        artifact["dataset_dependencies"] = deps
+    return artifact
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate model artifact JSON or example configs from declarative parameter definitions.",
@@ -163,8 +193,11 @@ def main():
                 print(f"Skipping {model_class.__name__}: define_parameters() not implemented.", file=sys.stderr)
                 continue
             output_path = output_dir / f"{schema.disease_type}.json"
+            artifact = _augment_with_dependencies(
+                schema.to_artifact_dict(), model_class, args.model_dir
+            )
             with open(output_path, "w") as f:
-                f.write(json.dumps(schema.to_artifact_dict(), indent=2) + "\n")
+                f.write(json.dumps(artifact, indent=2) + "\n")
             print(f"Artifact written to {output_path}", file=sys.stderr)
         return
 
@@ -184,7 +217,9 @@ def main():
         sys.exit(1)
 
     # --- Artifact JSON ---
-    artifact = schema.to_artifact_dict()
+    artifact = _augment_with_dependencies(
+        schema.to_artifact_dict(), model_class, args.model_dir
+    )
     artifact_json = json.dumps(artifact, indent=2)
 
     if args.output:

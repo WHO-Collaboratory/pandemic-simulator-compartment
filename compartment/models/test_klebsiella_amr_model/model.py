@@ -587,6 +587,31 @@ class KlebsiellaAmrModel(Model):
 
         self.payload = input
 
+        # This model has a hand-written __init__ that does not call
+        # super().__init__(), so invoke the BYOD dataset hook explicitly here.
+        self.load_datasets()
+
+    # ------------------------------------------------------------------
+    # Bring-Your-Own-Dataset
+    # ------------------------------------------------------------------
+
+    def load_datasets(self):
+        """Load reference antibiotic-consumption data declared in datasets.yaml.
+
+        Demonstrates the BYOD SDK: the identical ``datasets.load()`` call
+        resolves from the local cache in ``--mode local`` and from S3 (via
+        frozen pins) in the cloud. Loaded once here at init — never inside
+        ``derivative()``.
+        """
+        from compartment import datasets
+
+        self.antibiotic_use = datasets.load("amr/antibiotic-use")
+        logger.info(
+            "Loaded 'amr/antibiotic-use' dataset (%d rows, columns=%s)",
+            len(self.antibiotic_use),
+            list(self.antibiotic_use.columns),
+        )
+
     # ------------------------------------------------------------------
     # Initial population
     # ------------------------------------------------------------------

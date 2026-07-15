@@ -1,10 +1,12 @@
 import logging
 import json
 import os
+import inspect
 import multiprocessing
 import numpy as np  # should we use jax.numpy?
 from copy import deepcopy
 import boto3
+from compartment import datasets
 from compartment.model import Model
 from compartment.simulation_manager import SimulationManager
 from compartment.simulation_postprocessor import SimulationPostProcessor
@@ -171,6 +173,17 @@ def run_simulation(
     logger.info(f"run_mode: {run_mode}")
     if mode == "cloud" and simulation_params:
         update_simulation_job_run_mode(simulation_params, run_mode)
+
+    # Configure Bring-Your-Own-Dataset resolution before constructing the
+    # model, so the model's load_datasets() hook resolves against the right
+    # mode, this run's frozen version pins, and this model's datasets.yaml.
+    # The pin lives inside getSimulationJob in both modes (see resolver.py).
+    datasets.configure(
+        mode=mode,
+        environment=(simulation_params or {}).get("ENVIRONMENT"),
+        pins=job.get("dataset_pins"),
+        model_dir=os.path.dirname(inspect.getfile(model_class)),
+    )
 
     # Create business as usual model
     model_with = model_class(cleaned_config)
