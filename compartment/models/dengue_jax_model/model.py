@@ -62,6 +62,33 @@ class DengueJaxModel(Model):
             label="Dengue (4-serotype)",
             description="A 4-serotype vector-borne dengue model with temperature-driven mosquito dynamics",
         )
+        schema.set_model_metadata(
+            authors=[
+                {
+                    "name": "Daniel Langford",
+                    "email": "dlangford@ruvos",
+                    "affiliation": "Ruvos",
+                }
+            ],
+            license="MIT",
+            model_type="Compartmental",
+            diseases=["Dengue fever"],
+            transmission_routes=["Vector-borne"],
+            questions_answered=[
+                "How do bite reduction and vector control interventions affect dengue outbreak size and timing?",
+                "How does temperature seasonality affect dengue outbreak risk and timing?",
+                "How does population seroprevalence from prior serotype exposure affect future outbreak dynamics?",
+            ],
+            key_assumptions=[
+                "Four dengue serotypes (DENV-1–4) circulate simultaneously with a fixed 4-serotype structure.",
+                "Homogeneous mixing within zones; spatial coupling via a travel matrix.",
+                "Vector (Aedes mosquito) dynamics are temperature-driven via an Arrhenius thermal response model.",
+                "Mosquito carrying capacity is modeled as a multiple of the local human population.",
+                "Human birth and all-cause mortality rate is fixed at 1/(73 × 365) per day.",
+                "Primary infection confers temporary cross-serotype immunity before partial susceptibility is restored.",
+                "Secondary infection with a heterologous serotype carries elevated hospitalization risk (antibody-dependent enhancement).",
+            ],
+        )
 
         # ---- Vector compartments ----
         schema.add_compartment(
