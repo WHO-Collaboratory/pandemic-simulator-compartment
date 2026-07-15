@@ -13,6 +13,13 @@ GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
     tag_id
     time_steps
     updatedAt
+    dataset_pins {
+      slug
+      version
+      content_hash
+      bucket
+      key
+    }
     model_artifact_id
     ModelArtifact {
       id

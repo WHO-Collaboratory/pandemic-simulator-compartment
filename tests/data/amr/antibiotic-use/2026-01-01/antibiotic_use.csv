@@ -1,0 +1,5 @@
+setting,antibiotic_class,ddd_per_1000_per_day
+community,cephalosporins,1.0
+community,carbapenems,0.0
+hospital,cephalosporins,0.15
+hospital,carbapenems,0.08

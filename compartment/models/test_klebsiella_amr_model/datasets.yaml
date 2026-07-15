@@ -1,0 +1,8 @@
+# Bring-Your-Own-Dataset dependencies for the Klebsiella AMR demo model.
+# Read once via load_datasets(); resolves from the local cache in --mode local
+# and from S3 (via version pins frozen on the SimulationJob) in the cloud.
+datasets:
+  - name: amr/antibiotic-use
+    version: "2026-01-01"
+    required: true
+    format: csv
