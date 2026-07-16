@@ -8,11 +8,6 @@ from compartment.parameters import ValueType
 setup_logging()
 logger = logging.getLogger(__name__)
 
-"""
-WARNING: This model is not currently supported in the pandemic simulator app,
-but is available for testing and experimentation in the codebase.
-"""
-
 class CovidJaxModel(Model):
     """SEIHDR compartmental model with age-stratified transmission and spatial mobility."""
 
@@ -26,6 +21,33 @@ class CovidJaxModel(Model):
             disease_type=cls.DISEASE_TYPE,
             label=cls.DISEASE_LABEL,
             description=cls.DISEASE_DESCRIPTION,
+        )
+        schema.set_model_metadata(
+            authors=[
+                {
+                    "name": "Daniel Langford",
+                    "email": "dlangford@ruvos",
+                    "affiliation": "Ruvos",
+                }
+            ],
+            license="MIT",
+            model_type="Compartmental",
+            diseases=["Novel respiratory diseases"],
+            transmission_routes=["Airborne"],
+            questions_answered=[
+                "How does transmission rate affect peak incidence and total infections?",
+                "How do masks, social isolation, lockdown, and vaccination reduce spread?",
+                "How does age structure and contact patterns affect outbreak dynamics across age groups?",
+            ],
+            key_assumptions=[
+                "Closed population — no births or deaths.",
+                "Three age bands (0–17, 18–55, 56+) with age-stratified contact rates derived from Prem 2021 synthetic matrices.",
+                "Homogeneous mixing within each age group; spatial coupling via a travel matrix.",
+                "Transmission is frequency-dependent (force of infection scales with the proportion infectious, not the count).",
+                "Vaccination is modeled as a leaky vaccine: adherence represents coverage and transmission reduction represents vaccine efficacy.",
+                "Recovered individuals are fully immune with no waning (no R→S transition).",
+                "Hospitalization is a fixed fraction of all infected individuals regardless of age group.",
+            ],
         )
 
         # ---- Compartments (S-E-I-H-D-R) ----

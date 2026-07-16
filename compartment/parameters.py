@@ -632,6 +632,81 @@ class ContactOverrideDef:
 
 
 # ---------------------------------------------------------------------------
+# Model metadata
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ModelMetadata:
+    """
+    Editorial and publication metadata for a disease model.
+
+    All fields are optional — omitted fields are excluded from the artifact JSON.
+    Stored under ``metadata`` in the artifact root.
+    """
+
+    authors: Optional[list[dict]] = None
+    """List of author dicts: ``{"name": str, "email": str, "affiliation": str}``.
+    All sub-keys are optional within each dict."""
+
+    license: Optional[str] = None
+    """SPDX identifier or free-text license name (e.g. ``"MIT"``, ``"CC BY 4.0"``)."""
+
+    citations: Optional[list[str]] = None
+    """DOI URLs, paper URLs, or repo links related to this model."""
+
+    model_type: Optional[str] = None
+    """Structural category of the model (e.g. ``"Compartmental"``, ``"Network"``)."""
+
+    diseases: Optional[list[str]] = None
+    """ICD-11 codes or free-text disease names this model was designed for."""
+
+    transmission_routes: Optional[list[str]] = None
+    """Transmission pathways (e.g. ``["Airborne", "Droplet"]``).
+    No strict enum — pass any string; the UI offers a picker with a free-text fallback."""
+
+    questions_answered: Optional[list[str]] = None
+    """Research or policy questions this model is designed to answer."""
+
+    key_assumptions: Optional[list[str]] = None
+    """Core modelling assumptions authors want to surface to users."""
+
+    applicability: Optional[str] = None
+    """Contexts or settings where this model is appropriate."""
+
+    not_for: Optional[str] = None
+    """Contexts or use-cases where this model should *not* be applied."""
+
+    constraints: Optional[str] = None
+    """Known technical or data constraints."""
+
+    biases: Optional[str] = None
+    """Known biases in the model or its parameterisation."""
+
+    validation: Optional[str] = None
+    """Summary of validation work done on this model."""
+
+    def to_dict(self) -> dict:
+        """Serialize to a plain dict (None values omitted)."""
+        d = {
+            "authors": self.authors,
+            "license": self.license,
+            "citations": self.citations,
+            "model_type": self.model_type,
+            "diseases": self.diseases,
+            "transmission_routes": self.transmission_routes,
+            "questions_answered": self.questions_answered,
+            "key_assumptions": self.key_assumptions,
+            "applicability": self.applicability,
+            "not_for": self.not_for,
+            "constraints": self.constraints,
+            "biases": self.biases,
+            "validation": self.validation,
+        }
+        return {k: v for k, v in d.items() if v is not None}
+
+
+# ---------------------------------------------------------------------------
 # Full model parameter schema
 # ---------------------------------------------------------------------------
 
@@ -678,6 +753,9 @@ class ModelParameterSchema:
     # available, otherwise defaults to the raw compartment IDs
     # (excluding cumulative _total entries).
     compartment_display_order: list[str] = field(default_factory=list)
+
+    # Editorial / publication metadata (optional — omitted when not set).
+    metadata: Optional[ModelMetadata] = None
 
     # Model-level run mode: DETERMINISTIC or STOCHASTIC.
     # Derived from the model class's STOCHASTIC attribute.
@@ -774,6 +852,8 @@ class ModelParameterSchema:
             "name": self.disease_label,
             "definition": self.description,
             "run_mode": self.run_mode,
+            # Editorial / publication metadata (omitted when not set)
+            **({"metadata": self.metadata.to_dict()} if self.metadata else {}),
             # num_runs is surfaced solely as a "disease_parameter" custom field
             # (with default_value/min/max in its metadata) — declare it via
             # schema.add_disease_parameter(name="num_runs", ...). It is
@@ -945,6 +1025,7 @@ class ParameterSchemaBuilder:
         self._num_runs: int = 30
         self._num_runs_min: int = 1
         self._num_runs_max: int = 100
+        self._metadata: ModelMetadata | None = None
 
     # ----- Identity --------------------------------------------------------
 
@@ -967,6 +1048,62 @@ class ParameterSchemaBuilder:
         self._disease_type = disease_type
         self._disease_label = label
         self._description = description
+
+    def set_model_metadata(
+        self,
+        authors: list[dict] | None = None,
+        license: str | None = None,
+        citations: list[str] | None = None,
+        model_type: str | None = None,
+        diseases: list[str] | None = None,
+        transmission_routes: list[str] | None = None,
+        questions_answered: list[str] | None = None,
+        key_assumptions: list[str] | None = None,
+        applicability: str | None = None,
+        not_for: str | None = None,
+        constraints: str | None = None,
+        biases: str | None = None,
+        validation: str | None = None,
+    ) -> None:
+        """
+        Set editorial and publication metadata for the model.  All fields are
+        optional — omit any that don't apply.  Metadata is emitted under a
+        top-level ``metadata`` key in the artifact JSON and has no effect on
+        simulation runtime.
+
+        Args:
+            authors: List of author dicts.  Each dict may contain any subset of
+                ``"name"``, ``"email"``, and ``"affiliation"`` keys.
+            license: SPDX identifier or free-text license name
+                (e.g. ``"MIT"``, ``"CC BY 4.0"``).
+            citations: DOI URLs, paper URLs, or repo links related to this model.
+            model_type: Structural category (e.g. ``"Compartmental"``, ``"Network"``).
+            diseases: ICD-11 codes or free-text disease names this model targets.
+            transmission_routes: Transmission pathways
+                (e.g. ``["Airborne", "Droplet"]``).  No strict enum.
+            questions_answered: Research or policy questions this model addresses.
+            key_assumptions: Core modelling assumptions to surface to users.
+            applicability: Contexts or settings where this model is appropriate.
+            not_for: Use-cases where this model should *not* be applied.
+            constraints: Known technical or data constraints.
+            biases: Known biases in the model or its parameterisation.
+            validation: Summary of validation work done on this model.
+        """
+        self._metadata = ModelMetadata(
+            authors=authors,
+            license=license,
+            citations=citations,
+            model_type=model_type,
+            diseases=diseases,
+            transmission_routes=transmission_routes,
+            questions_answered=questions_answered,
+            key_assumptions=key_assumptions,
+            applicability=applicability,
+            not_for=not_for,
+            constraints=constraints,
+            biases=biases,
+            validation=validation,
+        )
 
     # ----- Compartments ----------------------------------------------------
 
@@ -1545,4 +1682,5 @@ class ParameterSchemaBuilder:
             num_runs=self._num_runs,
             num_runs_min=self._num_runs_min,
             num_runs_max=self._num_runs_max,
+            metadata=self._metadata,
         )
