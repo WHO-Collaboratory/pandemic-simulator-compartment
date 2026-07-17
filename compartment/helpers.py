@@ -231,10 +231,11 @@ def compute_jax_compartment_deltas(
 
 
 def compute_multi_run_compartment_deltas(
-    population_matrix, disease_type, n_regions, compartment_list, model_class=None
+    population_matrix, disease_type, n_regions, compartment_list, model_class=None, ci=0.95
 ):
     """
-    Calculate the average compartment deltas over all simulations
+    Calculate the average compartment deltas over all simulations, plus
+    lower/upper simulation-based interval bounds on the same per-run deltas.
     """
     all_deltas = []
     for sim in population_matrix:
@@ -244,9 +245,17 @@ def compute_multi_run_compartment_deltas(
         all_deltas.append(deltas)
     # Get unique compartments
     compartments = all_deltas[0].keys()
-    # calculate average for each compartment
-    avg_deltas = {comp: np.mean([d[comp] for d in all_deltas]) for comp in compartments}
-    return avg_deltas
+    lower_q = ((1 - ci) / 2) * 100
+    upper_q = (1 - ((1 - ci) / 2)) * 100
+    # average + CI bounds for each compartment
+    return {
+        comp: {
+            "mean": float(np.mean([d[comp] for d in all_deltas])),
+            "lower": float(np.percentile([d[comp] for d in all_deltas], lower_q)),
+            "upper": float(np.percentile([d[comp] for d in all_deltas], upper_q)),
+        }
+        for comp in compartments
+    }
 
 
 

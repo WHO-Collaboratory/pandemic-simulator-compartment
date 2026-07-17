@@ -49,16 +49,3 @@ If you are building or configuring a disease model, start here:
 | [Hantavirus (Rodent)](models/hantavirus.md) | `hantavirus_jax_model` | Spatial rodent-to-human hantavirus spillover (urban / rural-pop / rural-empty) following Cornejo-Donoso et al. 2023 |
 | [Hantavirus (Human)](models/hantavirus-human.md) | `hantavirus_human_jax_model` | SEIR hantavirus model with person-to-person transmission and endogenous risk-perception state |
 | [Mpox](models/mpox.md) | `mpox_jax_model` | A simple SIRS compartmental model for MPOX with spatial mobility |
-
-## Quick Start
-
-```bash
-# Install with docs dependencies
-uv sync --group docs
-
-# Serve docs locally with live reload
-uv run mkdocs serve
-
-# Build static HTML
-uv run mkdocs build
-```

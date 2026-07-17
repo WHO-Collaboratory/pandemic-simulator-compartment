@@ -249,7 +249,9 @@ def parse_compartment_deltas(run):
     """Return the run's compartment_deltas as {compartment: float}.
 
     These are per-compartment cumulative totals over the whole run (the final
-    ``*_total`` value). Returns {} when the run has none.
+    ``*_total`` value). Multi-run results may store
+    ``{mean, lower, upper}`` per compartment — use the central ``mean``
+    (average). Returns {} when the run has none.
     """
     cd = run.get("compartment_deltas") or {}
     out = {}
@@ -257,7 +259,10 @@ def parse_compartment_deltas(run):
         if comp == "__typename":
             continue
         try:
-            out[comp] = float(val)
+            if isinstance(val, dict) and "mean" in val:
+                out[comp] = float(val["mean"])
+            else:
+                out[comp] = float(val)
         except (TypeError, ValueError):
             continue
     return out
