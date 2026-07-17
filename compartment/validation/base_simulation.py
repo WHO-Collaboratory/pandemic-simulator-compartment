@@ -83,7 +83,7 @@ class BaseSimulationShared(BaseModel):
     id: Optional[str] = None
     simulation_name: str = ""
 
-    # Admin unit (optional for local configs — derived from first admin zone)
+    # Admin unit — always synthesized from first admin zone or admin_unit_id if omitted
     admin_unit_id: str = "LOCAL"
     AdminUnit: AdminUnit
 
@@ -102,7 +102,7 @@ class BaseSimulationShared(BaseModel):
     # Make travel_volume optional - models can declare if they need it
     travel_volume: Optional[TravelVolume] = TravelVolume()
 
-    case_file: CaseFile
+    case_file: Optional[CaseFile] = None
 
     # Uncertainty run settings
     n_simulations: Optional[int] = Field(default=None, gt=0, le=30)
@@ -124,15 +124,14 @@ class BaseSimulationShared(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def derive_admin_unit(cls, values):
-        """Synthesize AdminUnit from first admin zone if not provided."""
+        """Synthesize AdminUnit from first admin zone or admin_unit_id if not provided."""
         if isinstance(values, dict) and not values.get("AdminUnit"):
             case_file = values.get("case_file", {})
             zones = case_file.get("admin_zones", []) if isinstance(case_file, dict) else []
-            if zones:
-                values["AdminUnit"] = {
-                    "id": values.get("admin_unit_id", "LOCAL"),
-                    "center_lat": zones[0].get("center_lat", 0),
-                }
+            values["AdminUnit"] = {
+                "id": values.get("admin_unit_id", "LOCAL"),
+                "center_lat": zones[0].get("center_lat", 0) if zones else 0.0,
+            }
         return values
 
     @model_validator(mode="after")
