@@ -253,6 +253,13 @@ def _sanitize_legacy_time_series(time_series):
     ]
 
 
+def _legacy_delta_value(value):
+    """Coerce nested multi-run delta stats to the Float the closed schema accepts."""
+    if isinstance(value, dict) and "mean" in value:
+        return value["mean"]
+    return value
+
+
 def _add_v2_payloads(results):
     """Derive compartment-agnostic v2 fields and prune the legacy ones, in place.
 
@@ -263,6 +270,10 @@ def _add_v2_payloads(results):
     (COVID/dengue) keep their legacy data intact; novel models carry their full
     data only in v2. Single chokepoint for every builder path (deterministic
     3D/4D + uncertainty), which all converge on the same ``results`` shape here.
+
+    For multi-run (uncertainty/stochastic) output, ``compartment_deltas`` may be
+    ``{comp: {mean, lower, upper}}``; v2 preserves that shape while the legacy
+    Float fields receive only the central ``mean`` (average) value.
     """
     for zone in results.get("admin_zones", []) or []:
         if isinstance(zone, dict) and "time_series" in zone:
@@ -277,7 +288,9 @@ def _add_v2_payloads(results):
         results["compartment_deltas_v2"] = _to_awsjson(deltas)
         if isinstance(deltas, dict):
             results["compartment_deltas"] = {
-                k: v for k, v in deltas.items() if k in _LEGACY_COMPARTMENT_KEYS
+                k: _legacy_delta_value(v)
+                for k, v in deltas.items()
+                if k in _LEGACY_COMPARTMENT_KEYS
             }
     return results
 
