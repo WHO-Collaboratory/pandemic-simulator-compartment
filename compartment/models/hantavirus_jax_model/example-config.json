@@ -61,20 +61,16 @@
             }
         ]
     },
-    "admin_unit_id": "CHL",
-    "AdminUnit": { "id": "CHL", "center_lat": -35.4 },
+    "admin_unit_id": "MDG",
+    "AdminUnit": { "id": "MDG", "center_lat": -19.37564815173127 },
     "case_file": {
         "admin_zones": [
-            {
-                "name": "Maule (example)",
-                "center_lat": -35.4,
-                "center_lon": -71.7,
-                "population": 100000,
-                "rural_population_fraction": 20.0,
-                "rodents_in_a": 2000,
-                "rodents_in_f": 8000,
-                "infected_rodent_fraction": 1.0
-            }
+            { "name": "Antananarivo", "center_lat": -18.93585290187204, "center_lon": 46.80467692606311, "population": 7982937, "rural_population_fraction": 30.0, "rodents_in_a": 500,  "rodents_in_f": 1000, "infected_rodent_fraction": 1.0 },
+            { "name": "Antsiranana",  "center_lat": -13.869271297424163, "center_lon": 49.413514128028105, "population": 2127141, "rural_population_fraction": 50.0, "rodents_in_a": 1000, "rodents_in_f": 3000, "infected_rodent_fraction": 1.0 },
+            { "name": "Fianarantsoa", "center_lat": -21.856236442723883, "center_lon": 46.86230787719887, "population": 5785134, "rural_population_fraction": 70.0, "rodents_in_a": 3000, "rodents_in_f": 6000, "infected_rodent_fraction": 1.0 },
+            { "name": "Mahajanga",    "center_lat": -16.536991119784563, "center_lon": 46.68467040064395, "population": 3783162, "rural_population_fraction": 55.0, "rodents_in_a": 1500, "rodents_in_f": 4000, "infected_rodent_fraction": 1.0 },
+            { "name": "Toamasina",    "center_lat": -17.82287275056714,  "center_lon": 48.7510838190036,  "population": 3693480, "rural_population_fraction": 50.0, "rodents_in_a": 1200, "rodents_in_f": 3500, "infected_rodent_fraction": 1.0 },
+            { "name": "Toliary",      "center_lat": -22.60126035484297,  "center_lon": 45.01750093141163, "population": 4621930, "rural_population_fraction": 65.0, "rodents_in_a": 2000, "rodents_in_f": 5000, "infected_rodent_fraction": 1.0 }
         ]
     }
 }

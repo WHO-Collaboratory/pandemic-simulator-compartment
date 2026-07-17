@@ -17,9 +17,12 @@
         ]
     },
     "admin_zones": [
-        { "name": "Admin Zone 1", "center_lat": 9.87, "center_lon": 44.57, "population": 1047659, "infected_population": 5.0, "seroprevalence": 30.0, "temp_min": 15.0, "temp_max": 30.0, "temp_mean": 25.0 },
-        { "name": "Admin Zone 2", "center_lat": 9.09, "center_lon": 45.72, "population": 613303,  "infected_population": 5.0, "seroprevalence": 30.0, "temp_min": 15.0, "temp_max": 30.0, "temp_mean": 25.0 },
-        { "name": "Admin Zone 3", "center_lat": 2.65, "center_lon": 43.57, "population": 924603,  "infected_population": 5.0, "seroprevalence": 30.0, "temp_min": 15.0, "temp_max": 30.0, "temp_mean": 25.0 }
+        { "name": "Antananarivo", "center_lat": -18.93585290187204, "center_lon": 46.80467692606311, "population": 7982937, "infected_population": 3.0, "seroprevalence": 20.0, "temp_min": 10.0, "temp_max": 26.0, "temp_mean": 18.0 },
+        { "name": "Antsiranana",  "center_lat": -13.869271297424163, "center_lon": 49.413514128028105, "population": 2127141, "infected_population": 6.0, "seroprevalence": 35.0, "temp_min": 22.0, "temp_max": 35.0, "temp_mean": 28.0 },
+        { "name": "Fianarantsoa", "center_lat": -21.856236442723883, "center_lon": 46.86230787719887, "population": 5785134, "infected_population": 2.0, "seroprevalence": 15.0, "temp_min": 8.0,  "temp_max": 25.0, "temp_mean": 17.0 },
+        { "name": "Mahajanga",    "center_lat": -16.536991119784563, "center_lon": 46.68467040064395, "population": 3783162, "infected_population": 7.0, "seroprevalence": 40.0, "temp_min": 22.0, "temp_max": 35.0, "temp_mean": 28.0 },
+        { "name": "Toamasina",    "center_lat": -17.82287275056714,  "center_lon": 48.7510838190036,  "population": 3693480, "infected_population": 5.0, "seroprevalence": 30.0, "temp_min": 18.0, "temp_max": 30.0, "temp_mean": 24.0 },
+        { "name": "Toliary",      "center_lat": -22.60126035484297,  "center_lon": 45.01750093141163, "population": 4621930, "infected_population": 4.0, "seroprevalence": 25.0, "temp_min": 20.0, "temp_max": 35.0, "temp_mean": 27.0 }
     ],
     "demographics": { "age_0_17": 25.0, "age_18_55": 50.0, "age_56_plus": 25.0 },
     "travel_volume": { "leaving": 20.0}

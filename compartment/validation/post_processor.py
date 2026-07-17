@@ -100,7 +100,7 @@ class ValidationPostProcessor:
         # Convert to dicts for helper functions
         disease_dict = config.Disease.model_dump()
         disease_type = config.Disease.disease_type
-        admin_zones_dicts = [z.model_dump() for z in config.case_file.admin_zones]
+        admin_zones_dicts = [z.model_dump() for z in config.case_file.admin_zones] if config.case_file else []
         admin_unit_dict = config.AdminUnit.model_dump() if config.AdminUnit else None
         travel_volume_dict = (
             config.travel_volume.model_dump() if config.travel_volume else None

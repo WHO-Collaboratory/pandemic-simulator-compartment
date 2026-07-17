@@ -49,11 +49,6 @@
     "carb_consumption_hospital": 0.08,
     "treatment_duration": 10.0
   },
-  "admin_unit_id": "USA",
-  "AdminUnit": {
-    "id": "USA",
-    "center_lat": 37.0902
-  },
   "interventions": [
     {
       "id": "antibiotic_stewardship",
@@ -76,13 +71,12 @@
   ],
   "case_file": {
     "admin_zones": [
-      {
-        "center_lat": 40.7128,
-        "center_lon": -74.006,
-        "name": "Example Zone",
-        "population": 1000000,
-        "infected_population": 1
-      }
+      { "name": "Antananarivo", "center_lat": -18.93585290187204, "center_lon": 46.80467692606311, "population": 7982937, "infected_population": 5 },
+      { "name": "Antsiranana",  "center_lat": -13.869271297424163, "center_lon": 49.413514128028105, "population": 2127141, "infected_population": 2 },
+      { "name": "Fianarantsoa", "center_lat": -21.856236442723883, "center_lon": 46.86230787719887, "population": 5785134, "infected_population": 3 },
+      { "name": "Mahajanga",    "center_lat": -16.536991119784563, "center_lon": 46.68467040064395, "population": 3783162, "infected_population": 2 },
+      { "name": "Toamasina",    "center_lat": -17.82287275056714,  "center_lon": 48.7510838190036,  "population": 3693480, "infected_population": 2 },
+      { "name": "Toliary",      "center_lat": -22.60126035484297,  "center_lon": 45.01750093141163, "population": 4621930, "infected_population": 1 }
     ]
   }
 }

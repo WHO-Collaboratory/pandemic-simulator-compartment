@@ -938,11 +938,6 @@ class ModelParameterSchema:
 
         config["Disease"] = disease
 
-        # --- Admin unit stub ---
-        admin0_id = "USA"
-        config["admin_unit_id"] = admin0_id
-        config["AdminUnit"] = {"id": admin0_id, "center_lat": 37.0902}
-
         # --- Travel volume ---
         if self.travel_volume:
             tv: dict[str, Any] = {}
