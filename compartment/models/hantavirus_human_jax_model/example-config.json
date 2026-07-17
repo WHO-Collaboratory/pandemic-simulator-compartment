@@ -27,10 +27,10 @@
         "lambda_2": 0.5
     },
     "travel_volume": { "leaving": 0.05 },
-    "admin_unit_id": "USA",
+    "admin_unit_id": "MDG",
     "AdminUnit": {
-        "id": "USA",
-        "center_lat": 39.5
+        "id": "MDG",
+        "center_lat": -19.37564815173127
     },
     "interventions": [
         {
@@ -46,58 +46,69 @@
     "case_file": {
         "admin_zones": [
             {
-                "name": "Southwest (AZ, NM, TX)",
-                "center_lat": 34.0,
-                "center_lon": -111.0,
-                "population": 22000000,
-                "infected_population": 12,
-                "rodent_population": 5000,
-                "infected_rodent_count": 50,
-                "exposed_fraction": 10.0,
-                "initial_risk_perception": 10.0
-            },
-            {
-                "name": "Mountain (CO, UT, WY, MT, ID)",
-                "center_lat": 43.0,
-                "center_lon": -110.0,
-                "population": 11000000,
-                "infected_population": 10,
-                "rodent_population": 8000,
-                "infected_rodent_count": 80,
-                "exposed_fraction": 12.0,
-                "initial_risk_perception": 10.0
-            },
-            {
-                "name": "Pacific (CA, OR, WA)",
-                "center_lat": 37.0,
-                "center_lon": -120.0,
-                "population": 53000000,
-                "infected_population": 5,
+                "name": "Antananarivo",
+                "center_lat": -18.93585290187204,
+                "center_lon": 46.80467692606311,
+                "population": 7982937,
+                "infected_population": 8,
                 "rodent_population": 3000,
-                "infected_rodent_count": 20,
+                "infected_rodent_count": 30,
+                "exposed_fraction": 5.0,
+                "initial_risk_perception": 10.0
+            },
+            {
+                "name": "Antsiranana",
+                "center_lat": -13.869271297424163,
+                "center_lon": 49.413514128028105,
+                "population": 2127141,
+                "infected_population": 2,
+                "rodent_population": 800,
+                "infected_rodent_count": 8,
                 "exposed_fraction": 3.0,
                 "initial_risk_perception": 10.0
             },
             {
-                "name": "Great Plains (KS, NE, SD, ND, OK)",
-                "center_lat": 41.0,
-                "center_lon": -99.0,
-                "population": 10000000,
-                "infected_population": 2,
-                "rodent_population": 6000,
-                "infected_rodent_count": 40,
-                "exposed_fraction": 10.0,
+                "name": "Fianarantsoa",
+                "center_lat": -21.856236442723883,
+                "center_lon": 46.86230787719887,
+                "population": 5785134,
+                "infected_population": 5,
+                "rodent_population": 2000,
+                "infected_rodent_count": 20,
+                "exposed_fraction": 4.0,
                 "initial_risk_perception": 10.0
             },
             {
-                "name": "East (all other states)",
-                "center_lat": 38.0,
-                "center_lon": -80.0,
-                "population": 240000000,
-                "infected_population": 1,
-                "rodent_population": 1000,
-                "infected_rodent_count": 5,
-                "exposed_fraction": 1.0,
+                "name": "Mahajanga",
+                "center_lat": -16.536991119784563,
+                "center_lon": 46.68467040064395,
+                "population": 3783162,
+                "infected_population": 4,
+                "rodent_population": 1500,
+                "infected_rodent_count": 15,
+                "exposed_fraction": 4.0,
+                "initial_risk_perception": 10.0
+            },
+            {
+                "name": "Toamasina",
+                "center_lat": -17.82287275056714,
+                "center_lon": 48.7510838190036,
+                "population": 3693480,
+                "infected_population": 3,
+                "rodent_population": 1400,
+                "infected_rodent_count": 14,
+                "exposed_fraction": 4.0,
+                "initial_risk_perception": 10.0
+            },
+            {
+                "name": "Toliary",
+                "center_lat": -22.60126035484297,
+                "center_lon": 45.01750093141163,
+                "population": 4621930,
+                "infected_population": 2,
+                "rodent_population": 1800,
+                "infected_rodent_count": 18,
+                "exposed_fraction": 4.0,
                 "initial_risk_perception": 10.0
             }
         ]
