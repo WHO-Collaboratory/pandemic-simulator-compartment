@@ -834,12 +834,7 @@ def extract_disease_variance_params(disease_section):
     if not disease_section:
         return []
     return [
-        {
-            "param": vp["param"],
-            "dist": vp.get("dist", "uniform"),
-            "min": vp["min"],
-            "max": vp["max"],
-        }
+        {"dist": vp.get("dist", "uniform"), **vp}
         for vp in disease_section.get("variance_params", [])
     ]
 
