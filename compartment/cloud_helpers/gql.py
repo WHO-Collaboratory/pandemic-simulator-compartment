@@ -260,6 +260,13 @@ def _legacy_delta_value(value):
     return value
 
 
+def _add_compartment_deltas_v2(results):
+    deltas = results.get("compartment_deltas")
+    if deltas is not None:
+        results["compartment_deltas_v2"] = _to_awsjson(deltas)
+    return results
+
+
 def _add_v2_payloads(results):
     """Derive compartment-agnostic v2 fields and prune the legacy ones, in place.
 
