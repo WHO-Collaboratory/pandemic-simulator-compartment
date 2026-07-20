@@ -23,7 +23,7 @@ from compartment.cloud_helpers.gql import (
     get_simulation_job,
     update_simulation_job_run_mode,
     write_to_gql,
-    _add_v2_payloads,
+    _add_compartment_deltas_v2,
 )
 from compartment.cloud_helpers.s3 import write_to_s3, record_and_upload_validation
 from compartment.model import Model
@@ -298,7 +298,7 @@ def run_simulation(
     results = [results_with, results_without]
 
     for result in results:
-        _add_v2_payloads(result)
+        _add_compartment_deltas_v2(result)
 
     if mode == "local":
         if output_path is None:

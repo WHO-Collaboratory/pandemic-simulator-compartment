@@ -260,6 +260,13 @@ def _legacy_delta_value(value):
     return value
 
 
+def _add_compartment_deltas_v2(results):
+    deltas = results.get("compartment_deltas")
+    if deltas is not None:
+        results["compartment_deltas_v2"] = _to_awsjson(deltas)
+    return results
+
+
 def _add_v2_payloads(results):
     """Derive compartment-agnostic v2 fields and prune the legacy ones, in place.
 
@@ -324,7 +331,13 @@ def write_to_gql(job_params, results):
     control_run, dates, etc.).  AdminZoneTimeSeries (large time-series
     data) is no longer written to DynamoDB — it lives only in S3.
 
+    Derives compartment-agnostic v2 payloads (compartment_deltas_v2)
+    before writing so any compartment key is representable.
     """
+    # Derive v2 payloads so compartment_deltas_v2 is available on the
+    # metadata record (also enriches time series in-place for S3).
+    _add_v2_payloads(results)
+
     query = """
         mutation CreateSimulationJobResult($input: CreateSimulationJobResultInput!) {
             createSimulationJobResult(input: $input) {
