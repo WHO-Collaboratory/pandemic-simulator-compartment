@@ -26,7 +26,15 @@ class TestModelSmoke:
     @pytest.fixture(params=list(MODEL_CONFIGS.keys()))
     def model_run(self, request):
         """Run a model and return (model_id, results)."""
+        import json
         model_id, class_path, config_path = MODEL_CONFIGS[request.param]
+        raw = json.loads(config_path.read_text())
+        has_zones = (
+            raw.get("admin_zones")
+            or raw.get("case_file", {}).get("admin_zones")
+        )
+        if not has_zones:
+            pytest.skip("No admin_zones in example config — population-less config, skipping smoke test")
         model_class = import_class(class_path)
         results = run_model(model_class, config_path)
         return model_id, results

@@ -270,6 +270,10 @@ def _add_v2_payloads(results):
     (COVID/dengue) keep their legacy data intact; novel models carry their full
     data only in v2. Single chokepoint for every builder path (deterministic
     3D/4D + uncertainty), which all converge on the same ``results`` shape here.
+
+    For multi-run (uncertainty/stochastic) output, ``compartment_deltas`` may be
+    ``{comp: {mean, lower, upper}}``; v2 preserves that shape while the legacy
+    Float fields receive only the central ``mean`` (average) value.
     """
     for zone in results.get("admin_zones", []) or []:
         if isinstance(zone, dict) and "time_series" in zone:
