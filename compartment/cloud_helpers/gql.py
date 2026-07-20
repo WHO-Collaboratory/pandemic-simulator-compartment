@@ -270,10 +270,6 @@ def _add_v2_payloads(results):
     (COVID/dengue) keep their legacy data intact; novel models carry their full
     data only in v2. Single chokepoint for every builder path (deterministic
     3D/4D + uncertainty), which all converge on the same ``results`` shape here.
-
-    For multi-run (uncertainty/stochastic) output, ``compartment_deltas`` may be
-    ``{comp: {mean, lower, upper}}``; v2 preserves that shape while the legacy
-    Float fields receive only the central ``mean`` (average) value.
     """
     for zone in results.get("admin_zones", []) or []:
         if isinstance(zone, dict) and "time_series" in zone:
@@ -324,13 +320,7 @@ def write_to_gql(job_params, results):
     control_run, dates, etc.).  AdminZoneTimeSeries (large time-series
     data) is no longer written to DynamoDB — it lives only in S3.
 
-    Derives compartment-agnostic v2 payloads (compartment_deltas_v2)
-    before writing so any compartment key is representable.
     """
-    # Derive v2 payloads so compartment_deltas_v2 is available on the
-    # metadata record (also enriches time series in-place for S3).
-    _add_v2_payloads(results)
-
     query = """
         mutation CreateSimulationJobResult($input: CreateSimulationJobResultInput!) {
             createSimulationJobResult(input: $input) {
