@@ -22,13 +22,23 @@ PREM_BAND_EDGES: list[tuple[int, int]] = [
     (60, 64), (65, 69), (70, 74), (75, 120),
 ]
 
-from .loader import load_country_matrix, default_matrix, available_countries
+from .loader import (
+    load_country_matrix,
+    default_matrix,
+    available_countries,
+    income_matrix,
+    iso_income_group,
+    INCOME_LEVELS,
+)
 from .aggregator import aggregate_to_bands
 
 __all__ = [
     "load_country_matrix",
     "default_matrix",
     "available_countries",
+    "income_matrix",
+    "iso_income_group",
+    "INCOME_LEVELS",
     "aggregate_to_bands",
     "PREM_BAND_EDGES",
 ]

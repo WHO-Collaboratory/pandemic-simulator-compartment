@@ -4,10 +4,13 @@ import numpy as np
 import pytest
 
 from compartment.contact_matrices import (
+    INCOME_LEVELS,
     PREM_BAND_EDGES,
     aggregate_to_bands,
     available_countries,
     default_matrix,
+    income_matrix,
+    iso_income_group,
     load_country_matrix,
 )
 from compartment.contact_matrices.aggregator import (
@@ -147,3 +150,68 @@ class TestAggregator:
         assert (out >= 0).all()
         # Asymmetry: not all off-diagonal pairs equal
         assert not np.allclose(out, out.T)
+
+
+# ---------------------------------------------------------------------------
+# Income-level fallback
+# ---------------------------------------------------------------------------
+
+class TestIncomeMatrix:
+    def test_all_levels_present(self):
+        for level in INCOME_LEVELS:
+            m = income_matrix(level)
+            assert m is not None, f"Missing income matrix for '{level}'"
+            assert m.shape == (16, 16)
+            assert m.dtype == np.float64
+            assert (m > 0).all()
+
+    def test_unknown_level_returns_none(self):
+        assert income_matrix("Not a real level") is None
+
+    def test_returned_array_is_copy(self):
+        m = income_matrix("High income")
+        m[0, 0] = -999
+        assert income_matrix("High income")[0, 0] != -999
+
+    def test_income_levels_differ_from_each_other(self):
+        """Different income groups should not produce identical matrices."""
+        matrices = [income_matrix(lvl) for lvl in INCOME_LEVELS]
+        for i in range(len(matrices)):
+            for j in range(i + 1, len(matrices)):
+                assert not np.allclose(matrices[i], matrices[j]), (
+                    f"Income matrices for '{INCOME_LEVELS[i]}' and '{INCOME_LEVELS[j]}' are identical"
+                )
+
+
+class TestIsoIncomeGroup:
+    def test_known_income_only_iso(self):
+        # ASM (American Samoa) has Matrix Group = "High income" in the CSV
+        assert iso_income_group("ASM") == "High income"
+        assert iso_income_group("asm") == "High income"  # case-insensitive
+
+    def test_synthetic_iso_returns_none(self):
+        # USA has its own synthetic matrix — should not appear in income map
+        assert iso_income_group("USA") is None
+
+    def test_global_average_iso_returns_none(self):
+        # JEY (Jersey) has Matrix Group = "Global Average"
+        assert iso_income_group("JEY") is None
+
+    def test_none_input_returns_none(self):
+        assert iso_income_group(None) is None
+        assert iso_income_group("") is None
+
+    def test_unknown_iso_returns_none(self):
+        assert iso_income_group("ZZZ") is None
+
+    def test_lower_middle_income_iso(self):
+        # HTI (Haiti) has Matrix Group = "Lower middle income"
+        assert iso_income_group("HTI") == "Lower middle income"
+
+    def test_low_income_iso(self):
+        # SOM (Somalia) has Matrix Group = "Low income"
+        assert iso_income_group("SOM") == "Low income"
+
+    def test_upper_middle_income_iso(self):
+        # DMA (Dominica) has Matrix Group = "Upper middle income"
+        assert iso_income_group("DMA") == "Upper middle income"
