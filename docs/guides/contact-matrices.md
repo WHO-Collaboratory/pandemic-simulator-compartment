@@ -6,7 +6,7 @@ This document explains how contact matrices are created, loaded, aggregated, and
 
 Contact matrices quantify **age-specific social mixing patterns** — how frequently people in different age groups come into contact with each other. These mixing patterns are critical for modeling respiratory and other contact-transmitted diseases, as they determine the force of infection across demographic groups.
 
-The Pandemic Simulator uses **country-specific synthetic contact matrices** from [Prem et al. 2021](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009098), covering 177 countries with 16 five-year age bands (0-4, 5-9, ..., 75+).
+The Pandemic Simulator uses **country-specific synthetic contact matrices** from [Prem et al. 2021](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009098), covering 177 countries with 16 five-year age bands (0-4, 5-9, ..., 75+). When a country's ISO code is not in the Prem dataset, the framework falls back to a **precomputed income-level average** (grouped by World Bank income classification), and if no income group is available, to a **global average** across all 177 countries.
 
 ## Three Ways to Supply a Contact Matrix
 
@@ -20,8 +20,18 @@ The framework supports three approaches for defining contact matrices, in order 
 - At model instantiation, the framework:
   1. Reads the simulation's `admin_unit_id` (e.g., `"USA"`, `"DEU.1_1"`)
   2. Extracts the ISO3 country code (splits on `.` and takes the first part)
-  3. Loads that country's 16×16 synthetic contact matrix from the bundled dataset
+  3. Resolves a 16×16 source matrix using a **three-tier lookup** (see below)
   4. Aggregates the matrix down to your declared age bands using fractional-membership weighting
+
+**Three-tier matrix lookup:**
+
+| Tier | Condition | Source |
+|------|-----------|--------|
+| 1 | ISO3 is in the Prem 2021 bundle (177 countries) | Country's own synthetic 16×16 matrix |
+| 2 | ISO3 has a World Bank income classification in the bundled CSV | Precomputed average of all Prem matrices at that income level |
+| 3 | Neither | Global average across all 177 country matrices |
+
+The four income groups are: **High income**, **Upper middle income**, **Lower middle income**, **Low income**. Each group's precomputed average is stored in `income_defaults.npz` and loaded once on first use. If the income group assignment ever needs to change, regenerate this file with `python tools/build_income_matrices.py`.
 
 **When to use:** This is the recommended approach for most models. It provides realistic, country-specific mixing patterns without requiring you to manually specify contact rates.
 
@@ -35,7 +45,7 @@ def define_parameters(cls, schema):
     schema.add_demographic_group(
         "age_0_17", "Children (0-17)",
         default_weight=25.0,
-        age_range=(0, 17),  # This enables Prem auto-loading
+        age_range=(0, 17),  # This enables the three-tier matrix lookup
     )
     schema.add_demographic_group(
         "age_18_55", "Adults (18-55)",
@@ -49,7 +59,7 @@ def define_parameters(cls, schema):
     )
 ```
 
-If the country is not in the Prem dataset, the framework falls back to a **global-average matrix** (mean across all 177 countries) and logs an informational message.
+The framework logs an informational message indicating which tier was used for every run.
 
 ### 2. Schema-Level Overrides
 
@@ -189,10 +199,17 @@ The aggregator computes these overlaps automatically for every source-target pai
 ```
 compartment/contact_matrices/
 ├── __init__.py           # Public API, PREM_BAND_EDGES constant
-├── loader.py             # load_country_matrix(), default_matrix()
+├── loader.py             # load_country_matrix(), income_matrix(), iso_income_group(), default_matrix()
 ├── aggregator.py         # aggregate_to_bands()
 └── data/
-    └── contact_all.npz   # Bundled Prem 2021 matrices (177 countries)
+    ├── contact_all.npz              # Bundled Prem 2021 matrices (177 countries)
+    ├── income_defaults.npz          # Precomputed income-level averages (4 groups)
+    └── contact_matrices_economics.csv  # ISO → income group mapping
+```
+
+To regenerate `income_defaults.npz` (e.g., if the CSV is updated):
+```bash
+python tools/build_income_matrices.py
 ```
 
 ### Key Functions
@@ -201,6 +218,17 @@ compartment/contact_matrices/
 - Returns the 16×16 Prem matrix for the given ISO3 code
 - Case-insensitive: `"usa"` and `"USA"` both work
 - Returns `None` if the country is not in the bundle
+
+#### `iso_income_group(iso3: str | None) -> str | None`
+- Returns the World Bank income level for an ISO that lacks a synthetic matrix (e.g., `"High income"`)
+- Returns `None` for ISO codes that have their own synthetic matrix, have no income classification, or are unknown
+- Used internally by `_build_contact_matrix` for the tier-2 fallback
+
+#### `income_matrix(level: str) -> np.ndarray | None`
+- Returns the precomputed average 16×16 matrix for one of the four income groups
+- `level` must be one of `INCOME_LEVELS`: `"High income"`, `"Upper middle income"`, `"Lower middle income"`, `"Low income"`
+- Loaded once from `income_defaults.npz` and cached; returns a copy
+- Returns `None` for an unrecognised level
 
 #### `default_matrix() -> np.ndarray`
 - Returns the global-average 16×16 matrix
@@ -219,7 +247,7 @@ The `Model` base class method `_build_contact_matrix(config)` orchestrates the e
 1. Check if the model declares demographic groups — if not, return `None`
 2. Resolve effective group IDs (config demographics take precedence over schema defaults)
 3. Start with an identity matrix (A×A)
-4. If conditions are met (all groups have `age_range`, no overrides), load and aggregate the Prem matrix
+4. If conditions are met (all groups have `age_range`, no overrides), resolve a source matrix using the **three-tier lookup**: synthetic → income-level average → global average
 5. Apply schema-level overrides (if any)
 6. Apply config-level overrides (if any)
 7. Return the final matrix as a JAX/NumPy array
@@ -329,12 +357,16 @@ If a target age range has **no overlap** with the Prem source bands (0-120), the
 
 **Cause:** The `admin_unit_id` ISO3 code is not in the 177-country dataset.
 
-**Effect:** Framework falls back to global-average matrix and logs an info message. The model still runs.
+**Effect:** The framework applies the three-tier lookup and logs an info message at each step. The model still runs.
+
+- If the ISO has a World Bank income classification in `contact_matrices_economics.csv`, the framework uses the precomputed average matrix for that income group.
+- If no income group is available, the framework uses the global average across all 177 countries.
 
 **Fix (if needed):**
 
-- Check the list of available countries: `from compartment.contact_matrices import available_countries; print(available_countries())`
-- Use a neighboring country's ISO3 code in your config for testing
+- Check the list of countries with synthetic matrices: `from compartment.contact_matrices import available_countries; print(available_countries())`
+- Check which income group an ISO falls into: `from compartment.contact_matrices import iso_income_group; print(iso_income_group("ASM"))`
+- To assign an income group to a new ISO, add a row to `contact_matrices_economics.csv` and re-run `python tools/build_income_matrices.py`
 
 ### Force of infection seems wrong
 
@@ -367,5 +399,5 @@ print("Prevalence shape:", prevalence.shape)
 
 ---
 
-**Last Updated:** May 20, 2026  
-**Version:** 0.1.9
+**Last Updated:** July 20, 2026  
+**Version:** 0.2.0

@@ -600,32 +600,45 @@ class Model(ABC):
             from compartment.contact_matrices import (
                 load_country_matrix,
                 default_matrix,
+                income_matrix,
+                iso_income_group,
                 aggregate_to_bands,
             )
 
             iso3 = self._resolve_iso3_for_run(config)
             source = load_country_matrix(iso3)
-            if source is None:
-                source = default_matrix()
-                if iso3:
-                    log.info(
-                        "Country '%s' not in Prem bundle; using global-average "
-                        "contact matrix aggregated to %d bands.",
-                        iso3,
-                        A,
-                    )
-                else:
-                    log.info(
-                        "No admin_unit_id resolvable; using global-average "
-                        "contact matrix aggregated to %d bands.",
-                        A,
-                    )
-            else:
+            if source is not None:
                 log.info(
                     "Loaded Prem contact matrix for '%s', aggregated to %d bands.",
                     iso3,
                     A,
                 )
+            else:
+                income_level = iso_income_group(iso3) if iso3 else None
+                if income_level is not None:
+                    source = income_matrix(income_level)
+                    log.info(
+                        "Country '%s' not in Prem bundle; using '%s' income-level "
+                        "average contact matrix aggregated to %d bands.",
+                        iso3,
+                        income_level,
+                        A,
+                    )
+                else:
+                    source = default_matrix()
+                    if iso3:
+                        log.info(
+                            "Country '%s' not in Prem bundle or income group; "
+                            "using global-average contact matrix aggregated to %d bands.",
+                            iso3,
+                            A,
+                        )
+                    else:
+                        log.info(
+                            "No admin_unit_id resolvable; using global-average "
+                            "contact matrix aggregated to %d bands.",
+                            A,
+                        )
             # Build age_ranges in effective_ids order so the aggregated matrix
             # rows/cols align with the state array's demographic dimension.
             age_ranges = [schema_group_by_id[gid].age_range for gid in effective_ids]

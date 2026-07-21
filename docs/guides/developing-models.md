@@ -310,7 +310,12 @@ Age-stratified models need an NxN contact matrix where N is the number of demogr
 
 > **📚 For a comprehensive guide to contact matrices**, see **[CONTACT_MATRICES.md](./contact-matrices.md)** — detailed documentation on how contact matrices are loaded, aggregated, and used in the platform.
 
-1. **Country-aware Prem 2021 default** (recommended). Declare an inclusive `age_range=(low, high)` on every demographic group. At model instantiation the framework reads the run's `admin_unit_id`, takes the ISO3 prefix (split on `.`), and looks up that country's synthetic 16×16 contact matrix from a bundled dataset of 177 countries (Prem 2021). It then aggregates the matrix down to your declared bands using fractional age-year membership: row direction mean-averages (the contactor is a typical person sampled from the band), column direction sums (total contacts with everyone in the band). Aggregating Prem back to its own 16 bands is an exact identity. If the ISO3 isn't in the bundle, the framework falls back to the mean across all 177 country matrices (`default_matrix()`). Code lives in [compartment/contact_matrices/](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/contact_matrices/).
+1. **Country-aware Prem 2021 default** (recommended). Declare an inclusive `age_range=(low, high)` on every demographic group. At model instantiation the framework reads the run's `admin_unit_id`, takes the ISO3 prefix (split on `.`), and resolves a 16×16 contact matrix using a three-tier lookup:
+   1. **Synthetic matrix** — 177 countries from Prem 2021 (most countries).
+   2. **Income-level average** — if the ISO lacks a synthetic matrix but has a World Bank income classification, the framework uses a precomputed average of all Prem matrices at that income level (High / Upper middle / Lower middle / Low income).
+   3. **Global average** — mean across all 177 country matrices (`default_matrix()`), used when no synthetic matrix or income group is available.
+
+   The resolved matrix is then aggregated down to your declared age bands using fractional age-year membership: row direction mean-averages (the contactor is a typical person sampled from the band), column direction sums (total contacts with everyone in the band). Aggregating Prem back to its own 16 bands is an exact identity. Code lives in [compartment/contact_matrices/](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/contact_matrices/).
 
    ```python
    schema.add_demographic_group("age_0_17",    "Children", default_weight=33.3, age_range=(0, 17))
