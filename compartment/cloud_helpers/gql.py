@@ -144,7 +144,7 @@ def get_simulation_job(job_params: dict, graphql_query: str) -> dict:
                     f"Injected disease parameter '{field_name}' = {typed_value}"
                 )
 
-                # Preserve FieldConfig entries for uncertainty sampling.
+                # Preserve FieldConfig entries for parameter uncertainty sampling.
                 fc_section = cf.get("FieldConfig") or {}
                 fc_items = fc_section.get("items", []) if fc_section else []
                 for fc in fc_items:
@@ -164,7 +164,7 @@ def get_simulation_job(job_params: dict, graphql_query: str) -> dict:
             f"Processed {len(sim_job_custom_fields)} custom field(s) for job {simulation_job_id}"
         )
 
-    # Store disease parameter variance configs for uncertainty runs.
+    # Store disease parameter variance configs for parameter uncertainty runs.
     # run_simulation.py reads this before validation (which ignores extra keys).
     if disease_param_field_configs:
         config["_disease_param_field_configs"] = disease_param_field_configs
@@ -276,9 +276,9 @@ def _add_v2_payloads(results):
     the write never fails for models with bespoke compartments. Known models
     (COVID/dengue) keep their legacy data intact; novel models carry their full
     data only in v2. Single chokepoint for every builder path (deterministic
-    3D/4D + uncertainty), which all converge on the same ``results`` shape here.
+    3D/4D + parameter uncertainty), which all converge on the same ``results`` shape here.
 
-    For multi-run (uncertainty/stochastic) output, ``compartment_deltas`` may be
+    For multi-run (parameter uncertainty/stochastic) output, ``compartment_deltas`` may be
     ``{comp: {mean, lower, upper}}``; v2 preserves that shape while the legacy
     Float fields receive only the central ``mean`` (average) value.
     """
@@ -445,7 +445,7 @@ def get_simulation_job_custom_fields(job_params: dict, simulation_job_id: str) -
 
     Handles pagination via nextToken to ensure all records are returned.
     Each item includes the linked CustomField template (name, category,
-    metadata) and any FieldConfig records (for variance/uncertainty).
+    metadata) and any FieldConfig records (for parameter variance/uncertainty).
 
     Args:
         job_params: Dict with GRAPHQL_APIKEY and GRAPHQL_ENDPOINT.

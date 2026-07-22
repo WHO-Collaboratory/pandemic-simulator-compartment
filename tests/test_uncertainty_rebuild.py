@@ -1,4 +1,4 @@
-"""Behavioral tests for rebuild-from-config uncertainty sampling.
+"""Behavioral tests for rebuild-from-config parameter uncertainty sampling.
 
 The runner reconstructs the model from an overridden config per LHS sample
 (Model.build_overridden_config + BatchSimulationManager._single_run), so every
@@ -8,7 +8,7 @@ derived constant in __init__ (e.g. 1/latent_period) or a frozen Intervention
 object.
 
 These tests assert real spread in the output CI bands, not just that the
-uncertainty output format is present.
+parameter uncertainty output format is present.
 
 Run:
     python -m pytest tests/test_uncertainty_rebuild.py -v -m integration

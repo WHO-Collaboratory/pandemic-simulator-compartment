@@ -22,7 +22,7 @@ You only need to write code for the parts that are genuinely model-specific: the
 | Output formatter | [compartment/simulation_postprocessor.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/simulation_postprocessor.py) | Aggregates age groups, applies `COMPARTMENT_DELTA_GROUPING`, emits `_total` deltas |
 | Generic driver / CLI plumbing | [compartment/driver.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/driver.py) | `drive_simulation(model_class, args)` — your `main.py` is just a thin wrapper |
 | Artifact generator CLI | [compartment/generate_artifact.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/generate_artifact.py) | `python -m compartment.generate_artifact <DISEASE_TYPE> [--example-config]` |
-| Results viewer (local tool) | [tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py) | Plots `parent_admin_total` with vs. without interventions, intervention start/stop lines, uncertainty bands, and a `compartment_deltas` metric table |
+| Results viewer (local tool) | [tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py) | Plots `parent_admin_total` with vs. without interventions, intervention start/stop lines, parameter uncertainty bands, and a `compartment_deltas` metric table |
 
 Existing models to copy from:
 
@@ -150,7 +150,7 @@ class MyModel(Model):
         #    Rule of thumb: declare an edge for every compartment-to-compartment
         #    movement whose flow has the form `rate * source` (mass action) or
         #    `source * rate * sum(infective) / N` (frequency-dependent). The
-        #    framework then handles intervention scaling, uncertainty sampling,
+        #    framework then handles intervention scaling, parameter uncertainty sampling,
         #    and _total accumulation for free. Flows that do NOT fit that shape
         #    (multi-rate FOI, demographic births, density-dependent deaths) are
         #    handled manually — see "Flows without an edge" below.
@@ -516,7 +516,7 @@ To eyeball a run, use the local results viewer:
 python tools/view_results.py results/test_run.json
 ```
 
-It plots the whole-population (`parent_admin_total`) compartment time series for the **with-interventions** and **control** runs side by side, drops a vertical line at each intervention's start/stop date, shades the uncertainty bands for `UNCERTAINTY` output, and lists each run's `compartment_deltas` (cumulative per-compartment totals) as a metric table using the frontend's compartment names. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md) for flags (compartment subset, log scale, `--no-deltas`, saving to an image).
+It plots the whole-population (`parent_admin_total`) compartment time series for the **with-interventions** and **control** runs side by side, drops a vertical line at each intervention's start/stop date, shades the parameter uncertainty bands for `UNCERTAINTY` output, and lists each run's `compartment_deltas` (cumulative per-compartment totals) as a metric table using the frontend's compartment names. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md) for flags (compartment subset, log scale, `--no-deltas`, saving to an image).
 
 ## Tests
 

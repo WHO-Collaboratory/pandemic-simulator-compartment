@@ -178,7 +178,7 @@ def run_simulation(
     # Create a deepcopy for the interventionless model
     model_without = deepcopy(model_with)
     model_without.intervention_dict = {}
-    # Keep the control model's *source config* interventionless too: uncertainty
+    # Keep the control model's *source config* interventionless too: parameter uncertainty
     # rebuilds (Model.build_overridden_config) reconstruct from the source
     # config, so a non-empty intervention_dict there would silently re-add
     # interventions to the control batch.

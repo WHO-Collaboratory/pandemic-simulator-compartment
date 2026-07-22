@@ -1,13 +1,13 @@
 # Uncertainty Quantification in the Pandemic Simulator
 
-This document explains how to quantify and communicate parameter uncertainty in compartmental disease models using the Pandemic Simulator's built-in uncertainty quantification (UQ) system.
+This document explains how to quantify and communicate parameter uncertainty in compartmental disease models using the Pandemic Simulator's built-in parameter uncertainty quantification (UQ) system.
 
 ## Overview
 
-**Uncertainty quantification** addresses a fundamental challenge in epidemic modeling: **we don't know the true values of model parameters**. Transmission rates, recovery periods, intervention effectiveness, and initial conditions all have inherent uncertainty.
+**Uncertainty quantification** addresses a fundamental challenge in epidemic modeling: **we don't know the true values of model parameters**. Transmission rates, recovery periods, intervention effectiveness, and initial conditions all have inherent parameter uncertainty.
 
 Instead of running a single simulation with point estimates, UQ:
-1. **Defines uncertainty ranges** for parameters (e.g., "beta is between 0.2 and 0.4")
+1. **Defines parameter uncertainty ranges** for parameters (e.g., "beta is between 0.2 and 0.4")
 2. **Samples parameter combinations** using Latin Hypercube Sampling (LHS)
 3. **Runs multiple simulations** with different parameter sets
 4. **Aggregates results** to produce median trajectories and confidence intervals
@@ -28,7 +28,7 @@ But what if `beta` is actually 0.25? Or 0.35? The difference can be enormous.
 
 ### The UQ Solution
 
-An uncertainty run with `beta ~ Uniform(0.25, 0.35)` produces:
+A parameter uncertainty run with `beta ~ Uniform(0.25, 0.35)` produces:
 ```
 Day 30: 1,100 infections (95% CI: 850-1,450)
 Day 60: 7,800 infections (95% CI: 5,200-11,500)
@@ -36,9 +36,9 @@ Day 60: 7,800 infections (95% CI: 5,200-11,500)
 
 **Key benefits:**
 
-- **Honest uncertainty:** Reflects what we don't know
+- **Honest parameter uncertainty:** Reflects what we don't know
 - **Decision support:** "In the worst case, we'll have 11,500 infections"
-- **Sensitivity analysis:** Which parameters drive uncertainty the most?
+- **Sensitivity analysis:** Which parameters drive parameter uncertainty the most?
 - **Credibility:** Avoids overconfident predictions
 
 ## Run Modes: DETERMINISTIC vs. UNCERTAINTY
@@ -74,9 +74,9 @@ The simulator supports two run modes:
 - Runs model **N times** with sampled parameters (default: 30)
 - Returns **median, lower bound (2.5%), upper bound (97.5%)** for each compartment
 - Slower (minutes to hours, depending on N and model complexity)
-- Use for: final results, communicating uncertainty, policy analysis
+- Use for: final results, communicating parameter uncertainty, policy analysis
 
-**Note:** Both modes still run **with and without interventions** in parallel (control run), so you get uncertainty bands for both scenarios.
+**Note:** Both modes still run **with and without interventions** in parallel (control run), so you get parameter uncertainty bands for both scenarios.
 
 ## Latin Hypercube Sampling (LHS)
 
@@ -522,7 +522,7 @@ Find plausible ranges from literature:
 
 ### Step 5: Run and Interpret
 
-Run the uncertainty mode:
+Run the parameter uncertainty mode:
 
 ```bash
 python -m compartment.models.covid_jax_model.main \
@@ -535,7 +535,7 @@ python -m compartment.models.covid_jax_model.main \
 
 - Is the median similar to your deterministic baseline?
 - Are CIs reasonable (not too wide or too narrow)?
-- Do CIs widen over time (typical — uncertainty compounds)?
+- Do CIs widen over time (typical — parameter uncertainty compounds)?
 
 ### Step 6: Sensitivity Analysis
 
@@ -543,8 +543,8 @@ Which parameters drive uncertainty the most?
 
 **Method:**
 
-1. Run uncertainty with **only beta varying**
-2. Run uncertainty with **only gamma varying**
+1. Run parameter uncertainty with **only beta varying**
+2. Run parameter uncertainty with **only gamma varying**
 3. Compare CI widths
 
 **Result:** The parameter that produces wider CIs is the **high-sensitivity parameter** — prioritize getting better estimates for it.
@@ -618,7 +618,7 @@ Which parameters drive uncertainty the most?
 
 ### Pattern 3: Mixed Distribution Types
 
-**Use case:** Different parameters have different uncertainty profiles
+**Use case:** Different parameters have different parameter uncertainty profiles
 
 ```json
 {
@@ -691,20 +691,20 @@ low_level_workers = 2  # parallel UQ runs within each
 
 ### ✅ Do
 
-- **Start with deterministic** to validate your model before adding uncertainty
+- **Start with deterministic** to validate your model before adding parameter uncertainty
 - **Use uniform distributions** when you have minimal prior information
 - **Use normal/lognormal** when you have mean and variance estimates from data
 - **Vary transmission rates** — they're almost always uncertain
 - **Vary intervention adherence** — compliance is highly unpredictable
 - **Run 30+ simulations** for reportable results
-- **Report CIs alongside point estimates** — never give a single number without uncertainty
+- **Report CIs alongside point estimates** — never give a single number without parameter uncertainty
 - **Document parameter sources** — where did your ranges come from?
 - **Check CI widths** — unreasonably wide or narrow suggests bad priors
 
 ### ❌ Don't
 
 - **Don't vary everything** — prioritize parameters you're most uncertain about
-- **Don't use tiny ranges** (e.g., min=0.299, max=0.301) — be honest about uncertainty
+- **Don't use tiny ranges** (e.g., min=0.299, max=0.301) — be honest about parameter uncertainty
 - **Don't ignore literature** — use published estimates when available
 - **Don't report only the median** — CIs are the point of UQ
 - **Don't assume normality** without justification — many parameters are skewed
@@ -749,7 +749,7 @@ low_level_workers = 2  # parallel UQ runs within each
    ```json
    {"min": 0.29, "max": 0.31}  // Only 7% variation
    ```
-   **Fix:** Widen ranges to reflect true uncertainty
+   **Fix:** Widen ranges to reflect true parameter uncertainty
 
 2. **Only varying low-sensitivity parameters**
    - E.g., varying recovery rate but not transmission rate
@@ -844,7 +844,7 @@ LHS assumes **independence** between parameters. To model correlation:
 
 - **[INTERVENTIONS.md](./interventions.md)** — Varying intervention effectiveness
 - **[DEVELOPING_MODELS.md](./developing-models.md)** — Model development guide
-- **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; shades the mean/lower/upper uncertainty bands from UNCERTAINTY output
+- **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; shades the mean/lower/upper parameter uncertainty bands from UNCERTAINTY output
 - **[compartment/run_simulation.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/run_simulation.py)** — UQ orchestration code
 - **[compartment/helpers.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/helpers.py)** — LHS implementation (`generate_LHS_samples`)
 - **[compartment/batch_simulation_manager.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/batch_simulation_manager.py)** — Parallel simulation runner
@@ -873,7 +873,7 @@ LHS assumes **independence** between parameters. To model correlation:
 ### Distribution Selection
 
 - **Vose (2008).** *Risk Analysis: A Quantitative Guide* (3rd ed.). John Wiley & Sons.
-    - Comprehensive guide to probability distributions for uncertainty
+    - Comprehensive guide to probability distributions for parameter uncertainty
 
 ---
 

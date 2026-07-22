@@ -231,7 +231,7 @@ class Dengue2StrainModel(Model):
 
         # Map the configurable disease parameters (native units, as declared in
         # the schema) onto the rate constants used by the ODE.  Done here rather
-        # than in derivative() so uncertainty runs (which rebuild the model from
+        # than in derivative() so parameter uncertainty runs (which rebuild the model from
         # an overridden config) re-derive every constant from scratch.
         self.beta_0 = self.transmission_rate
         self.eta = self.seasonality_amplitude

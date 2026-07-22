@@ -1,7 +1,7 @@
 """COVID model tests.
 
 Covers compartment structure validation, disease dynamics, all variant schemas,
-end-to-end runs for every COVID variant, and uncertainty (LHS) runs.
+end-to-end runs for every COVID variant, and parameter uncertainty (LHS) runs.
 
 Run:
     python3 -m pytest tests/test_covid_jax_model.py -v -m integration
@@ -632,11 +632,11 @@ class TestCovidVariantRuns:
 
 
 class TestCovidUncertainty:
-    """Test COVID uncertainty (LHS) runs produce valid confidence intervals."""
+    """Test COVID parameter uncertainty (LHS) runs produce valid confidence intervals."""
 
     @pytest.mark.integration
     def test_uncertainty_varying_params(self):
-        """Uncertainty run with variance on beta should produce CI bands."""
+        """Parameter uncertainty run with variance on beta should produce CI bands."""
         from compartment.models.covid_jax_model.model import CovidJaxModel
 
         config = {
@@ -691,7 +691,7 @@ class TestCovidUncertainty:
             for comp in ["S", "I", "R"]:
                 assert comp in mid_point
                 val = mid_point[comp]
-                assert "mean" in val, f"Expected uncertainty format (mean/lower/upper) for {comp}"
+                assert "mean" in val, f"Expected parameter uncertainty format (mean/lower/upper) for {comp}"
                 assert "lower" in val
                 assert "upper" in val
 
@@ -752,7 +752,7 @@ class TestCovidUncertainty:
                         continue
                     if isinstance(val, dict):
                         assert "mean" in val and "lower" in val and "upper" in val, (
-                            f"Expected uncertainty format for {key}, got keys: {val.keys()}"
+                            f"Expected parameter uncertainty format for {key}, got keys: {val.keys()}"
                         )
                         for stat in ["mean", "lower", "upper"]:
                             assert not math.isnan(val[stat]), (
@@ -761,7 +761,7 @@ class TestCovidUncertainty:
 
     @pytest.mark.integration
     def test_uncertainty_lower_le_mean_le_upper(self):
-        """In uncertainty output, lower <= mean <= upper should hold."""
+        """In parameter uncertainty output, lower <= mean <= upper should hold."""
         from compartment.models.covid_jax_model.model import CovidJaxModel
 
         config = {

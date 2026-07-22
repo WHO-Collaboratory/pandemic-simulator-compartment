@@ -164,7 +164,7 @@ class Model(ABC):
         - ``disease_params`` — :class:`DiseaseParamValues` with
           attribute access (e.g. ``self.disease_params.immunity_period``)
         - Top-level aliases for each disease parameter
-          (e.g. ``self.immunity_period``) for uncertainty compatibility
+          (e.g. ``self.immunity_period``) for parameter uncertainty compatibility
         - ``intervention_dict`` (kept for post-processing compat)
         - ``interventions`` — list of :class:`Intervention` runtime objects
         - ``intervention_statuses`` — auto-generated from schema
@@ -200,7 +200,7 @@ class Model(ABC):
         # -- Disease parameters --
         # Auto-unpack from the Disease dict using schema declarations.
         # Values are accessible via self.disease_params.<name> and also
-        # as top-level aliases (self.<name>) for uncertainty compatibility
+        # as top-level aliases (self.<name>) for parameter uncertainty compatibility
         # (BatchSimulationManager._single_run uses setattr(model, key, val)).
         disease_dict = config.get("Disease", {}) or {}
         self.disease_params = DiseaseParamValues(
@@ -363,7 +363,7 @@ class Model(ABC):
             ParameterDef(
                 name="run_mode",
                 label="Run Mode",
-                description="Run a single deterministic simulation or uncertainty analysis with multiple runs. STOCHASTIC models always run their model-defined NUM_RUNS trajectories. UNCERTAINTY runs 30 trajectories on deterministic models.",
+                description="Run a single deterministic simulation or parameter uncertainty analysis with multiple runs. STOCHASTIC models always run their model-defined NUM_RUNS trajectories. UNCERTAINTY runs 30 trajectories on deterministic models.",
                 value_type=ValueType.SELECT,
                 default="DETERMINISTIC",
                 options=["DETERMINISTIC", "UNCERTAINTY"],
@@ -810,10 +810,10 @@ class Model(ABC):
         return cfg
 
     def build_overridden_config(self, params: dict[str, Any]):
-        """Deep-copy this model's source config and apply LHS uncertainty
+        """Deep-copy this model's source config and apply LHS parameter uncertainty
         overrides, returning the new config.
 
-        This is the basis for uncertainty sampling: instead of mutating a
+        This is the basis for parameter uncertainty sampling: instead of mutating a
         constructed model (whose ``__init__`` may have already baked params
         into derived constants like ``1/latent_period``), the runner rebuilds
         the model from an overridden config so every value declared via
@@ -993,7 +993,7 @@ class Model(ABC):
 
             # Use absolute demographic rate vector if declared, bypassing the
             # intervention-scaled scalar.  Demographic rates are fixed
-            # epidemiological values and do not participate in uncertainty
+            # epidemiological values and do not participate in parameter uncertainty
             # sampling or intervention scaling.
             rate_vectors = getattr(self, "_rate_vectors", None)
             if rate_vectors and edge.variable_name in rate_vectors:

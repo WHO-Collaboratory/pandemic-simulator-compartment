@@ -72,7 +72,7 @@ class ParameterDef:
     min_value: Optional[float] = None  # hard minimum (validation)
     max_value: Optional[float] = None  # hard maximum (validation)
 
-    # Variance / uncertainty defaults
+    # Parameter variance / uncertainty defaults
     default_min: Optional[float] = None  # default lower bound for variance
     default_max: Optional[float] = None  # default upper bound for variance
 
@@ -761,7 +761,7 @@ class ModelParameterSchema:
     # Derived from the model class's STOCHASTIC attribute.
     run_mode: str = "DETERMINISTIC"
 
-    # Number of stochastic/uncertainty trajectories for this model.
+    # Number of stochastic/parameter uncertainty trajectories for this model.
     # Overrides the global default of 30 when set on the model class as NUM_RUNS.
     num_runs: int = 30
     num_runs_min: int = 1
@@ -1230,8 +1230,8 @@ class ParameterSchemaBuilder:
             default: Default value in native units of ``value_type``.
             min_value: Hard minimum for validation (native units).
             max_value: Hard maximum for validation (native units).
-            default_min: Default lower bound for variance / uncertainty (native units).
-            default_max: Default upper bound for variance / uncertainty (native units).
+            default_min: Default lower bound for parameter variance / uncertainty (native units).
+            default_max: Default upper bound for parameter variance / uncertainty (native units).
             unit: Display unit (defaults to ``"per day"``).
             frequency_dependent: If ``True``, the framework computes flow
                 as ``source * rate * sum(infective) / N_total`` instead
@@ -1441,8 +1441,8 @@ class ParameterSchemaBuilder:
             default: Default value -- required so the example config is runnable.
             min_value: Hard minimum for validation.
             max_value: Hard maximum for validation.
-            default_min: Default lower bound for variance / uncertainty.
-            default_max: Default upper bound for variance / uncertainty.
+            default_min: Default lower bound for parameter variance / uncertainty.
+            default_max: Default upper bound for parameter variance / uncertainty.
             unit: Display unit (e.g. ``"%"``, ``"days"``).
             required: Whether this field is required in the config.
             options: Valid choices for ``ValueType.SELECT`` fields.
@@ -1494,8 +1494,8 @@ class ParameterSchemaBuilder:
             default: Default value -- required so the example config is runnable.
             min_value: Hard minimum for validation.
             max_value: Hard maximum for validation.
-            default_min: Default lower bound for variance / uncertainty.
-            default_max: Default upper bound for variance / uncertainty.
+            default_min: Default lower bound for parameter variance / uncertainty.
+            default_max: Default upper bound for parameter variance / uncertainty.
             unit: Display unit (e.g. ``"days"``, ``"per day"``).
             required: Whether this parameter is required in the config.
             options: Valid choices for ``ValueType.SELECT`` fields.

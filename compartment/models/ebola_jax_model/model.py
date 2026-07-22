@@ -11,7 +11,7 @@ as two sequential sub-compartments each draining at rate λ per step. This
 produces the same Erlang(2) sojourn time distribution as the boxcar model
 with a fraction of the state — O(k) = 2 compartments per stage instead of
 O(k * mean_period) boxcars, reducing ~133 compartments to 14 and making
-uncertainty runs practical.
+parameter uncertainty runs practical.
 
 Compartments: S, E1/E2, I1/I2, H1/H2, Funeral, R.
 Output is rolled up to the six public compartments via

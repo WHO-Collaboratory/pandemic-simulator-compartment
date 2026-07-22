@@ -172,11 +172,11 @@ class TestDengueDisease:
 
 
 class TestDengueUncertainty:
-    """Test Dengue uncertainty (LHS) runs produce valid confidence intervals."""
+    """Test Dengue parameter uncertainty (LHS) runs produce valid confidence intervals."""
 
     @pytest.mark.integration
     def test_uncertainty_varying_interventions(self):
-        """Uncertainty run with variance on intervention adherence."""
+        """Parameter uncertainty run with variance on intervention adherence."""
         from compartment.models.dengue_jax_model.model import DengueJaxModel
 
         config = {
@@ -230,7 +230,7 @@ class TestDengueUncertainty:
         mid_point = ts[len(ts) // 2]
         sample_comp = [k for k in mid_point if k != "date"][0]
         val = mid_point[sample_comp]
-        assert "mean" in val, f"Expected uncertainty format for {sample_comp}, got {val}"
+        assert "mean" in val, f"Expected parameter uncertainty format for {sample_comp}, got {val}"
 
         ctrl_run = next(r for r in results if r["control_run"])
         ctrl_ts = ctrl_run["parent_admin_total"]["time_series"]
