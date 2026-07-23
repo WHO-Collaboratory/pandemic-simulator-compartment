@@ -53,8 +53,8 @@ Pick the closest analog before suggesting from scratch.
    - `example-config.json` (generate via CLI after the schema is written)
 2. **Write `define_parameters()`** in this order: `set_model_info` → `add_compartment` (mark `infective=True` on FOI sources) → `add_transmission_edge` → `add_intervention` → `set_travel_volume` → demographics / contact matrix → `add_admin_zone_field` → `add_disease_parameter`.
 3. **Write `__init__(self, config)`**. Default to `super().__init__(config)` then add what's missing (typically `self.travel_matrix`, demographics, temperature, model-specific scalars).
-4. **Write `prepare_initial_state(self)`**. Set `self.travel_matrix` (use `jnp.eye(R)` if no travel). Return `(state, list(self.compartment_list))`.
-5. **Write `derivative(self, y, t, p)`**. Lean on `_compute_derivatives()` first; only drop to manual flows for spatially-coupled or age-stratified FOI.
+4. **Write `prepare_initial_state(self)`**. Set `self.travel_matrix` (use `jnp.eye(R)` if no travel). Return the `state` array (the population matrix).
+5. **Write `derivative(self, y, t, p)`** (or name it `evaluate(self, y, t, p)` — the two are aliases; the framework calls whichever you define, so implement only one). Lean on `_compute_derivatives()` first; only drop to manual flows for spatially-coupled or age-stratified FOI. Prefer `evaluate()` for stochastic/Euler models, where the return is a per-step delta rather than a true derivative.
 6. **Generate the example config**:
    ```bash
    python -m compartment.generate_artifact <DISEASE_TYPE> --example-config \
@@ -95,6 +95,8 @@ schema.add_disease_parameter(name, label, description, value_type, default, ...)
 `ValueType` choices: `RATE`, `DAYS`, `PERCENTAGE`, `COUNT`, `DATE`, `BOOLEAN`, `TEXT`, `SELECT`, `FLOAT`, `INTEGER`, `COORDINATE`. `DAYS` and `PERCENTAGE` get auto-converted to per-day fractional rates inside `_load_transmission_params()`.
 
 ## Patterns I reach for in `derivative()`
+
+> The step method can equivalently be named `evaluate()` — it's an alias for `derivative()`. Every snippet below works under either name.
 
 ```python
 def derivative(self, y, t, p):
@@ -153,7 +155,7 @@ The covid model currently keeps its hardcoded 9-cell POLYMOD overrides for backw
 - **`value_type=ValueType.DAYS`** means `default=10.0` is interpreted as a 10-day mean ⇒ rate `0.1`. Do not pre-divide.
 - **Travel matrix must exist before `_apply_interventions()`** — it reads `self.travel_matrix`. Set it in `__init__` or `prepare_initial_state()` before the first `derivative()` call. Use `jnp.eye(R)` when there's no travel model.
 - **Variants** use `super().define_parameters(schema)` and then mutate. Removing a compartment cascades and removes any edges that reference it. To re-add an edge that the parent referenced via the removed compartment (e.g. an S→I beta after E is gone), call `schema.add_transmission_edge(**_BETA_SI)` — see covid `variants.py` for the canonical pattern.
-- **Stochastic / Euler models** must set `STOCHASTIC = True` (or `SOLVER = "euler"`) and have `derivative()` return the **per-step delta**, not the rate. Multiplying by `dt` happens inside `_euler_integrate`.
+- **Stochastic / Euler models** must set `STOCHASTIC = True` (or `SOLVER = "euler"`) and have their step method return the **per-step delta**, not the rate. Multiplying by `dt` happens inside `_euler_integrate`. Since the return isn't a true derivative here, name the method `evaluate()` rather than `derivative()` (both are accepted).
 - **The "short form" config loader** wraps top-level `admin_zones` and `demographics` into `case_file` automatically. Don't double-nest when writing example configs by hand.
 - **`schema.remove_compartment("X")` cascades to edges**, but only by `source_id`/`target_id`. If a manual flow inside `derivative()` still indexes `states["X"]`, that branch must be guarded with `if "X" in states:`.
 - **The user does not need to edit `MODEL_REGISTRY` or `validation/__init__.py`**. The registry is built by scanning the filesystem; the validation entry resolves through `_get_model_registry()` and `has_parameter_schema()`. If a model isn't being picked up, it's because either (a) the `model.py` import fails, or (b) the class doesn't subclass `Model` / lacks a `DISEASE_TYPE`.

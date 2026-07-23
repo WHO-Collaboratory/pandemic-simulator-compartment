@@ -305,7 +305,7 @@ class MyDiseaseModel(Model):
         self.travel_matrix = np.array(
             self.mobility(self._admin_zones, self._sigma)
         )
-        return self.population_matrix, list(self.compartment_list)
+        return self.population_matrix
 ```
 
 **When to use:**

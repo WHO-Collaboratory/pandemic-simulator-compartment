@@ -261,7 +261,7 @@ class CovidJaxModel(Model):
     def prepare_initial_state(self):
         # Expand (K, R) → (K, A, R) and append _total rows for active compartments.
         self._prepare_demographic_state()
-        return self.population_matrix, self.compartment_list
+        return self.population_matrix
 
     def derivative(self, y, t, p):
         """Compute derivatives with age-stratified force of infection.

@@ -22,8 +22,13 @@ class SimulationManager:
         logger.info(f"step size (days): {step}")
         ts = np.arange(0.0, float(self.model.n_timesteps), step)
 
-        init_state, comp_list = self.model.prepare_initial_state()
+        init_state = self.model.prepare_initial_state()
         params = self.model.get_params()
+
+        # Resolve the per-step function the model implemented. Authors may
+        # name it evaluate() or derivative() (aliases); the resolver picks
+        # whichever the subclass overrode.
+        step_fn = self.model._resolve_step_function()
 
         # Default: adaptive ODE solver (JAX).
         # Models can set SOLVER = "euler" to use fixed-step Euler
@@ -36,23 +41,26 @@ class SimulationManager:
 
         if solver == "euler":
             logger.info("solver: euler")
-            pred = self._euler_integrate(init_state, ts, params)
+            pred = self._euler_integrate(step_fn, init_state, ts, params)
             if isinstance(pred, jax.Array):
                 pred = jax.device_get(pred)
             out = np.asarray(pred)
         else:
             logger.info("solver: odeint")
-            pred = odeint(self.model.derivative, init_state, ts, params)
+            pred = odeint(step_fn, init_state, ts, params)
             out = jax.device_get(pred)
 
         logger.info("run_simulation function ENDING")
         return np.array(out)
 
-    def _euler_integrate(self, y0, ts, params):
+    def _euler_integrate(self, step_fn, y0, ts, params):
         """Fixed-step Euler integration.
 
         Works with both JAX and plain numpy arrays — the array module
         is detected from *y0* so numpy-only models never touch JAX.
+
+        *step_fn* is the model's resolved per-step callable (its
+        ``evaluate()`` or ``derivative()`` override).
         """
         if isinstance(y0, jax.Array):
             xp = jnp
@@ -63,7 +71,7 @@ class SimulationManager:
         y = y0
         for i in range(1, len(ts)):
             dt = ts[i] - ts[i - 1]
-            dy = self.model.derivative(y, ts[i - 1], params)
+            dy = step_fn(y, ts[i - 1], params)
             y = y + dt * dy
             y = xp.maximum(y, 0.0)
             results.append(y)

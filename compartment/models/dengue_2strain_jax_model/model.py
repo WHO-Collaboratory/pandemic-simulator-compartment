@@ -294,7 +294,7 @@ class Dengue2StrainModel(Model):
         # Base __init__ already produced population_matrix as (compartments, regions)
         # (it transposes config["initial_population"]).  No demographic
         # stratification is used, so the state is passed through unchanged.
-        return self.population_matrix, self.compartment_list
+        return self.population_matrix
 
     def derivative(self, y, t, p):
         y = np.clip(y, 0.0, 1e9)  # clip to avoid infs/negatives feeding back in

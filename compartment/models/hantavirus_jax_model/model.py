@@ -617,7 +617,7 @@ class HantavirusJaxModel(Model):
     # ------------------------------------------------------------------
 
     def prepare_initial_state(self):
-        return self.population_matrix, list(self.compartment_list)
+        return self.population_matrix
 
     # ------------------------------------------------------------------
     # ODE derivative
