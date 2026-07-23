@@ -44,7 +44,7 @@ class Model(ABC):
 
     Subclasses **should** override:
     - ``prepare_initial_state()``
-    - ``derivative()``
+    - ``evaluate()`` (or ``derivative()`` — they are aliases; implement one)
 
     Non-migrated models can still override ``disease_type``, define
     ``COMPARTMENT_LIST`` manually, and implement ``get_params()``.
@@ -80,6 +80,24 @@ class Model(ABC):
         ``define_parameters()`` are silently skipped.
         """
         super().__init_subclass__(**kwargs)
+
+        # Fail fast if a model defines BOTH evaluate() and derivative():
+        # they are aliases for the same per-step function and defining
+        # both is ambiguous.  This runs at class-definition time (import)
+        # so registry discovery, artifact generation, and the test suite
+        # all surface the mistake immediately — not only when a
+        # simulation runs (:meth:`_resolve_step_function` re-checks at
+        # run time as a backstop).  Kept OUTSIDE the try/except below so
+        # it is never swallowed by the non-migrated-model fallback.
+        if (
+            cls.evaluate is not Model.evaluate
+            and cls.derivative is not Model.derivative
+        ):
+            raise TypeError(
+                f"{cls.__name__} defines both evaluate() and derivative(); "
+                "they are aliases for the model's step function — implement only one."
+            )
+
         try:
             schema = cls._build_parameter_schema()
             cls._cached_schema = schema
@@ -1229,5 +1247,60 @@ class Model(ABC):
     def prepare_initial_state(self):
         pass
 
+    def evaluate(self, y, t, p):
+        """
+        Compute the per-step state change at time ``t``.
+
+        This is the function the solver calls each step. For continuous
+        ODE models it returns ``dy/dt`` (a derivative); for discrete or
+        stochastic Euler-stepped models it returns the per-step
+        increment, where ``evaluate`` reads more naturally than
+        "derivative".
+
+        Override **either** this method or :meth:`derivative` — they are
+        aliases and the framework calls whichever the subclass defines
+        (see :meth:`_resolve_step_function`). Return an array shaped like
+        ``y``, typically
+        ``jnp.stack([derivs[c] for c in self.compartment_list])``.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement evaluate() or derivative()."
+        )
+
     def derivative(self, y, t, p):
-        pass
+        """Alias for :meth:`evaluate`. Override whichever name fits the model."""
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement evaluate() or derivative()."
+        )
+
+    def _resolve_step_function(self):
+        """
+        Return the per-step callable the subclass actually implemented —
+        its :meth:`evaluate` or :meth:`derivative` override.
+
+        Model authors may implement either name (they are aliases); this
+        picks whichever the subclass overrode so the solver can call it.
+        Inherited overrides count: a variant subclassing a model that
+        defines ``derivative()`` resolves to that inherited method.
+
+        Raises:
+            TypeError: if the subclass overrides **both** names, which is
+                ambiguous — implement only one.
+            NotImplementedError: if the subclass overrides **neither**.
+        """
+        cls = type(self)
+        overrides_evaluate = cls.evaluate is not Model.evaluate
+        overrides_derivative = cls.derivative is not Model.derivative
+
+        if overrides_evaluate and overrides_derivative:
+            raise TypeError(
+                f"{cls.__name__} overrides both evaluate() and derivative(); "
+                "implement only one (they are aliases)."
+            )
+        if overrides_evaluate:
+            return self.evaluate
+        if overrides_derivative:
+            return self.derivative
+        raise NotImplementedError(
+            f"{cls.__name__} must implement evaluate() or derivative()."
+        )
