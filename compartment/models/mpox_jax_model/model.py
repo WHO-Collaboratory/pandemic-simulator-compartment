@@ -276,7 +276,7 @@ class MpoxJaxModel(Model):
 
         return self.population_matrix
 
-    def derivative(self, y, t, p):
+    def equation(self, y, t, p):
         C = self.COMPARTMENTS
         params = self._unpack_params(p)
 
@@ -304,7 +304,7 @@ class MpoxJaxModel(Model):
         # Base class auto-handles gamma (I->R) and omega (R->S).
         # beta is skipped here — spatially-coupled S->I flow applied manually below.
         rates = {"gamma": params["gamma"], "omega": params["omega"]}
-        derivs = self._compute_derivatives(states, rates, skip_edges={"beta"})
+        derivs = self._compute_equations(states, rates, skip_edges={"beta"})
 
         # Manually apply spatially-coupled S->I flow and accumulate into I_total
         foi_flow = S * lambda_force

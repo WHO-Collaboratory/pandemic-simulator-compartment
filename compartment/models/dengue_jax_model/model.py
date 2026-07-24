@@ -499,10 +499,10 @@ class DengueJaxModel(Model):
         return self.population_matrix
 
     # ------------------------------------------------------------------
-    # ODE derivative
+    # ODE equation
     # ------------------------------------------------------------------
 
-    def derivative(self, y, t, p):
+    def equation(self, y, t, p):
         y = np.clip(y, 0.0, 1e9)
         Tmax, Tmin, Tmean, numeric_day, hemisphere = p
 

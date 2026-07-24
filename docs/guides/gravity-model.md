@@ -518,13 +518,13 @@ dist_clamped = np.where(dist_km < 1.0, 1.0, dist_km)
 
 **Possible causes:**
 
-1. **Travel matrix not used in derivative** — Check that `travel_matrix` appears in FOI calculation
+1. **Travel matrix not used in equation** — Check that `travel_matrix` appears in FOI calculation
 2. **σ = 0** — No travel configured
 3. **All regions infected identically** — Initial conditions mask spatial effects
 
 **Debug:**
 ```python
-# In derivative(), log the travel-mixed prevalence
+# In equation(), log the travel-mixed prevalence
 print(f"t={t:.1f} | Travel-mixed I_frac: {(travel_matrix @ I_frac)}")
 print(f"t={t:.1f} | Raw I_frac: {I_frac}")
 # Should see differences when infections are spatially heterogeneous

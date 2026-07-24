@@ -25,9 +25,7 @@ class SimulationManager:
         init_state = self.model.prepare_initial_state()
         params = self.model.get_params()
 
-        # Resolve the per-step function the model implemented. Authors may
-        # name it evaluate() or derivative() (aliases); the resolver picks
-        # whichever the subclass overrode.
+        # Resolve the per-step function the model implemented as equation().
         step_fn = self.model._resolve_step_function()
 
         # Default: adaptive ODE solver (JAX).
@@ -60,7 +58,7 @@ class SimulationManager:
         is detected from *y0* so numpy-only models never touch JAX.
 
         *step_fn* is the model's resolved per-step callable (its
-        ``evaluate()`` or ``derivative()`` override).
+        ``equation()`` override).
         """
         if isinstance(y0, jax.Array):
             xp = jnp

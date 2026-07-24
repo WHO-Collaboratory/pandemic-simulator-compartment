@@ -357,14 +357,14 @@ Total reduction: 1 - (0.1968 / 0.3) = 34.4%
 
 This is **not** the same as adding 20% + 18% = 38%.
 
-## Implementation in `derivative()`
+## Implementation in `equation()`
 
-Models typically call `_apply_interventions()` in their `derivative()` method:
+Models typically call `_apply_interventions()` in their `equation()` method:
 
 ### Standard Pattern
 
 ```python
-def derivative(self, y, t, p):
+def equation(self, y, t, p):
     xp = self._array_module()
     
     # Unpack parameters
@@ -388,7 +388,7 @@ def derivative(self, y, t, p):
     # Use modified rates in force of infection calculation
     foi = rates["beta"] * I / (N_total + 1e-10)
     
-    # ... rest of derivative logic ...
+    # ... rest of equation logic ...
 ```
 
 ### What `_apply_interventions()` Does
@@ -418,7 +418,7 @@ def custom_intervention(self, beta, t, prop_infective):
         return beta * (1 - cfg["coverage"] * cfg["efficacy"])
     return beta
 
-def derivative(self, y, t, p):
+def equation(self, y, t, p):
     # ... setup ...
     
     # Framework interventions (social distancing, masks, etc.)
@@ -501,7 +501,7 @@ self.intervention_statuses = {
 - Logging/debugging intervention activation times
 - Conditional logic in custom interventions
 
-**Access in `derivative()`:**
+**Access in `equation()`:**
 ```python
 if self.intervention_statuses.get("lock_down", False):
     # Lockdown is currently active
@@ -705,7 +705,7 @@ Set `end_threshold` significantly below `start_threshold` to create a buffer zon
    ```
    **Fix:** Set `modifies_travel=True`
 
-2. **Travel matrix not used in derivative**
+2. **Travel matrix not used in equation**
    ```python
    # Missing travel_matrix in FOI calculation
    foi = beta * I / N  # Should be: (travel_matrix @ I)

@@ -143,7 +143,7 @@ class CompartmentDef:
     Set ``infective=True`` on compartments whose population contributes
     to the force of infection (e.g. the *I* compartment in an SIR model).
     When a transmission edge is marked ``frequency_dependent=True``,
-    :meth:`Model._compute_derivatives` uses the sum of all infective
+    :meth:`Model._compute_equations` uses the sum of all infective
     compartments to compute the flow:
     ``source * rate * sum(infective) / N_total``.
     """
@@ -184,7 +184,7 @@ class CompartmentRegistry:
         len(cls.COMPARTMENTS)       # → 3
         "S" in cls.COMPARTMENTS     # → True
 
-        # In derivative():
+        # In equation():
         states = {c: y[i] for i, c in enumerate(self.COMPARTMENTS)}
         S = states[self.COMPARTMENTS.S]
 
@@ -1208,7 +1208,7 @@ class ParameterSchemaBuilder:
         The ``source`` and ``target`` are matched against previously added
         compartment IDs or labels (case-insensitive).  The resolved short
         IDs are stored as ``source_id`` and ``target_id`` on the edge for
-        direct use in derivative computations.
+        direct use in equation computations.
 
         All numeric arguments (``default``, ``min_value``, ``max_value``,
         ``default_min``, ``default_max``) should be in the **native units**

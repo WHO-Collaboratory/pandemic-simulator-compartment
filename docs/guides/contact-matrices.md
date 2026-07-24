@@ -252,7 +252,7 @@ The `Model` base class method `_build_contact_matrix(config)` orchestrates the e
 6. Apply config-level overrides (if any)
 7. Return the final matrix as a JAX/NumPy array
 
-The resulting matrix is stored in `self.contact_matrix` and used by the model's `derivative()` function to compute age-stratified force of infection.
+The resulting matrix is stored in `self.contact_matrix` and used by the model's `equation()` function to compute age-stratified force of infection.
 
 ## Using Contact Matrices in Your Model
 
@@ -282,10 +282,10 @@ def define_parameters(cls, schema):
     # schema.set_contact_override("age_0_17", "age_0_17", 10.0)
 ```
 
-### In `derivative()`
+### In `equation()`
 
 ```python
-def derivative(self, y, t, p):
+def equation(self, y, t, p):
     xp = self._array_module()
     R = self.num_regions
     A = self.num_age_groups
@@ -307,7 +307,7 @@ def derivative(self, y, t, p):
     # Apply foi to susceptibles
     new_infections = foi * state["S"]
     
-    # ... rest of derivative logic
+    # ... rest of equation logic
 ```
 
 The key insight: the contact matrix transforms prevalence (infection fraction by age) into an age-specific force of infection.
@@ -371,7 +371,7 @@ If a target age range has **no overlap** with the Prem source bands (0-120), the
 ### Force of infection seems wrong
 
 **Check:**
-1. Is `self.contact_matrix` being applied correctly in `derivative()`?
+1. Is `self.contact_matrix` being applied correctly in `equation()`?
 2. Are you using the right matrix dimensions (A×A, not R×A)?
 3. Is the matrix multiplication `contact_matrix @ prevalence.T` producing the expected shape?
 4. Are you scaling by `beta` (transmission rate per contact)?

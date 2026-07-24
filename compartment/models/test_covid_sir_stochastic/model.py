@@ -117,11 +117,11 @@ class CovidSirStochasticModel(Model):
         self.travel_matrix = np.eye(self.population_matrix.shape[1])
         return self.population_matrix
 
-    def derivative(self, y, t, p):
+    def equation(self, y, t, p):
         """Tau-leaping stochastic step.
 
         Returns the *change* (delta) for one timestep so the Euler
-        integrator y_{t+1} = y_t + dt * derivative gives the correct
+        integrator y_{t+1} = y_t + dt * equation gives the correct
         stochastic update.
         """
         C = self.COMPARTMENTS

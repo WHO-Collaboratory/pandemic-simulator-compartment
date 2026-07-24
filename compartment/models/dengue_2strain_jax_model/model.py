@@ -20,7 +20,7 @@ class Dengue2StrainModel(Model):
     schema-driven framework.  The compartment structure and the epidemiological
     parameters are now declared in :meth:`define_parameters` (so they appear in
     the artifact, validation config, and are configurable via the ``Disease``
-    block), while the ODE dynamics in :meth:`derivative` are preserved exactly
+    block), while the ODE dynamics in :meth:`equation` are preserved exactly
     from the original model.
 
     The force of infection has a non-standard multi-term form (a constant
@@ -98,7 +98,7 @@ class Dengue2StrainModel(Model):
 
         # ---- Cumulative tracking compartments ----
         # This model declares no transmission edges (the multi-term force of
-        # infection is applied manually in derivative()), so the framework's
+        # infection is applied manually in equation()), so the framework's
         # automatic per-edge _total generation is a no-op.  We declare the
         # cumulative trackers explicitly to preserve the legacy output columns.
         schema.add_compartment(
@@ -231,7 +231,7 @@ class Dengue2StrainModel(Model):
 
         # Map the configurable disease parameters (native units, as declared in
         # the schema) onto the rate constants used by the ODE.  Done here rather
-        # than in derivative() so parameter uncertainty runs (which rebuild the model from
+        # than in equation() so parameter uncertainty runs (which rebuild the model from
         # an overridden config) re-derive every constant from scratch.
         self.beta_0 = self.transmission_rate
         self.eta = self.seasonality_amplitude
@@ -296,7 +296,7 @@ class Dengue2StrainModel(Model):
         # stratification is used, so the state is passed through unchanged.
         return self.population_matrix
 
-    def derivative(self, y, t, p):
+    def equation(self, y, t, p):
         y = np.clip(y, 0.0, 1e9)  # clip to avoid infs/negatives feeding back in
 
         states = {comp: y[i] for i, comp in enumerate(self.compartment_list)}

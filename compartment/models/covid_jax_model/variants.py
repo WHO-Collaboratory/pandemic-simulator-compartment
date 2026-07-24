@@ -1,7 +1,7 @@
 """
 Fixed-compartment COVID variant subclasses.
 
-Each class is a thin configuration wrapper over CovidJaxModel. The derivative
+Each class is a thin configuration wrapper over CovidJaxModel. The equation
 logic is shared; only the schema (and therefore the artifact and COMPARTMENT_LIST)
 differs between variants. None of these expose flexible compartment selection.
 

@@ -319,14 +319,14 @@ class EbolaJaxModel(Model):
         return self.population_matrix
 
     # ------------------------------------------------------------------
-    # ODE / discrete-time derivative
+    # ODE / discrete-time equation
     # ------------------------------------------------------------------
 
-    def derivative(self, y, t, p):
+    def equation(self, y, t, p):
         """Per-timestep change for the discrete stochastic Erlang(2) chain model.
 
         With ``STOCHASTIC = True`` the framework uses Euler integration:
-        ``y_{t+1} = y_t + 1 * derivative(y_t, t, p)``.
+        ``y_{t+1} = y_t + 1 * equation(y_t, t, p)``.
         """
         params = self._unpack_params(p)
         beta = params["beta"]

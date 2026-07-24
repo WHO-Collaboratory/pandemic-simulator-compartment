@@ -6,14 +6,14 @@ You only need to write code for the parts that are genuinely model-specific: the
 
 ## Prerequisites
 - Python 3.10+ (managed via `uv`)
-- Familiarity with `jax.numpy` for the ODE `derivative()`
+- Familiarity with `jax.numpy` for the ODE `equation()`
 - Light Pydantic exposure (you rarely touch validators directly — they're generated from your schema)
 
 ## Where things live
 
 | Concern | File | Notes |
 |---|---|---|
-| Base `Model` class | [compartment/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/model.py) | Auto-wires the schema, contact matrix, interventions, helpers like `_compute_derivatives()` |
+| Base `Model` class | [compartment/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/model.py) | Auto-wires the schema, contact matrix, interventions, helpers like `_compute_equations()` |
 | Schema builder + types | [compartment/parameters.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/parameters.py) | `ParameterSchemaBuilder`, `ValueType`, `CompartmentDef`, `TransmissionEdgeDef`, etc. |
 | Auto model registry | [compartment/registry.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/registry.py) | Discovers every `Model` subclass with a `DISEASE_TYPE` — no manual mapping |
 | Pydantic config generator | [compartment/schema_generator.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/schema_generator.py) | Builds the `BaseDiseaseConfig` subclass from your schema |
@@ -44,7 +44,7 @@ python -m compartment.new_model my_disease
 
 This creates `compartment/models/my_disease_model/` containing:
 - `__init__.py` — empty package marker
-- `model.py` — `MyDiseaseModel` with a minimal SIR (`define_parameters` + `derivative`)
+- `model.py` — `MyDiseaseModel` with a minimal SIR (`define_parameters` + `equation`)
 - `main.py` — standard CLI wrapper around `drive_simulation()`
 - `example-config.json` — minimal runnable config wired to the template's edges
 
@@ -96,7 +96,7 @@ From there, open `model.py` and:
        --example-config \
        --config-output compartment/models/my_disease_model/example-config.json
    ```
-3. Flesh out `derivative()` with the actual ODE logic.
+3. Flesh out `equation()` with the actual ODE logic.
 
 The sections below explain each piece in detail.
 
@@ -107,7 +107,7 @@ Create a new directory under `compartment/models/<your_model>/`:
 ```
 compartment/models/your_model/
 ├── __init__.py            # empty
-├── model.py               # Model subclass with define_parameters() + derivative()
+├── model.py               # Model subclass with define_parameters() + equation()
 ├── main.py                # CLI entry point — thin wrapper around drive_simulation()
 ├── example-config.json    # minimal runnable config (can be auto-generated)
 ├── variants.py            # OPTIONAL — fixed-compartment variants of the same model
@@ -121,7 +121,7 @@ The auto-discovery registry scans every directory under `compartment/models/`, i
 A migrated model has two responsibilities:
 
 1. **`define_parameters(cls, schema)`** — declare the model.
-2. **`evaluate(self, y, t, p)`** — implement the ODE right-hand side. (This method may also be named **`derivative()`** — the two are aliases; implement whichever reads better for your model. See [below](#evaluateself-y-t-p--derivativeself-y-t-p).)
+2. **`equation(self, y, t, p)`** — implement the ODE right-hand side. See [below](#equationself-y-t-p).
 
 The base class handles `disease_type`, `COMPARTMENT_LIST`, `COMPARTMENTS` (attribute-style compartment registry), `get_params()`, transmission rate attributes, intervention runtime objects, contact matrices, and demographic rate vectors.
 
@@ -254,16 +254,16 @@ The first axis of `state` must line up with `self.compartment_list` (set in `__i
 
 Set `self.travel_matrix` here (or in `__init__`) — built-in helpers like `_apply_interventions()` expect it to exist.
 
-### `evaluate(self, y, t, p)` / `derivative(self, y, t, p)`
+### `equation(self, y, t, p)`
 
 Implement the per-step function using `jax.numpy`. The shape of `y` matches what `prepare_initial_state()` returned. Return a `jnp.stack([...])` whose first axis matches `self.compartment_list` exactly (including `_total` columns).
 
-**You may name this method either `evaluate()` or `derivative()`** — they are aliases, and the framework calls whichever your subclass defines. Implement only one (defining both raises `TypeError`). For continuous ODE models the return value is a true derivative `dy/dt`, so `derivative()` fits; for [stochastic / Euler models](#stochastic--euler-integrated-models) it's a per-step increment rather than a rate, so `evaluate()` reads more honestly. All examples below use `derivative()`, but `evaluate()` is interchangeable.
+For continuous ODE models the return value is a true derivative `dy/dt`; for [stochastic / Euler models](#stochastic--euler-integrated-models) it's a per-step increment rather than a rate.
 
 The framework provides three helpers that handle the boilerplate. Use them where you can; reach for manual flow math only when you need spatially-coupled or age-stratified force-of-infection terms.
 
 ```python
-def derivative(self, y, t, p):
+def equation(self, y, t, p):
     C = self.COMPARTMENTS
     params = self._unpack_params(p)        # {"beta": ..., "gamma": ...}
 
@@ -278,17 +278,17 @@ def derivative(self, y, t, p):
 
     # Standard mass-action / FOI flows — handled by the framework.
     # Returns a dict {compartment_id: deriv_array}.
-    derivs = self._compute_derivatives(states, rates)
+    derivs = self._compute_equations(states, rates)
 
     # If you need a custom flow (e.g. spatial coupling), skip that edge
     # and apply it manually:
-    #   derivs = self._compute_derivatives(states, rates, skip_edges={"beta"})
+    #   derivs = self._compute_equations(states, rates, skip_edges={"beta"})
     #   self._apply_flow(derivs, "S", "I", S * lambda_force)
 
     return jnp.stack([derivs[c] for c in self.compartment_list])
 ```
 
-`_compute_derivatives()` reads `frequency_dependent` and `infective` flags from your schema, automatically accumulates flow into `_total` compartments, and skips edges whose source/target compartments aren't active in the current run (which is what makes the COVID variants work via `schema.remove_compartment()`).
+`_compute_equations()` reads `frequency_dependent` and `infective` flags from your schema, automatically accumulates flow into `_total` compartments, and skips edges whose source/target compartments aren't active in the current run (which is what makes the COVID variants work via `schema.remove_compartment()`).
 
 ### Flows without an edge
 
@@ -301,7 +301,7 @@ Some compartment-to-compartment movements can't be expressed as a single schema 
 
 For these, the pattern is:
 1. Declare the underlying constants via `schema.add_disease_parameter()` so they show up in the artifact and the validated config.
-2. Skip the corresponding edge in `_compute_derivatives()` (or just don't declare it) and apply the flow manually with `self._apply_flow(derivs, source_id, target_id, flow)`.
+2. Skip the corresponding edge in `_compute_equations()` (or just don't declare it) and apply the flow manually with `self._apply_flow(derivs, source_id, target_id, flow)`.
 3. **Declare the target's `*_total` compartment by hand** with `schema.add_compartment("X_total", ...)` if you want cumulative tracking. The framework only auto-generates `*_total` for compartments that are the target of at least one declared edge — flows applied via `_apply_flow()` will populate the `_total` counter, but only if it exists.
 
 Hantavirus is the canonical example here: `Em` and `Ef` are not edge targets, the three β rates are `disease_parameter`s, and `Em_total` / `Ef_total` are declared manually. See [hantavirus_jax_model/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/hantavirus_jax_model/model.py).
@@ -409,7 +409,7 @@ class MyModel(Model):
     STOCHASTIC = True       # or: SOLVER = "euler"
 ```
 
-This switches the integrator to a fixed-step Euler loop where your step function returns the **delta per timestep**, not the instantaneous rate. Because the return value isn't a true derivative here, naming the method `evaluate()` rather than `derivative()` reads more honestly (both work — see [above](#evaluateself-y-t-p--derivativeself-y-t-p)). See [test_covid_sir_stochastic/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/test_covid_sir_stochastic/model.py) for a tau-leaping example.
+This switches the integrator to a fixed-step Euler loop where `equation()` returns the **delta per timestep**, not the instantaneous rate. See [test_covid_sir_stochastic/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/test_covid_sir_stochastic/model.py) for a tau-leaping example.
 
 ### Variants (multiple disease types from one model class)
 
@@ -431,7 +431,7 @@ class MySEIRModel(MyBaseModel):
         schema.remove_compartment("D")
 ```
 
-Each variant gets its own `DISEASE_TYPE`, its own auto-generated `COMPARTMENT_LIST`, and its own artifact JSON. The shared `derivative()` works as long as it tolerates missing compartments (use `_compute_derivatives()` and check `if "E" in states` before referencing optional compartments — see CovidJaxModel.derivative). The auto-discovery registry picks up every variant in `variants.py` automatically.
+Each variant gets its own `DISEASE_TYPE`, its own auto-generated `COMPARTMENT_LIST`, and its own artifact JSON. The shared `equation()` works as long as it tolerates missing compartments (use `_compute_equations()` and check `if "E" in states` before referencing optional compartments — see CovidJaxModel.equation). The auto-discovery registry picks up every variant in `variants.py` automatically.
 
 ## `main.py`
 
@@ -544,10 +544,10 @@ There's also [tests/test_artifact.py](https://github.com/WHO-Collaboratory/pande
 
 - `define_parameters()` calls `set_model_info()` and adds at least one compartment. Every transmission edge's `source`/`target` matches a declared compartment id or label (case-insensitive).
 - Every compartment-to-compartment movement in your dynamics is either a declared edge (preferred) **or** intentionally a manual flow because the rate isn't a single tunable scalar (multi-rate FOI, demographic births, density-dependent deaths). For each manual flow the underlying rates are exposed as `add_disease_parameter()` and the target's `*_total` compartment is declared by hand if you need cumulative tracking.
-- The compartments your `derivative()` indexes are spelled the same as `self.COMPARTMENTS.X` — typos raise `AttributeError` with a helpful list.
-- `derivative()` returns `jnp.stack([...])` in `self.compartment_list` order, including any `_total` rows.
+- The compartments your `equation()` indexes are spelled the same as `self.COMPARTMENTS.X` — typos raise `AttributeError` with a helpful list.
+- `equation()` returns `jnp.stack([...])` in `self.compartment_list` order, including any `_total` rows.
 - `prepare_initial_state()` sets `self.travel_matrix` (use `np.eye(R)` if you don't model travel).
-- Custom flows skip their edges via `_compute_derivatives(states, rates, skip_edges={...})` and apply manually with `_apply_flow()`.
+- Custom flows skip their edges via `_compute_equations(states, rates, skip_edges={...})` and apply manually with `_apply_flow()`.
 - `infective=True` is set on the right compartments — frequency-dependent edges read from `cls.COMPARTMENTS.infective_ids`.
 - `value_type` matches the unit of `default` (e.g. `ValueType.DAYS` with `default=10.0` means "10-day average," automatically converted to a `0.1/day` rate at load time).
 - A minimal `example-config.json` exists and `python -m compartment.models.your_model.main --mode local --config_file …` completes without errors.
@@ -565,4 +565,4 @@ There's also [tests/test_artifact.py](https://github.com/WHO-Collaboratory/pande
 
 ## Support
 
-If validation rejects your config, check the structured error output — it points at the offending `loc` path. If the runtime fails inside `derivative()`, JAX errors usually trace back to a shape mismatch between `states[X]` and the rate you're multiplying it by. Reach for `_unpack_params(p)` and a fresh `print(states[c].shape for c in C)` block to debug.
+If validation rejects your config, check the structured error output — it points at the offending `loc` path. If the runtime fails inside `equation()`, JAX errors usually trace back to a shape mismatch between `states[X]` and the rate you're multiplying it by. Reach for `_unpack_params(p)` and a fresh `print(states[c].shape for c in C)` block to debug.

@@ -5,7 +5,7 @@ Tests cover:
 - _build_rate_vectors: base fallback, per-group absolute rates, unit conversion
 - _prepare_demographic_state: 2D → 3D expansion, _total rows appended
 - _array_module: returns numpy for numpy arrays, jax for jax arrays
-- end-to-end COVID model derivative computation with demographic rates
+- end-to-end COVID model equation computation with demographic rates
 """
 
 import numpy as np

@@ -777,7 +777,7 @@ low_level_workers = 2  # parallel UQ runs within each
 
 3. **Model instability**
    - Some parameter combinations violate model assumptions
-   **Fix:** Add validation in `derivative()` or narrow ranges
+   **Fix:** Add validation in `equation()` or narrow ranges
 
 ### Slow Performance
 

@@ -14,7 +14,7 @@ Python 3.13+, managed with `uv`. JAX (`odeint`) is the default ODE solver; stoch
 
 ```
 compartment/
-├── model.py                 # Base Model class — schema wiring, _compute_derivatives, _apply_flow, _apply_interventions
+├── model.py                 # Base Model class — schema wiring, _compute_equations, _apply_flow, _apply_interventions
 ├── parameters.py            # ParameterSchemaBuilder + ValueType enum
 ├── registry.py              # Auto-discovery of Model subclasses with DISEASE_TYPE
 ├── schema_generator.py      # Generates Pydantic config classes from the schema
@@ -25,7 +25,7 @@ compartment/
 ├── validation/              # Pydantic validators; post_processor.py builds the runtime config dict
 ├── cloud_helpers/           # Pandemic Simulator web app integration (not for local users)
 └── models/<disease>_model/          # (existing models use the legacy <disease>_jax_model)
-    ├── model.py             # define_parameters() + derivative()
+    ├── model.py             # define_parameters() + equation()
     ├── main.py              # CLI wrapper
     ├── example-config.json
     ├── variants.py          # OPTIONAL — fixed-compartment variants
@@ -89,7 +89,7 @@ python -m py_compile compartment/path/to/file.py
 - **Model directory naming**: `compartment/models/<disease>_model/` (this is what `python -m compartment.new_model` generates). Existing models predating this convention keep the legacy `<disease>_jax_model` suffix and their `JaxModel` class names — leave those as-is. The suffix is not load-bearing: the registry discovers models by scanning every directory under `models/` and keying on `DISEASE_TYPE`, and the ECR/Lambda deploy path derives image tags/handlers from the directory name and the Lambda name from the model label, so neither depends on the `jax`/`_jax_model` string. Prefix with `test_` for in-repo example/test models that aren't intended for production use (e.g. `test_covid_sir_stochastic`, `test_klebsiella_amr_model`).
 - **No manual registry edits.** The registry scans `compartment/models/*/model.py` and `variants.py` for `Model` subclasses with a `DISEASE_TYPE`. If a model isn't picked up, the cause is almost always an import error in `model.py` or a missing `DISEASE_TYPE`/`set_model_info()` call.
 - **No manual `validation/__init__.py` edits.** Pydantic configs are generated from each model's schema; only legacy non-migrated disease types (`COVID_*`, `VECTOR_BORNE`, `VECTOR_BORNE_2STRAIN`) have hand-written config classes.
-- **Compartment order is load-bearing.** `derivative()` indexes the state array by position. Always stack with `jnp.stack([derivs[c] for c in self.compartment_list])`, never with a hardcoded order.
+- **Compartment order is load-bearing.** `equation()` indexes the state array by position. Always stack with `jnp.stack([derivs[c] for c in self.compartment_list])`, never with a hardcoded order.
 - **Prefer schema edges over manual flows.** Every compartment-to-compartment movement of the form `rate * source` or frequency-dependent FOI should be a `schema.add_transmission_edge(...)`. Reserve manual `_apply_flow()` calls for legitimate cases (multi-rate FOI, demographic births, density-dependent deaths, spatial coupling). See the authoring reference for the canonical examples.
 - **`*_total` compartments are auto-generated** for every edge target. Don't declare them by hand unless the flow is manual or you're overriding `_add_total_compartments()` (dengue does).
 - **`value_type=ValueType.DAYS`** means `default=10.0` represents a 10-day mean (auto-converted to a `0.1/day` rate at load). Don't pre-divide.
