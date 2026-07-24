@@ -2,9 +2,8 @@
 
 Base class for all compartmental disease models. Subclasses **must**
 implement `define_parameters(schema)`. They **should** also override
-`prepare_initial_state()` and the per-step function — either
-`evaluate()` or `derivative()` (they are aliases; implement one and the
-framework calls whichever you define).
+`prepare_initial_state()` and `equation()`, the per-step function the
+solver calls.
 
 ::: compartment.model.Model
     options:

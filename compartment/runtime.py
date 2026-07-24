@@ -4,7 +4,7 @@ Runtime domain classes for disease models.
 These classes bridge the gap between schema-time definitions
 (:mod:`compartment.parameters`) and the ODE solver.  They hold
 config-derived values and provide JAX-safe methods that the model
-calls during ``derivative()``.
+calls during ``equation()``.
 
 - :class:`TransmissionEdge` — schema metadata + current rate value,
   with :meth:`compute_flow` for automatic flow computation.
@@ -39,7 +39,7 @@ class TransmissionEdge:
 
     Created from a :class:`TransmissionEdgeDef` and the corresponding
     config rate value.  The model stores a list of these and can call
-    :meth:`compute_flow` for automatic derivative computation.
+    :meth:`compute_flow` for automatic equation computation.
 
     Attributes:
         source_id: Compartment the flow leaves (e.g. ``"S"``).
@@ -119,7 +119,7 @@ class Intervention:
     Created from an :class:`InterventionDef` (schema) and the
     corresponding config dict entry (runtime values).  The model
     creates a list of these in ``__init__`` and calls their methods
-    in ``derivative()``.
+    in ``equation()``.
 
     The activation logic replicates exactly the ``_update_one`` and
     ``_update_date`` helpers from ``interventions.py``, using

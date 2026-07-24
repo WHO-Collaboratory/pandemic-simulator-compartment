@@ -124,7 +124,7 @@ class HantavirusHumanJaxModel(Model):
         # --- Schema edges (framework-handled) ------------------------------
         # Pure rate * source flows for E -> I and I -> R (humans + rodents).
         # Force-of-infection terms (S -> E) are multi-rate and applied
-        # manually in derivative().
+        # manually in equation().
         schema.add_transmission_edge(
             source="E_h", target="I_h",
             variable_name="delta_h",
@@ -654,10 +654,10 @@ class HantavirusHumanJaxModel(Model):
         return self.population_matrix
 
     # ------------------------------------------------------------------
-    # ODE derivative
+    # ODE equation
     # ------------------------------------------------------------------
 
-    def derivative(self, y, t, p):
+    def equation(self, y, t, p):
         params = self._unpack_params(p)
         states = {c: y[i] for i, c in enumerate(self.compartment_list)}
 
@@ -679,7 +679,7 @@ class HantavirusHumanJaxModel(Model):
         # --- Framework-handled E->I (humans + rodents); I->R is skipped -----
         # gamma_h is skipped here because I_h exits via competing hazards
         # (recovery vs death) rather than a single edge. Applied manually below.
-        derivs = self._compute_derivatives(
+        derivs = self._compute_equations(
             states, rates, skip_edges={"transmission_scale", "gamma_h"},
         )
 

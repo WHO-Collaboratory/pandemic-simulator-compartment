@@ -36,7 +36,7 @@ class KlebsiellaAmrModel(Model):
     27 core compartments + 2 cumulative tracking compartments.
     """
 
-    # Compartment group look-ups for clean iteration in derivative().
+    # Compartment group look-ups for clean iteration in equation().
     # Keys: (strain, setting) -> (untreated, drug_a, drug_b) compartment IDs
     _GROUPS = {
         ("S", "c"): ("Sc_u", "Sc_a", "Sc_b"),
@@ -216,7 +216,7 @@ class KlebsiellaAmrModel(Model):
         )
 
         # ---- Transmission edges (user-configurable) ----
-        # All dynamics are computed manually in derivative(); these edges
+        # All dynamics are computed manually in equation(); these edges
         # expose the key rates to the UI as configurable parameters.
 
         schema.add_transmission_edge(
@@ -708,10 +708,10 @@ class KlebsiellaAmrModel(Model):
         return np.where(in_window, 1.0 - adh * red, 1.0)
 
     # ------------------------------------------------------------------
-    # ODE derivative
+    # ODE equation
     # ------------------------------------------------------------------
 
-    def derivative(self, y, t, p):
+    def equation(self, y, t, p):
         C = self.COMPARTMENTS
         params = self._unpack_params(p)
         states = {c: y[i] for i, c in enumerate(C)}

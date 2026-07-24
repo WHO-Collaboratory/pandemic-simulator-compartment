@@ -215,7 +215,7 @@ class HantavirusJaxModel(Model):
         # Rodent FOI and human spillover all have bilinear `rate × source ×
         # infectious-pool` forms that don't match the framework's edge
         # model, so β, β_a, β_f live as disease parameters and the flows
-        # are applied manually in derivative().
+        # are applied manually in equation().
         schema.add_disease_parameter(
             name="beta",
             label="Rodent–Rodent Transmission (β)",
@@ -481,7 +481,7 @@ class HantavirusJaxModel(Model):
         # spillover. Implemented as a multiplier on β_a and β_f. Schema
         # interventions can only target schema-declared edge variable
         # names, so we expose the spillover through "shadow" edge
-        # variables and apply them in derivative() — see _spillover_scale.
+        # variables and apply them in equation() — see _spillover_scale.
         schema.add_intervention(
             id="environmental_management",
             label="Environmental Management",
@@ -497,8 +497,8 @@ class HantavirusJaxModel(Model):
 
         # Shadow edge so the intervention has a target_rate to scale. The
         # source/target compartments are nominal — the edge is *always*
-        # skipped in _compute_derivatives() and only its rate value
-        # (modified by the intervention) is read in derivative() as a
+        # skipped in _compute_equations() and only its rate value
+        # (modified by the intervention) is read in equation() as a
         # multiplier on the spillover βs.
         schema.add_transmission_edge(
             source="H_uuS", target="H_uuS",
@@ -620,10 +620,10 @@ class HantavirusJaxModel(Model):
         return self.population_matrix
 
     # ------------------------------------------------------------------
-    # ODE derivative
+    # ODE equation
     # ------------------------------------------------------------------
 
-    def derivative(self, y, t, p):
+    def equation(self, y, t, p):
         C = self.COMPARTMENTS
         params = self._unpack_params(p)
         states = {c: y[i] for i, c in enumerate(self.compartment_list)}
@@ -655,7 +655,7 @@ class HantavirusJaxModel(Model):
 
         # --- Framework-handled rodent E→I and I→R ------------------------
         # Skip the spillover_scale sentinel (self-loop, no flow).
-        derivs = self._compute_derivatives(
+        derivs = self._compute_equations(
             states, rates, skip_edges={"spillover_scale"},
         )
 

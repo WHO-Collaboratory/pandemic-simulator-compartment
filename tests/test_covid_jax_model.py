@@ -342,7 +342,7 @@ class TestCovidDisease:
         assert d_young >= 0, "Young group deaths should be non-negative"
         assert d_elderly > 10 * d_young, (
             f"Elderly deaths ({d_elderly:.0f}) should be at least 10x young deaths ({d_young:.0f}). "
-            "demographic_rate_overrides for delta may not be flowing through the derivative."
+            "demographic_rate_overrides for delta may not be flowing through the equation."
         )
 
 

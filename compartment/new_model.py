@@ -158,7 +158,7 @@ class CLASS_NAME(Model):
         self.travel_matrix = np.eye(R)
         return self.population_matrix
 
-    def derivative(self, y, t, p):
+    def equation(self, y, t, p):
         C = self.COMPARTMENTS
         params = self._unpack_params(p)
 
@@ -176,9 +176,9 @@ class CLASS_NAME(Model):
         )
         rates["gamma"] = params["gamma"]
 
-        # _compute_derivatives handles mass-action / frequency-dependent FOI,
+        # _compute_equations handles mass-action / frequency-dependent FOI,
         # _total accumulation, and skips compartments not active in this variant.
-        derivs = self._compute_derivatives(states, rates)
+        derivs = self._compute_equations(states, rates)
         return jnp.stack([derivs[c] for c in self.compartment_list])
 '''
 
@@ -445,7 +445,7 @@ def main() -> None:
     print("Next steps:")
     print(f"  1. Edit {dest}/model.py")
     print(f"       — add/remove compartments, transmission edges, interventions")
-    print(f"       — flesh out derivative() with your disease's ODE")
+    print(f"       — flesh out equation() with your disease's ODE")
     print(f"  2. Regenerate example-config.json from the schema (optional):")
     print(f"       python -m compartment.generate_artifact {disease_type} \\")
     print(f"           --example-config \\")

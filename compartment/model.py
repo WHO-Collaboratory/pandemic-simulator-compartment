@@ -44,7 +44,7 @@ class Model(ABC):
 
     Subclasses **should** override:
     - ``prepare_initial_state()``
-    - ``evaluate()`` (or ``derivative()`` — they are aliases; implement one)
+    - ``equation()``
 
     Non-migrated models can still override ``disease_type``, define
     ``COMPARTMENT_LIST`` manually, and implement ``get_params()``.
@@ -81,23 +81,6 @@ class Model(ABC):
         """
         super().__init_subclass__(**kwargs)
 
-        # Fail fast if a model defines BOTH evaluate() and derivative():
-        # they are aliases for the same per-step function and defining
-        # both is ambiguous.  This runs at class-definition time (import)
-        # so registry discovery, artifact generation, and the test suite
-        # all surface the mistake immediately — not only when a
-        # simulation runs (:meth:`_resolve_step_function` re-checks at
-        # run time as a backstop).  Kept OUTSIDE the try/except below so
-        # it is never swallowed by the non-migrated-model fallback.
-        if (
-            cls.evaluate is not Model.evaluate
-            and cls.derivative is not Model.derivative
-        ):
-            raise TypeError(
-                f"{cls.__name__} defines both evaluate() and derivative(); "
-                "they are aliases for the model's step function — implement only one."
-            )
-
         try:
             schema = cls._build_parameter_schema()
             cls._cached_schema = schema
@@ -113,7 +96,7 @@ class Model(ABC):
                 schema.compartment_display_order = [c.id for c in schema.compartments]
 
             # Auto-generate _total compartments for each edge target.
-            # These are a framework concern (derivative accumulation,
+            # These are a framework concern (derivative/equation accumulation,
             # post-processing) — model authors never declare them.
             cls._add_total_compartments(schema)
 
@@ -145,8 +128,8 @@ class Model(ABC):
         For every compartment that is the target of at least one
         transmission edge a corresponding ``<id>_total`` compartment is
         created (unless the model author already declared one).  Their
-        derivatives are computed automatically by
-        :meth:`_compute_derivatives`.
+        equations are computed automatically by
+        :meth:`_compute_equations`.
 
         Called from :meth:`__init_subclass__` — model authors never
         need to call this directly.
@@ -757,7 +740,7 @@ class Model(ABC):
         Specified groups get their absolute value converted by the edge's
         ``value_type`` (so DAYS and PERCENTAGE are handled correctly).
 
-        These vectors are used directly in :meth:`_compute_derivatives`,
+        These vectors are used directly in :meth:`_compute_equations`,
         bypassing the intervention-scaled scalar.  This means:
 
         - Uncertainty runs vary only the base scalar — demographic rates
@@ -900,7 +883,7 @@ class Model(ABC):
         parameter schema — no need to override.  The tuple order matches
         the ``add_transmission_edge()`` call order in
         ``define_parameters()``, which must match the positional unpack
-        in ``derivative()``.
+        in ``equation()``.
 
         Non-migrated models should override this method.
         """
@@ -915,7 +898,7 @@ class Model(ABC):
         """
         Unpack a params tuple into a dict keyed by variable name.
 
-        Optional convenience for ``derivative()`` implementations that
+        Optional convenience for ``equation()`` implementations that
         prefer named access over positional unpacking::
 
             params = self._unpack_params(p)
@@ -931,14 +914,14 @@ class Model(ABC):
             edge.variable_name: p[i] for i, edge in enumerate(schema.transmission_edges)
         }
 
-    def _compute_derivatives(
+    def _compute_equations(
         self,
         states: dict[str, Any],
         rates: dict[str, Any],
         skip_edges: set[str] | None = None,
     ) -> dict[str, Any]:
         """
-        Compute per-compartment derivatives from the declared transmission
+        Compute per-compartment equations from the declared transmission
         edges and compartment flags.  No callables or intermediates needed.
 
         For each edge the flow formula is selected by the edge's
@@ -978,7 +961,7 @@ class Model(ABC):
 
         Returns:
             Dict mapping every compartment ID present in ``states``
-            to its derivative array.  Models that skipped edges should
+            to its equation array.  Models that skipped edges should
             add their manual flows to this dict before stacking.
         """
         schema = type(self)._get_cached_schema()
@@ -1049,25 +1032,25 @@ class Model(ABC):
         flow: Any,
     ) -> None:
         """
-        Apply a manually-computed flow to the derivatives dict.
+        Apply a manually-computed flow to the equations dict.
 
         Subtracts *flow* from the source, adds it to the target, and
         auto-accumulates into the target's ``_total`` compartment if
-        present.  This is the companion to :meth:`_compute_derivatives`
+        present.  This is the companion to :meth:`_compute_equations`
         for edges excluded via ``skip_edges``.
 
         Modifies *derivs* in place (returns ``None``).
 
         Args:
-            derivs: The derivatives dict returned by
-                :meth:`_compute_derivatives`.
+            derivs: The equations dict returned by
+                :meth:`_compute_equations`.
             source_id: Compartment ID the flow leaves (e.g. ``"S"``).
             target_id: Compartment ID the flow enters (e.g. ``"E"``).
             flow: The flow array (same shape as the state arrays).
 
         Example::
 
-            derivs = self._compute_derivatives(states, rates, skip_edges={"beta"})
+            derivs = self._compute_equations(states, rates, skip_edges={"beta"})
 
             # Manual FOI with age-stratified contact matrix
             omega = age_trans @ ((rates["beta"] * contact) @ I_frac.T).T
@@ -1100,7 +1083,7 @@ class Model(ABC):
         ``prepare_initial_state()``).
 
         Args:
-            t: Current time step (passed to derivative by the solver).
+            t: Current time step (passed to equation by the solver).
             rates: Dict of rate variable names → current values.
                 Only rates targeted by interventions are modified.
             prop_infective: Proportion of infective population (scalar).
@@ -1247,60 +1230,35 @@ class Model(ABC):
     def prepare_initial_state(self):
         pass
 
-    def evaluate(self, y, t, p):
+    def equation(self, y, t, p):
         """
         Compute the per-step state change at time ``t``.
 
         This is the function the solver calls each step. For continuous
-        ODE models it returns ``dy/dt`` (a derivative); for discrete or
-        stochastic Euler-stepped models it returns the per-step
-        increment, where ``evaluate`` reads more naturally than
-        "derivative".
+        ODE models it returns ``dy/dt``; for discrete or stochastic
+        Euler-stepped models it returns the per-step increment.
 
-        Override **either** this method or :meth:`derivative` — they are
-        aliases and the framework calls whichever the subclass defines
-        (see :meth:`_resolve_step_function`). Return an array shaped like
-        ``y``, typically
+        Return an array shaped like ``y``, typically
         ``jnp.stack([derivs[c] for c in self.compartment_list])``.
         """
         raise NotImplementedError(
-            f"{type(self).__name__} must implement evaluate() or derivative()."
-        )
-
-    def derivative(self, y, t, p):
-        """Alias for :meth:`evaluate`. Override whichever name fits the model."""
-        raise NotImplementedError(
-            f"{type(self).__name__} must implement evaluate() or derivative()."
+            f"{type(self).__name__} must implement equation()."
         )
 
     def _resolve_step_function(self):
         """
-        Return the per-step callable the subclass actually implemented —
-        its :meth:`evaluate` or :meth:`derivative` override.
+        Return the per-step callable the subclass implemented —
+        its :meth:`equation` override.
 
-        Model authors may implement either name (they are aliases); this
-        picks whichever the subclass overrode so the solver can call it.
         Inherited overrides count: a variant subclassing a model that
-        defines ``derivative()`` resolves to that inherited method.
+        defines ``equation()`` resolves to that inherited method.
 
         Raises:
-            TypeError: if the subclass overrides **both** names, which is
-                ambiguous — implement only one.
-            NotImplementedError: if the subclass overrides **neither**.
+            NotImplementedError: if the subclass doesn't override it.
         """
         cls = type(self)
-        overrides_evaluate = cls.evaluate is not Model.evaluate
-        overrides_derivative = cls.derivative is not Model.derivative
-
-        if overrides_evaluate and overrides_derivative:
-            raise TypeError(
-                f"{cls.__name__} overrides both evaluate() and derivative(); "
-                "implement only one (they are aliases)."
+        if cls.equation is Model.equation:
+            raise NotImplementedError(
+                f"{cls.__name__} must implement equation()."
             )
-        if overrides_evaluate:
-            return self.evaluate
-        if overrides_derivative:
-            return self.derivative
-        raise NotImplementedError(
-            f"{cls.__name__} must implement evaluate() or derivative()."
-        )
+        return self.equation

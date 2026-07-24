@@ -263,10 +263,10 @@ class CovidJaxModel(Model):
         self._prepare_demographic_state()
         return self.population_matrix
 
-    def derivative(self, y, t, p):
+    def equation(self, y, t, p):
         """Compute derivatives with age-stratified force of infection.
 
-        Uses the escape-hatch pattern: ``_compute_derivatives()`` handles
+        Uses the escape-hatch pattern: ``_compute_equations()`` handles
         the 6 standard edges (E->I, I->H, I->D, H->D, I->R, H->R),
         while S->E uses an age-stratified contact matrix and is applied
         manually via ``_apply_flow()``.
@@ -297,7 +297,7 @@ class CovidJaxModel(Model):
                 rates[name] = value
 
         # --- Standard edges via framework (skip manual FOI edge) ---
-        derivs = self._compute_derivatives(states, rates, skip_edges={"beta"})
+        derivs = self._compute_equations(states, rates, skip_edges={"beta"})
 
         # --- Manual FOI: spatial travel mixing + demographic contact matrix ---
         BETA = ((rates["beta"] * travel_matrix) @ I_frac.T).T
