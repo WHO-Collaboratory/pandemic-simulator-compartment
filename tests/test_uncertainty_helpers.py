@@ -1,6 +1,6 @@
 """Fast unit tests for the variance-collection helpers in compartment.helpers.
 
-These exercise the run_mode promotion logic and multi-source uncertainty
+These exercise the run_mode promotion logic and multi-source parameter uncertainty
 collection without running a full simulation.
 
 Run:

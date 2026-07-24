@@ -2,7 +2,7 @@
 
 Covers:
   - SimulationManager solver dispatch → Euler for models with STOCHASTIC=True (unit)
-  - Stochastic runs produce uncertainty-format output (CI bands, not scalar) (integration)
+  - Stochastic runs produce parameter uncertainty-format output (CI bands, not scalar) (integration)
   - CI bands have non-zero spread — different seeds produce different trajectories (integration)
   - Stochastic mode always runs exactly 30 trajectories (integration, via mock)
   - Config run_mode=DETERMINISTIC does not suppress stochastic batch behaviour (integration)

@@ -115,7 +115,7 @@ class CovidSirStochasticModel(Model):
 
     def prepare_initial_state(self):
         self.travel_matrix = np.eye(self.population_matrix.shape[1])
-        return (self.population_matrix, list(self.compartment_list))
+        return self.population_matrix
 
     def derivative(self, y, t, p):
         """Tau-leaping stochastic step.

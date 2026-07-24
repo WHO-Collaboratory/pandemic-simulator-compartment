@@ -231,7 +231,7 @@ class Dengue2StrainModel(Model):
 
         # Map the configurable disease parameters (native units, as declared in
         # the schema) onto the rate constants used by the ODE.  Done here rather
-        # than in derivative() so uncertainty runs (which rebuild the model from
+        # than in derivative() so parameter uncertainty runs (which rebuild the model from
         # an overridden config) re-derive every constant from scratch.
         self.beta_0 = self.transmission_rate
         self.eta = self.seasonality_amplitude
@@ -294,7 +294,7 @@ class Dengue2StrainModel(Model):
         # Base __init__ already produced population_matrix as (compartments, regions)
         # (it transposes config["initial_population"]).  No demographic
         # stratification is used, so the state is passed through unchanged.
-        return self.population_matrix, self.compartment_list
+        return self.population_matrix
 
     def derivative(self, y, t, p):
         y = np.clip(y, 0.0, 1e9)  # clip to avoid infs/negatives feeding back in

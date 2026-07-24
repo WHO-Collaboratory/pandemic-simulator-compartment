@@ -764,7 +764,7 @@ def create_transmission_dict(transmission_edge_items):
 
 
 def build_uncertainty_params(transmission_edge_items: list, intervention_items: list):
-    """Build uncertainty parameters from normalized TransmissionEdges.items
+    """Build parameter uncertainty from normalized TransmissionEdges.items
     and Interventions.items.
 
     Args:
@@ -849,7 +849,7 @@ def extract_disease_variance_params(disease_section):
 
 
 def collect_uncertainty_params(cleaned_config, disease_param_field_configs=None):
-    """Gather every variance/uncertainty parameter for a validated config into
+    """Gather every parameter variance/uncertainty for a validated config into
     a single flat list suitable for generate_LHS_samples.
 
     Sources, all merged:

@@ -496,7 +496,7 @@ class DengueJaxModel(Model):
     def prepare_initial_state(self):
         # Transpose: rows=compartments, columns=regions
         self.population_matrix = self.population_matrix.T
-        return self.population_matrix, self.compartment_list
+        return self.population_matrix
 
     # ------------------------------------------------------------------
     # ODE derivative

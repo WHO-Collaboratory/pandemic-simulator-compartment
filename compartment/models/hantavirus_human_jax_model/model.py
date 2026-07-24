@@ -651,7 +651,7 @@ class HantavirusHumanJaxModel(Model):
         self.travel_matrix = jnp.array(
             self.gravity(self._admin_zones, self._sigma)
         )
-        return self.population_matrix, list(self.compartment_list)
+        return self.population_matrix
 
     # ------------------------------------------------------------------
     # ODE derivative

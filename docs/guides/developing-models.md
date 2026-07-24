@@ -22,7 +22,7 @@ You only need to write code for the parts that are genuinely model-specific: the
 | Output formatter | [compartment/simulation_postprocessor.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/simulation_postprocessor.py) | Aggregates age groups, applies `COMPARTMENT_DELTA_GROUPING`, emits `_total` deltas |
 | Generic driver / CLI plumbing | [compartment/driver.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/driver.py) | `drive_simulation(model_class, args)` — your `main.py` is just a thin wrapper |
 | Artifact generator CLI | [compartment/generate_artifact.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/generate_artifact.py) | `python -m compartment.generate_artifact <DISEASE_TYPE> [--example-config]` |
-| Results viewer (local tool) | [tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py) | Plots `parent_admin_total` with vs. without interventions, intervention start/stop lines, uncertainty bands, and a `compartment_deltas` metric table |
+| Results viewer (local tool) | [tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py) | Plots `parent_admin_total` with vs. without interventions, intervention start/stop lines, parameter uncertainty bands, and a `compartment_deltas` metric table |
 
 Existing models to copy from:
 
@@ -42,9 +42,9 @@ one shot:
 python -m compartment.new_model my_disease
 ```
 
-This creates `compartment/models/my_disease_jax_model/` containing:
+This creates `compartment/models/my_disease_model/` containing:
 - `__init__.py` — empty package marker
-- `model.py` — `MyDiseaseJaxModel` with a minimal SIR (`define_parameters` + `derivative`)
+- `model.py` — `MyDiseaseModel` with a minimal SIR (`define_parameters` + `derivative`)
 - `main.py` — standard CLI wrapper around `drive_simulation()`
 - `example-config.json` — minimal runnable config wired to the template's edges
 
@@ -52,29 +52,39 @@ This creates `compartment/models/my_disease_jax_model/` containing:
 
 | Input name | Directory | Class | Disease type |
 |---|---|---|---|
-| `my_disease` | `my_disease_jax_model/` | `MyDiseaseJaxModel` | `MY_DISEASE` |
-| `my_disease_jax_model` | same (suffix stripped) | same | same |
+| `my_disease` | `my_disease_model/` | `MyDiseaseModel` | `MY_DISEASE` |
+| `my_disease_model` | same (suffix stripped) | same | same |
+
+A trailing `_model`, `_jax`, or legacy `_jax_model` on the input name is stripped
+before the directory and class names are built, so passing any of those forms
+resolves to the same result. Models scaffolded before this convention keep their
+original `_jax_model` directory and `JaxModel` class names — only newly generated
+models use the `_model` / `Model` suffix.
 
 ### Optional flags
 
 ```bash
-# Custom display label and disease-type identifier
+# Custom display label, disease-type identifier, and model description
 python -m compartment.new_model my_disease \
     --label "My Disease" \
-    --disease-type MY_DISEASE
+    --disease-type MY_DISEASE \
+    --description "An SIR model for my disease"
 
 # Preview what would be created without writing anything
 python -m compartment.new_model my_disease --dry-run
 ```
+
+`--description` sets the text passed to `set_model_info(description=...)` (shown in
+the UI); it defaults to `"A simple SIR model for <label>"` when omitted.
 
 ### After scaffolding
 
 The generated model runs immediately as a sanity check:
 
 ```bash
-python -m compartment.models.my_disease_jax_model.main \
+python -m compartment.models.my_disease_model.main \
     --mode local \
-    --config_file compartment/models/my_disease_jax_model/example-config.json \
+    --config_file compartment/models/my_disease_model/example-config.json \
     --output_file results/my_disease-test.json
 ```
 
@@ -84,7 +94,7 @@ From there, open `model.py` and:
    ```bash
    python -m compartment.generate_artifact MY_DISEASE \
        --example-config \
-       --config-output compartment/models/my_disease_jax_model/example-config.json
+       --config-output compartment/models/my_disease_model/example-config.json
    ```
 3. Flesh out `derivative()` with the actual ODE logic.
 
@@ -111,7 +121,7 @@ The auto-discovery registry scans every directory under `compartment/models/`, i
 A migrated model has two responsibilities:
 
 1. **`define_parameters(cls, schema)`** — declare the model.
-2. **`derivative(self, y, t, p)`** — implement the ODE right-hand side.
+2. **`evaluate(self, y, t, p)`** — implement the ODE right-hand side. (This method may also be named **`derivative()`** — the two are aliases; implement whichever reads better for your model. See [below](#evaluateself-y-t-p--derivativeself-y-t-p).)
 
 The base class handles `disease_type`, `COMPARTMENT_LIST`, `COMPARTMENTS` (attribute-style compartment registry), `get_params()`, transmission rate attributes, intervention runtime objects, contact matrices, and demographic rate vectors.
 
@@ -150,7 +160,7 @@ class MyModel(Model):
         #    Rule of thumb: declare an edge for every compartment-to-compartment
         #    movement whose flow has the form `rate * source` (mass action) or
         #    `source * rate * sum(infective) / N` (frequency-dependent). The
-        #    framework then handles intervention scaling, uncertainty sampling,
+        #    framework then handles intervention scaling, parameter uncertainty sampling,
         #    and _total accumulation for free. Flows that do NOT fit that shape
         #    (multi-rate FOI, demographic births, density-dependent deaths) are
         #    handled manually — see "Flows without an edge" below.
@@ -233,20 +243,22 @@ Then set whatever else your model needs (travel matrix, demographics, temperatur
 
 If your model genuinely cannot use `super().__init__()` (e.g. dengue's hand-rolled disease parameters), you can still extract the same fields manually — but keep `self.compartment_list = list(self.COMPARTMENTS)` so downstream code finds the canonical order.
 
-### `prepare_initial_state()` → `(state, compartment_list)`
+### `prepare_initial_state()` → `state`
 
 Return the state array used by the ODE solver. Supported shapes:
 
 - `(K, R)` — compartments × regions (default)
 - `(K, A, R)` — compartments × demographic groups × regions (call `self._prepare_demographic_state()` to expand from `(K, R)` and append zero rows for `_total` compartments)
 
-`compartment_list` must list compartment IDs in the **same order** as the first axis of `state`, including any `_total` rows.
+The first axis of `state` must line up with `self.compartment_list` (set in `__init__` from `self.COMPARTMENTS`, or extended by `_prepare_demographic_state()`), including any `_total` rows. Downstream code reads `self.compartment_list` directly, so `prepare_initial_state()` only needs to return the array.
 
 Set `self.travel_matrix` here (or in `__init__`) — built-in helpers like `_apply_interventions()` expect it to exist.
 
-### `derivative(self, y, t, p)`
+### `evaluate(self, y, t, p)` / `derivative(self, y, t, p)`
 
-Implement the ODE right-hand side using `jax.numpy`. The shape of `y` matches what `prepare_initial_state()` returned. Return a `jnp.stack([...])` whose first axis matches `self.compartment_list` exactly (including `_total` columns).
+Implement the per-step function using `jax.numpy`. The shape of `y` matches what `prepare_initial_state()` returned. Return a `jnp.stack([...])` whose first axis matches `self.compartment_list` exactly (including `_total` columns).
+
+**You may name this method either `evaluate()` or `derivative()`** — they are aliases, and the framework calls whichever your subclass defines. Implement only one (defining both raises `TypeError`). For continuous ODE models the return value is a true derivative `dy/dt`, so `derivative()` fits; for [stochastic / Euler models](#stochastic--euler-integrated-models) it's a per-step increment rather than a rate, so `evaluate()` reads more honestly. All examples below use `derivative()`, but `evaluate()` is interchangeable.
 
 The framework provides three helpers that handle the boilerplate. Use them where you can; reach for manual flow math only when you need spatially-coupled or age-stratified force-of-infection terms.
 
@@ -397,7 +409,7 @@ class MyModel(Model):
     STOCHASTIC = True       # or: SOLVER = "euler"
 ```
 
-This switches the integrator to a fixed-step Euler loop where `derivative()` returns the **delta per timestep**, not the instantaneous rate. See [test_covid_sir_stochastic/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/test_covid_sir_stochastic/model.py) for a tau-leaping example.
+This switches the integrator to a fixed-step Euler loop where your step function returns the **delta per timestep**, not the instantaneous rate. Because the return value isn't a true derivative here, naming the method `evaluate()` rather than `derivative()` reads more honestly (both work — see [above](#evaluateself-y-t-p--derivativeself-y-t-p)). See [test_covid_sir_stochastic/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/test_covid_sir_stochastic/model.py) for a tau-leaping example.
 
 ### Variants (multiple disease types from one model class)
 
@@ -516,7 +528,7 @@ To eyeball a run, use the local results viewer:
 python tools/view_results.py results/test_run.json
 ```
 
-It plots the whole-population (`parent_admin_total`) compartment time series for the **with-interventions** and **control** runs side by side, drops a vertical line at each intervention's start/stop date, shades the uncertainty bands for `UNCERTAINTY` output, and lists each run's `compartment_deltas` (cumulative per-compartment totals) as a metric table using the frontend's compartment names. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md) for flags (compartment subset, log scale, `--no-deltas`, saving to an image).
+It plots the whole-population (`parent_admin_total`) compartment time series for the **with-interventions** and **control** runs side by side, drops a vertical line at each intervention's start/stop date, shades the parameter uncertainty bands for `UNCERTAINTY` output, and lists each run's `compartment_deltas` (cumulative per-compartment totals) as a metric table using the frontend's compartment names. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md) for flags (compartment subset, log scale, `--no-deltas`, saving to an image).
 
 ## Tests
 

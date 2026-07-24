@@ -15,7 +15,7 @@ class BatchSimulationManager:
         # Rebuild the model from an overridden config rather than mutating a
         # constructed instance. Re-running __init__ re-derives every value
         # declared via add_transmission_edge / add_disease_parameter /
-        # add_intervention, so uncertainty sampling covers params that the
+        # add_intervention, so parameter uncertainty sampling covers params that the
         # model bakes into derived constants (e.g. 1/latent_period) or into
         # frozen Intervention objects.
         import copy

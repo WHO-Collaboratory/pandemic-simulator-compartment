@@ -678,10 +678,7 @@ class KlebsiellaAmrModel(Model):
         # No spatial travel matrix — hospital/community coupling is
         # modelled internally via admission/discharge flows.
         self.travel_matrix = np.eye(self.population_matrix.shape[1])
-        return (
-            self.population_matrix,
-            list(self.compartment_list),
-        )
+        return self.population_matrix
 
     # ------------------------------------------------------------------
     # Intervention helpers

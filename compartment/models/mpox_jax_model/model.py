@@ -274,10 +274,7 @@ class MpoxJaxModel(Model):
             self.mobility(self._admin_zones, self._sigma)
         )
 
-        return (
-            self.population_matrix,
-            list(self.compartment_list),
-        )
+        return self.population_matrix
 
     def derivative(self, y, t, p):
         C = self.COMPARTMENTS

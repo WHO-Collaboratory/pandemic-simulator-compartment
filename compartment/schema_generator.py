@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class VarianceParams(BaseModel):
-    """Variance configuration for uncertainty analysis."""
+    """Variance configuration for parameter uncertainty analysis."""
 
     has_variance: bool
     distribution_type: Literal["UNIFORM", "NORMAL"] = "UNIFORM"
@@ -46,7 +46,7 @@ class GeneratedTransmissionEdgeData(BaseModel):
     Transmission edge data model (auto-generated compatible).
 
     Contains the transmission_rate plus optional variance_params
-    for uncertainty analysis.
+    for parameter uncertainty analysis.
     """
 
     transmission_rate: float = Field(gt=0)

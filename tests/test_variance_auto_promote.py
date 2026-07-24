@@ -77,7 +77,7 @@ class TestVarianceAutoPromote:
         with_run = next(r for r in results if not r["control_run"])
         ts = with_run["parent_admin_total"]["time_series"]
         assert _has_uncertainty_format(ts), (
-            "Expected uncertainty (CI) format when variance_params present but "
+            "Expected parameter uncertainty (CI) format when variance_params present but "
             "run_mode not set. Got scalar values — auto-promotion may be broken."
         )
 
@@ -96,7 +96,7 @@ class TestVarianceAutoPromote:
         with_run = next(r for r in results if not r["control_run"])
         ts = with_run["parent_admin_total"]["time_series"]
         assert _has_uncertainty_format(ts), (
-            "Expected UNCERTAINTY output even with explicit run_mode=DETERMINISTIC "
+            "Expected parameter uncertainty output even with explicit run_mode=DETERMINISTIC "
             "when variance_params are present."
         )
 
@@ -118,7 +118,7 @@ class TestVarianceAutoPromote:
     # NOTE: assertions that variance actually moves the output (CI spread)
     # live in test_uncertainty_rebuild.py, since real spread depends on the
     # rebuild-from-config mechanism. This file only covers run_mode promotion
-    # and the uncertainty output *format*.
+    # and the parameter uncertainty output *format*.
 
     @pytest.mark.integration
     def test_variance_params_default_dist_is_uniform(self):

@@ -432,7 +432,7 @@ def derivative(self, y, t, p):
 
 ## Uncertainty Quantification with Interventions
 
-Intervention parameters can vary during uncertainty analysis:
+Intervention parameters can vary during parameter uncertainty analysis:
 
 ### In Config JSON
 
@@ -474,8 +474,8 @@ Intervention parameters can vary during uncertainty analysis:
 
 **Why vary interventions?**
 
-- **Adherence uncertainty:** How many people will actually follow guidelines?
-- **Efficacy uncertainty:** How effective is mask-wearing really?
+- **Adherence parameter uncertainty:** How many people will actually follow guidelines?
+- **Efficacy parameter uncertainty:** How effective is mask-wearing really?
 - **Policy scenario analysis:** What's the range of possible outcomes?
 
 ## Intervention Status Tracking
@@ -588,7 +588,7 @@ With `end_threshold`, it stays active until infections drop to 1%, preventing os
 - **Use date interventions** for planned campaigns (vaccination rollout with fixed dates)
 - **Set end_threshold < start_threshold** to prevent oscillation
 - **Test without interventions first** to establish a baseline
-- **Use uncertainty quantification** for adherence and efficacy when confidence is low
+- **Use parameter uncertainty quantification** for adherence and efficacy when confidence is low
 - **Verify intervention activation** by checking logs or status tracking
 - **Document intervention assumptions** in your model schema descriptions
 

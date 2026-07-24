@@ -3,9 +3,10 @@ CLI tool for scaffolding a new disease model directory.
 
 Usage:
     python -m compartment.new_model my_disease
-    python -m compartment.new_model my_disease --label "My Disease" --disease-type MY_DISEASE
+    python -m compartment.new_model my_disease --label "My Disease" \\
+        --disease-type MY_DISEASE --description "An SIR model for my disease"
 
-Creates compartment/models/my_disease_jax_model/ with:
+Creates compartment/models/my_disease_model/ with:
     __init__.py, model.py, main.py, example-config.json
 
 The generated model is a minimal SIR with frequency-dependent transmission.
@@ -31,10 +32,16 @@ MODELS_DIR = Path(__file__).parent / "models"
 
 
 def _normalize_base_name(raw: str) -> str:
-    """Return the base snake_case name (strips a trailing _jax_model suffix)."""
+    """Return the base snake_case name (strips a trailing _model/_jax_model suffix).
+
+    Both the current ``_model`` suffix and the legacy ``_jax_model`` suffix are
+    stripped so a name copied from either convention resolves to the same base.
+    """
     name = raw.strip().lower()
-    if name.endswith("_jax_model"):
-        name = name[: -len("_jax_model")]
+    for suffix in ("_jax_model", "_jax", "_model"):
+        if name.endswith(suffix):
+            name = name[: -len(suffix)]
+            break
     return name
 
 
@@ -57,10 +64,11 @@ def _to_pascal_case(snake: str) -> str:
 # File templates
 #
 # Placeholders (replaced by scaffold()):
-#   CLASS_NAME    – e.g. MyDiseaseJaxModel
+#   CLASS_NAME    – e.g. MyDiseaseModel
 #   DISEASE_TYPE  – e.g. MY_DISEASE
 #   LABEL         – e.g. My Disease
-#   DIR_NAME      – e.g. my_disease_jax_model
+#   DESCRIPTION   – e.g. A simple SIR model for My Disease
+#   DIR_NAME      – e.g. my_disease_model
 # ---------------------------------------------------------------------------
 
 _MODEL_PY = '''\
@@ -80,7 +88,7 @@ class CLASS_NAME(Model):
         schema.set_model_info(
             disease_type="DISEASE_TYPE",
             label="LABEL",
-            description="A simple SIR model for LABEL",
+            description="DESCRIPTION",
         )
 
         # --- Compartments ---
@@ -148,7 +156,7 @@ class CLASS_NAME(Model):
         # No inter-region travel: identity matrix keeps each region self-contained.
         # Replace with a gravity-model travel matrix if you add travel support.
         self.travel_matrix = np.eye(R)
-        return self.population_matrix, list(self.compartment_list)
+        return self.population_matrix
 
     def derivative(self, y, t, p):
         C = self.COMPARTMENTS
@@ -285,13 +293,23 @@ _EXAMPLE_CONFIG = {
 # ---------------------------------------------------------------------------
 
 
-def _fill_template(template: str, class_name: str, disease_type: str, label: str, dir_name: str) -> str:
+def _fill_template(
+    template: str,
+    class_name: str,
+    disease_type: str,
+    label: str,
+    dir_name: str,
+    description: str,
+) -> str:
+    # DESCRIPTION is substituted last so that user-supplied prose is never
+    # re-scanned for the other placeholders.
     return (
         template
         .replace("CLASS_NAME", class_name)
         .replace("DISEASE_TYPE", disease_type)
         .replace("LABEL", label)
         .replace("DIR_NAME", dir_name)
+        .replace("DESCRIPTION", description)
     )
 
 
@@ -300,16 +318,19 @@ def scaffold(
     *,
     label: str | None = None,
     disease_type: str | None = None,
+    description: str | None = None,
     dry_run: bool = False,
 ) -> Path:
     """
     Create a new model directory under compartment/models/.
 
     Args:
-        base_name:    Snake-case model name without the _jax_model suffix
+        base_name:    Snake-case model name without the _model suffix
                       (e.g. ``"my_disease"``).  The suffix is appended automatically.
         label:        Human-readable display name (default: title-cased base_name).
         disease_type: ALL_CAPS identifier (default: uppercased base_name).
+        description:  Model description shown in set_model_info() / the UI
+                      (default: "A simple SIR model for <label>").
         dry_run:      Print what would be created without writing any files.
 
     Returns:
@@ -317,10 +338,13 @@ def scaffold(
     """
     _validate_name(base_name)
 
-    dir_name = f"{base_name}_jax_model"
-    class_name = f"{_to_pascal_case(base_name)}JaxModel"
+    dir_name = f"{base_name}_model"
+    class_name = f"{_to_pascal_case(base_name)}Model"
     disease_type = disease_type or base_name.upper()
     label = label or base_name.replace("_", " ").title()
+    description = description or f"A simple SIR model for {label}"
+    # Guard against quotes/backslashes breaking the generated string literal.
+    safe_description = description.replace("\\", "\\\\").replace('"', '\\"')
 
     dest = MODELS_DIR / dir_name
 
@@ -330,8 +354,8 @@ def scaffold(
 
     files = {
         "__init__.py": "",
-        "model.py": _fill_template(_MODEL_PY, class_name, disease_type, label, dir_name),
-        "main.py": _fill_template(_MAIN_PY, class_name, disease_type, label, dir_name),
+        "model.py": _fill_template(_MODEL_PY, class_name, disease_type, label, dir_name, safe_description),
+        "main.py": _fill_template(_MAIN_PY, class_name, disease_type, label, dir_name, safe_description),
         "example-config.json": json.dumps(
             _patch_config(disease_type), indent=4
         ) + "\n",
@@ -370,7 +394,8 @@ def main() -> None:
         "name",
         help=(
             "Snake-case model name, e.g. 'my_disease'. "
-            "The _jax_model suffix is appended automatically to the directory name."
+            "The _model suffix is appended automatically to the directory name "
+            "(e.g. 'my_disease' -> compartment/models/my_disease_model/)."
         ),
     )
     parser.add_argument(
@@ -385,6 +410,14 @@ def main() -> None:
         help="ALL_CAPS disease type identifier used in configs (default: uppercased name).",
     )
     parser.add_argument(
+        "--description",
+        default=None,
+        help=(
+            "Model description shown in set_model_info() and the UI "
+            "(default: 'A simple SIR model for <label>')."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print what would be created without writing any files.",
@@ -396,6 +429,7 @@ def main() -> None:
         base_name,
         label=args.label,
         disease_type=args.disease_type,
+        description=args.description,
         dry_run=args.dry_run,
     )
 
@@ -403,7 +437,7 @@ def main() -> None:
         return
 
     dir_name = dest.name
-    class_name = f"{_to_pascal_case(base_name)}JaxModel"
+    class_name = f"{_to_pascal_case(base_name)}Model"
     disease_type = (args.disease_type or base_name.upper())
 
     print(f"Created: {dest}/")
