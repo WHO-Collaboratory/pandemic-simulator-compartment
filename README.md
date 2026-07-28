@@ -96,8 +96,7 @@ All configuration files must include the following shared fields:
 - **`id`** (string, optional): Simulation identifier, random string used by the web application.
 - **`simulation_name`** (string, default: `""`): Friendly name for the simulation, used by the web application for display.
 - **`owner`** (string, optional): Owner identifier, used by the web application.
-- **`travel_volume`** (object, optional): Travel/mobility parameters:
-  - `leaving` (float, default: 0.2): Percentage of population leaving their admin zone, causing mixing across admin zones (0-1, or 0-100 which will be normalized)
+- **`Disease.travel_sigma`** (float, optional): Percentage of each admin zone's population away from home on a given day, causing mixing across admin zones (0-100; `0` disables travel). Mobility is model-owned, so this lives inside the `Disease` block alongside the model's other parameters, and only models that declare it accept it — see [docs/guides/gravity-model.md](docs/guides/gravity-model.md). Some models declare extra mobility parameters next to it (mpox: `travel_scale_km`; hantavirus_human: `travel_alpha`).
 - **`case_file.demographics`** (object, optional): Age structure, used for a social mixing function:
   - `age_0_17` (float, default: 25.0): Percentage aged 0-17 (0-100)
   - `age_18_55` (float, default: 50.0): Percentage aged 18-55 (0-100)

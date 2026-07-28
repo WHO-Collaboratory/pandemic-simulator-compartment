@@ -45,6 +45,8 @@ class Model(ABC):
     Subclasses **should** override:
     - ``prepare_initial_state()``
     - ``equation()``
+    - ``build_travel_matrix(admin_zones)`` — only if the model has
+      inter-zone mobility.  The default is the identity matrix.
 
     Non-migrated models can still override ``disease_type``, define
     ``COMPARTMENT_LIST`` manually, and implement ``get_params()``.
@@ -1079,8 +1081,8 @@ class Model(ABC):
 
         Requires ``self.start_date_ordinal``, ``self.intervention_statuses``,
         and ``self.travel_matrix`` to be set (the first two are set by
-        ``super().__init__()``; travel_matrix is set by the subclass or
-        ``prepare_initial_state()``).
+        ``super().__init__()``; travel_matrix is set by the framework via
+        ``_ensure_travel_matrix()`` before ``prepare_initial_state()``).
 
         Args:
             t: Current time step (passed to equation by the solver).
@@ -1226,6 +1228,69 @@ class Model(ABC):
                     self.compartment_list = self.compartment_list + [total_id]
                     active_set.add(total_id)
                     seen.add(tid)
+
+    # ------------------------------------------------------------------
+    # Spatial mobility
+    # ------------------------------------------------------------------
+
+    def build_travel_matrix(self, admin_zones):
+        """
+        Return this model's ``(R, R)`` inter-zone travel matrix.
+
+        ``T[i, j]`` is the fraction of zone *i*'s population present in
+        zone *j* on a given day.  Rows must sum to 1, and the diagonal is
+        the stay-home fraction (``1 - sigma`` for a model with an outbound
+        travel rate ``sigma``).
+
+        The default is the identity matrix — no inter-zone travel.
+        Override this to define the model's mobility, reading whatever
+        parameters ``define_parameters()`` declared.  Declare them with
+        ``schema.add_disease_parameter()`` (by convention ``travel_sigma``,
+        plus any kernel-specific extras such as ``travel_alpha`` or
+        ``travel_scale_km``) so they surface as custom fields in the UI.
+
+        ``PERCENTAGE`` parameters arrive in native units (``20.0``, not
+        ``0.2``) because only transmission edges are auto-converted.
+        Convert with ``self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)``.
+
+        Args:
+            admin_zones: The case file's admin-zone dicts, in
+                population-matrix column order.  Each carries
+                ``center_lat``, ``center_lon`` and ``population``.
+        """
+        return np.eye(len(admin_zones))
+
+    def _ensure_travel_matrix(self) -> None:
+        """
+        Internal: populate ``self.travel_matrix`` from
+        :meth:`build_travel_matrix`.
+
+        The framework calls this immediately before
+        ``prepare_initial_state()``, so every model has a travel matrix by
+        the time ``_apply_interventions()`` reads it — including models
+        that declare no mobility at all.  Idempotent.
+        """
+        xp = self._array_module()
+
+        # The runtime config is a ProcessedSimulation (or a plain dict in tests);
+        # both expose .get(), so duck-type rather than isinstance-check — a
+        # ProcessedSimulation is not a dict and would silently fall through.
+        config = getattr(self, "config", None)
+        if not hasattr(config, "get"):
+            # Models that don't call super().__init__() stash it on self.payload.
+            config = getattr(self, "payload", None)
+        case_file = config.get("case_file") if hasattr(config, "get") else None
+        admin_zones = (case_file or {}).get("admin_zones") or []
+
+        if not admin_zones:
+            # No case file — fall back to the admin-unit count. Don't infer it
+            # from population_matrix: models disagree on its orientation
+            # ((K, R) for most, (R, K) for dengue).
+            n_regions = len(getattr(self, "admin_units", None) or []) or 1
+            self.travel_matrix = xp.eye(n_regions)
+            return
+
+        self.travel_matrix = xp.asarray(self.build_travel_matrix(admin_zones))
 
     def prepare_initial_state(self):
         pass

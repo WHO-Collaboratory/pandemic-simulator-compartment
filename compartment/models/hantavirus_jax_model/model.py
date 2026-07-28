@@ -565,9 +565,10 @@ class HantavirusJaxModel(Model):
         super().__init__(config)
 
         # No region-to-region travel — each admin zone is an independent
-        # territory containing all three sectors internally.
-        n_regions = self.population_matrix.shape[1]
-        self.travel_matrix = jnp.eye(n_regions)
+        # territory containing all three sectors internally, so this model
+        # declares no travel parameters and inherits the base class's identity
+        # build_travel_matrix(). Movement between the u/a/f sectors *within* a
+        # zone is modelled explicitly as ODE flows in equation().
 
         # Schema edges set self.delta_aa/ff/af and self.gamma_aa/ff/af
         # via _load_transmission_params; provide fallbacks for None so

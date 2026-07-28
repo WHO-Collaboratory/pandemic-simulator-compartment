@@ -15,7 +15,7 @@ from .diseases import KlebsiellaAmrDiseaseConfig
 from .diseases import CovidSirStochasticDiseaseConfig
 
 # Shared models still used
-from .base_simulation import BaseSimulationShared, TravelVolume
+from .base_simulation import BaseSimulationShared
 from .field_configs import FieldConfig, FieldConfigItems
 from .interventions import (
     NormalizedIntervention,
@@ -48,7 +48,6 @@ __all__ = [
     "CovidSirStochasticDiseaseConfig",
     # Shared models
     "BaseSimulationShared",
-    "TravelVolume",
     # Normalized models
     "FieldConfig",
     "FieldConfigItems",

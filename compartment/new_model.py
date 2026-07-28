@@ -130,7 +130,19 @@ class CLASS_NAME(Model):
         )
 
         # --- Optional: spatial travel support ---
-        # schema.set_travel_volume(leaving_default=0.2)
+        # Declare your mobility parameters as custom fields, then define how
+        # they build the matrix in build_travel_matrix() below. Without this,
+        # the base class supplies an identity matrix (no inter-zone travel).
+        # schema.add_disease_parameter(
+        #     name="travel_sigma",
+        #     label="Travel Rate (σ)",
+        #     description="Percentage of each zone's population away from home per day.",
+        #     value_type=ValueType.PERCENTAGE,
+        #     default=20.0,
+        #     min_value=0.0,
+        #     max_value=100.0,
+        #     unit="%",
+        # )
 
         # --- Optional: interventions ---
         # schema.add_intervention(
@@ -149,13 +161,19 @@ class CLASS_NAME(Model):
 
     def __init__(self, config):
         super().__init__(config)
-        # Add any model-specific initialisation here (e.g. travel matrix, temperature).
+        # Add any model-specific initialisation here (e.g. temperature).
+
+    # --- Optional: spatial travel support ---
+    # The framework calls this before prepare_initial_state() and stores the
+    # result on self.travel_matrix. The default returns the identity matrix,
+    # so only override it if your model has inter-zone mobility.
+    #
+    # def build_travel_matrix(self, admin_zones):
+    #     # PERCENTAGE params arrive as 20.0, not 0.2 — convert first.
+    #     sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
+    #     return get_gravity_model_travel_matrix(admin_zones, sigma)
 
     def prepare_initial_state(self):
-        R = self.population_matrix.shape[1]
-        # No inter-region travel: identity matrix keeps each region self-contained.
-        # Replace with a gravity-model travel matrix if you add travel support.
-        self.travel_matrix = np.eye(R)
         return self.population_matrix
 
     def equation(self, y, t, p):

@@ -50,6 +50,7 @@ def batch_simulate_and_postprocess(model, n_sims, param_list, ci, num_workers):
     batcher = BatchSimulationManager(max_workers=num_workers)
     all_output = batcher.run_batch(model, n_sims, param_list)
     # Using the first model as a template for metadata
+    model._ensure_travel_matrix()
     model.prepare_initial_state()
     processor = SimulationPostProcessor(model, all_output)
     return processor.process(ci=ci)

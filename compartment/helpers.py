@@ -1091,8 +1091,23 @@ def gravity_model(df, mass_origin_col, mass_dest_col, distance_col, k=1):
     return df
 
 
-def create_travel_matrix(input_df, sigma):
-    """Data transformations including measuring distance, applying gravity model and pivoting the df"""
+def create_travel_matrix(input_df, sigma, zone_order=None):
+    """
+    Measure distances, apply the gravity model, and pivot into a travel matrix.
+
+    ``T[i, j]`` is the fraction of zone *i*'s population present in zone *j*.
+    Each row sums to 1: ``sigma`` is distributed across the off-diagonal by
+    gravity weight, and the diagonal holds the stay-home remainder.
+
+    Args:
+        input_df: Cross-joined origin/destination frame from
+            :func:`get_admin_zone_df`.
+        sigma: Fraction of each zone's population away from home per day.
+        zone_order: Zone ids in population-matrix column order. Required for
+            correctness whenever ids aren't already sorted — ``pivot_table``
+            sorts its labels, which would otherwise permute the matrix
+            relative to the population matrix.
+    """
     # Calculating distances between cities
     input_df["distance_km"] = input_df.apply(
         lambda x: geopy.distance.geodesic(x.lat_long_origin, x.lat_long_destination).km,
@@ -1101,11 +1116,16 @@ def create_travel_matrix(input_df, sigma):
     input_df = gravity_model(
         input_df, "population_origin", "population_destination", "distance_km"
     )
-    input_df["gravity"] = input_df["gravity"].replace(np.inf, 0)
-    # Calculate a rate, e.g., flow per origin
-    input_df["gravity_rate"] = input_df["gravity"] / input_df.groupby("id_origin")[
-        "gravity"
-    ].transform("sum")
+    # Self-pairs have distance 0, so gravity is infinite; so is any pair of
+    # zones sharing a centroid. Drop them — the diagonal is set explicitly below.
+    input_df["gravity"] = input_df["gravity"].replace([np.inf, -np.inf], 0)
+
+    # Share of each origin's outbound trips going to each destination.
+    row_totals = input_df.groupby("id_origin")["gravity"].transform("sum")
+    input_df["gravity_rate"] = np.where(
+        row_totals > 0, input_df["gravity"] / row_totals.replace(0, 1), 0.0
+    )
+
     pivot_df = pd.pivot_table(
         input_df,
         index="id_origin",
@@ -1113,37 +1133,60 @@ def create_travel_matrix(input_df, sigma):
         values="gravity_rate",
         aggfunc="sum",
     )
-    travel_matrix = pivot_df
-    travel_matrix = travel_matrix.fillna(0) + np.diag(1 - travel_matrix.sum(axis=1))
+    if zone_order is not None:
+        pivot_df = pivot_df.reindex(index=zone_order, columns=zone_order)
 
-    travel_matrix = travel_matrix * sigma
-    np.fill_diagonal(travel_matrix.values, 1 - sigma)
-    return travel_matrix.to_numpy()
+    travel_matrix = pivot_df.fillna(0).to_numpy(dtype=float)
+    np.fill_diagonal(travel_matrix, 0.0)
+
+    # Scale each row's off-diagonal mass to sigma. A row with no reachable
+    # destination (every pair collapsed to zero gravity) keeps its whole
+    # population at home rather than losing sigma of it.
+    off_diagonal_totals = travel_matrix.sum(axis=1, keepdims=True)
+    travel_matrix = np.divide(
+        travel_matrix * sigma,
+        off_diagonal_totals,
+        out=np.zeros_like(travel_matrix),
+        where=off_diagonal_totals > 0,
+    )
+    np.fill_diagonal(travel_matrix, 1.0 - travel_matrix.sum(axis=1))
+    return travel_matrix
 
 
-def get_gravity_model_travel_matrix(case_file, travel_rates):
+def get_gravity_model_travel_matrix(admin_zones, sigma):
     """
-    Create a travel matrix using the gravity model.
-    Returns identity matrix if travel_rates is None or if only one region.
-    """
-    if travel_rates is None:
-        # No travel - return identity matrix
-        n_regions = len(case_file)
-        return np.eye(n_regions)
+    Create a travel matrix using the inverse-square gravity model.
 
-    if len(case_file) == 1:
+    Call this from a model's ``build_travel_matrix()`` with the model's own
+    outbound travel rate. ``sigma`` is a **fraction** (0-1), not a percentage —
+    convert PERCENTAGE-typed parameters first (see ``Model._to_rate``).
+
+    Returns the identity matrix when ``sigma`` is 0 or None, and ``[[1.0]]``
+    for a single zone.
+
+    Args:
+        admin_zones: Admin-zone dicts with ``id``, ``center_lat``,
+            ``center_lon`` and ``population``.
+        sigma: Fraction of each zone's population away from home per day.
+    """
+    n_regions = len(admin_zones)
+
+    if n_regions == 1:
         # Single region - no travel needed
         return np.array([[1.0]])
 
-    df = get_admin_zone_df(case_file)
-    sigma = travel_rates.get("leaving", 0.0)
-
-    if sigma == 0.0:
+    if not sigma:
         # No travel rate specified - return identity
-        n_regions = len(case_file)
         return np.eye(n_regions)
 
-    return create_travel_matrix(df, sigma)
+    # Key zones positionally rather than by their own ids, so the matrix
+    # rows/columns always line up with the population matrix columns
+    # (real zone ids are UUIDs, and pivot_table sorts its labels).
+    zone_order = list(range(n_regions))
+    df = get_admin_zone_df(
+        [{**zone, "id": i} for i, zone in enumerate(admin_zones)]
+    )
+    return create_travel_matrix(df, sigma, zone_order=zone_order)
 
 
 # --------------------------------------------------

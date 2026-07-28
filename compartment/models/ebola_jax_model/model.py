@@ -29,7 +29,7 @@ import jax
 import jax.numpy as jnp
 import numpy as onp
 
-from compartment.helpers import setup_logging
+from compartment.helpers import get_gravity_model_travel_matrix, setup_logging
 from compartment.model import Model
 from compartment.parameters import ValueType
 
@@ -227,12 +227,23 @@ class EbolaJaxModel(Model):
             transmission_reduction=40.0,
         )
 
-        schema.set_travel_volume(
-            leaving_default=0.05,
-            leaving_description=(
-                "Fraction of each zone's population traveling to other zones per day. "
-                "Drives the gravity-model travel matrix used in spatial FOI mixing."
+        # ---- Mobility ----
+        # NOTE: deliberately named travel_sigma, not sigma — sigma is already
+        # this model's E1->I1 incubation edge (see add_transmission_edge above).
+        schema.add_disease_parameter(
+            name="travel_sigma",
+            label="Travel Rate (σ)",
+            description=(
+                "Percentage of each zone's population away from home on a given day. "
+                "Trips are distributed across destinations by an inverse-square "
+                "gravity model weighted by population and distance, driving the "
+                "spatial FOI mixing. 0 disables inter-zone travel."
             ),
+            value_type=ValueType.PERCENTAGE,
+            default=5.0,
+            min_value=0.0,
+            max_value=100.0,
+            unit="%",
         )
 
         schema.add_disease_parameter(
@@ -279,15 +290,6 @@ class EbolaJaxModel(Model):
     def __init__(self, config):
         super().__init__(config)
 
-        # Use the gravity-model travel matrix built by the post-processor.
-        # Falls back to identity (no spatial coupling) if travel_volume is absent.
-        raw_tm = config.get("travel_matrix")
-        if raw_tm is not None:
-            self.travel_matrix = jnp.array(onp.array(raw_tm))
-        else:
-            n_regions = self.population_matrix.shape[1]
-            self.travel_matrix = jnp.eye(n_regions)
-
         if self.beta is None:
             self.beta = 0.125
         sigma_per_day = self.sigma if self.sigma is not None else 1.0 / 5.0
@@ -314,6 +316,14 @@ class EbolaJaxModel(Model):
     # ------------------------------------------------------------------
     # Simulation setup
     # ------------------------------------------------------------------
+
+    def build_travel_matrix(self, admin_zones):
+        """
+        Inverse-square gravity mobility driven by the ``travel_sigma``
+        custom field, used for spatial FOI mixing in ``equation()``.
+        """
+        sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
+        return get_gravity_model_travel_matrix(admin_zones, sigma)
 
     def prepare_initial_state(self):
         return self.population_matrix

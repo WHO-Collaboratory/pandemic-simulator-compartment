@@ -3,16 +3,14 @@
     "start_date": "2025-11-21",
     "end_date": "2026-11-21",
     "run_mode": "UNCERTAINTY",
-    "travel_volume": {
-        "leaving": 10.0
-    },
     "AdminUnit": {
         "id": "MDG",
         "center_lat": -19.37564815173127
     },
     "Disease": {
         "disease_type": "VECTOR_BORNE",
-        "immunity_period": 240
+        "immunity_period": 240,
+        "travel_sigma": 10.0
     },
     "interventions": [
         {

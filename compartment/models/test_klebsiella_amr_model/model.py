@@ -675,9 +675,9 @@ class KlebsiellaAmrModel(Model):
     # ------------------------------------------------------------------
 
     def prepare_initial_state(self):
-        # No spatial travel matrix — hospital/community coupling is
-        # modelled internally via admission/discharge flows.
-        self.travel_matrix = np.eye(self.population_matrix.shape[1])
+        # No spatial travel matrix — hospital/community coupling is modelled
+        # internally via admission/discharge flows, so this model declares no
+        # travel parameters and inherits the base class's identity matrix.
         return self.population_matrix
 
     # ------------------------------------------------------------------

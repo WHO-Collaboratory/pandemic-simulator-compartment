@@ -22,6 +22,11 @@ class SimulationManager:
         logger.info(f"step size (days): {step}")
         ts = np.arange(0.0, float(self.model.n_timesteps), step)
 
+        # Build the model's travel matrix before prepare_initial_state() so it
+        # exists by the time equation() -> _apply_interventions() reads it.
+        # Models without mobility get the identity matrix from the base class.
+        self.model._ensure_travel_matrix()
+
         init_state = self.model.prepare_initial_state()
         params = self.model.get_params()
 

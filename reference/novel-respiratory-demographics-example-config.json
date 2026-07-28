@@ -1,7 +1,8 @@
 {
     "Disease": {
         "disease_type": "RESPIRATORY",
-        "compartment_list": ["S", "E", "I", "H", "D", "R"]
+        "compartment_list": ["S", "E", "I", "H", "D", "R"],
+        "travel_sigma": 10.0
     },
     "start_date": "2026-04-20",
     "end_date": "2026-05-20",
@@ -32,7 +33,6 @@
         { "name": "Kinshasa", "center_lat": -4.32, "center_lon": 15.32, "population": 17000000, "infected_population": 0.04 },
         { "name": "Dakar",    "center_lat": 14.72, "center_lon": -17.47, "population":  3800000, "infected_population": 0.03 }
     ],
-    "travel_volume": { "leaving": 10.0 },
     "demographics": {
         "infant_0_4":    8.0,
         "child_5_17":   22.0,

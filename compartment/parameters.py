@@ -730,9 +730,6 @@ class ModelParameterSchema:
     transmission_edges: list[TransmissionEdgeDef]
 
     interventions: list[InterventionDef] = field(default_factory=list)
-    travel_volume: Optional[dict[str, ParameterDef]] = (
-        None  # {"leaving": ParameterDef, ...}
-    )
 
     # Fields that appear on each admin zone (beyond the shared defaults)
     admin_zone_fields: list[ParameterDef] = field(default_factory=list)
@@ -823,14 +820,12 @@ class ModelParameterSchema:
 
         # -- Simulation parameters (shared across all models) ---------------
         # These are non-negotiable baseline fields every simulation gets.
-        # Travel volume parameters are appended here as well.
+        # Mobility is *not* one of them — models that travel declare their own
+        # travel parameters as disease parameters, so they land in custom_fields.
         sim_params = [
             self._wrap_parameter(p, idx)
             for idx, p in enumerate(self.simulation_parameters, start=1)
         ]
-        if self.travel_volume:
-            for _key, param in self.travel_volume.items():
-                sim_params.append(self._wrap_parameter(param, len(sim_params) + 1))
 
         # -- Assemble -------------------------------------------------------
         compartment_dicts = [
@@ -938,13 +933,6 @@ class ModelParameterSchema:
 
         config["Disease"] = disease
 
-        # --- Travel volume ---
-        if self.travel_volume:
-            tv: dict[str, Any] = {}
-            for key, param in self.travel_volume.items():
-                tv[key] = param.default
-            config["travel_volume"] = tv
-
         # --- Interventions stub ---
         if self.interventions:
             interventions_list = []
@@ -1011,7 +999,6 @@ class ParameterSchemaBuilder:
         self._compartments: list[CompartmentDef] = []
         self._transmission_edges: list[TransmissionEdgeDef] = []
         self._interventions: list[InterventionDef] = []
-        self._travel_volume: dict[str, ParameterDef] | None = None
         self._admin_zone_fields: list[ParameterDef] = []
         self._disease_parameters: list[ParameterDef] = []
         self._simulation_parameters: list[ParameterDef] = []
@@ -1338,55 +1325,6 @@ class ParameterSchemaBuilder:
             )
         )
 
-    # ----- Travel volume ---------------------------------------------------
-
-    def set_travel_volume(
-        self,
-        leaving_default: float = 0.2,
-        leaving_description: str = "Proportion of population traveling out of their zone per day",
-        leaving_min: float = 0.0,
-        leaving_max: float = 1.0,
-        returning_default: float | None = None,
-        returning_description: str = "Proportion of traveling population returning per day",
-        returning_required: bool = False,
-    ) -> None:
-        """
-        Enable inter-zone travel for this model.
-
-        Args:
-            leaving_default: Default fraction of population leaving.
-            leaving_description: UI description for the leaving parameter.
-            leaving_min: Hard minimum for leaving.
-            leaving_max: Hard maximum for leaving.
-            returning_default: Default fraction returning (None = optional).
-            returning_description: UI description for the returning parameter.
-            returning_required: Whether the returning parameter is required.
-        """
-        tv: dict[str, ParameterDef] = {
-            "leaving": ParameterDef(
-                name="leaving",
-                label="Outbound Travel Rate",
-                description=leaving_description,
-                value_type=ValueType.PERCENTAGE,
-                default=leaving_default,
-                min_value=leaving_min,
-                max_value=leaving_max,
-                unit="%",
-            ),
-        }
-        tv["returning"] = ParameterDef(
-            name="returning",
-            label="Return Travel Rate",
-            description=returning_description,
-            value_type=ValueType.PERCENTAGE,
-            default=returning_default,
-            min_value=0.0,
-            max_value=1.0,
-            unit="%",
-            required=returning_required,
-        )
-        self._travel_volume = tv
-
     # ----- Number of runs (stochastic models only) -------------------------
 
     def set_num_runs(
@@ -1668,7 +1606,6 @@ class ParameterSchemaBuilder:
             compartments=self._compartments,
             transmission_edges=self._transmission_edges,
             interventions=self._interventions,
-            travel_volume=self._travel_volume,
             admin_zone_fields=self._admin_zone_fields,
             disease_parameters=self._disease_parameters,
             simulation_parameters=self._simulation_parameters,

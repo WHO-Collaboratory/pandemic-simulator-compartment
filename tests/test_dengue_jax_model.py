@@ -101,7 +101,6 @@ class TestDengueDisease:
                 {"name": "Zone A", "center_lat": 2.0, "center_lon": 45.0, "population": 500000, "infected_population": 5.0, "seroprevalence": 30, "temp_min": 20, "temp_max": 35, "temp_mean": 28},
             ],
             "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
-            "travel_volume": {"leaving": 20},
             "Interventions": {"items": []},
         }
 
@@ -192,7 +191,6 @@ class TestDengueUncertainty:
                 {"name": "Zone A", "center_lat": 2.0, "center_lon": 45.0, "population": 500000, "infected_population": 5, "seroprevalence": 30, "temp_min": 20, "temp_max": 35, "temp_mean": 28},
             ],
             "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
-            "travel_volume": {"leaving": 20},
             "Interventions": {
                 "items": [
                     {

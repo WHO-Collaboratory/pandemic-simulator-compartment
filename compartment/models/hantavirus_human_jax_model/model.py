@@ -445,11 +445,38 @@ class HantavirusHumanJaxModel(Model):
             unit="%",
         )
 
-        # --- Travel volume -------------------------------------------------
-        # Exposes the `leaving` fraction in the config travel_volume block.
-        # When > 0, the gravity model in prepare_initial_state() replaces
-        # the identity matrix with a population-distance weighted matrix.
-        schema.set_travel_volume(leaving_default=0.05)
+        # --- Mobility ------------------------------------------------------
+        # This model uses a steeper-than-inverse-square gravity kernel, so it
+        # declares its own exponent alongside sigma. Both are consumed by
+        # build_travel_matrix() -> gravity() below. When sigma is 0 the matrix
+        # collapses to the identity (no person-to-person spatial coupling).
+        schema.add_disease_parameter(
+            name="travel_sigma",
+            label="Travel Rate (σ)",
+            description=(
+                "Percentage of each zone's population away from home on a given day. "
+                "Couples person-to-person transmission across zones; spillover from "
+                "rodents always stays local. 0 disables inter-zone travel."
+            ),
+            value_type=ValueType.PERCENTAGE,
+            default=5.0,
+            min_value=0.0,
+            max_value=100.0,
+            unit="%",
+        )
+        schema.add_disease_parameter(
+            name="travel_alpha",
+            label="Distance Decay Exponent",
+            description=(
+                "Gravity exponent α: trips to a zone are weighted by "
+                "population / distance^α. 1.5 is a typical empirical value for "
+                "inter-regional mobility; larger values keep travel more local."
+            ),
+            value_type=ValueType.FLOAT,
+            default=1.5,
+            min_value=0.5,
+            max_value=4.0,
+        )
 
         # --- Optional intervention -----------------------------------------
         # Argentina 2018-19 outbreak: R0 fell from 2.12 to 0.96 once
@@ -534,17 +561,12 @@ class HantavirusHumanJaxModel(Model):
     def __init__(self, config):
         super().__init__(config)
 
-        # Admin zones + sigma — used by gravity() in prepare_initial_state().
+        # Admin zones — source of the per-zone exposed_fraction below.
+        # (Mobility no longer needs them here: travel_sigma / travel_alpha are
+        # set by Model.__init__ from the schema's disease parameters, and the
+        # framework passes the zones straight into build_travel_matrix().)
         case_file = config.get("case_file") or {}
         self._admin_zones = case_file.get("admin_zones", [])
-        travel_volume = config.get("travel_volume") or {}
-        self._sigma = (
-            travel_volume.get("leaving", 0.0)
-            if isinstance(travel_volume, dict) else 0.0
-        )
-        # Placeholder; overwritten in prepare_initial_state().
-        n_regions = self.population_matrix.shape[1]
-        self.travel_matrix = jnp.eye(n_regions)
 
         # Schema edges populate self.delta_h / gamma_h / delta_m / gamma_m
         # and self.transmission_scale. Provide fallbacks so the model can
@@ -600,6 +622,14 @@ class HantavirusHumanJaxModel(Model):
     # Simulation setup
     # ------------------------------------------------------------------
 
+    def build_travel_matrix(self, admin_zones):
+        """
+        Haversine gravity mobility driven by the ``travel_sigma`` and
+        ``travel_alpha`` custom fields.
+        """
+        sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
+        return self.gravity(admin_zones, sigma, alpha=self.travel_alpha)
+
     def gravity(self, admin_zones, sigma, alpha=1.5):
         """Gravity travel matrix from admin-zone lat/lon/population.
 
@@ -648,9 +678,7 @@ class HantavirusHumanJaxModel(Model):
         return T
 
     def prepare_initial_state(self):
-        self.travel_matrix = jnp.array(
-            self.gravity(self._admin_zones, self._sigma)
-        )
+        # The travel matrix is built by the framework via build_travel_matrix().
         return self.population_matrix
 
     # ------------------------------------------------------------------

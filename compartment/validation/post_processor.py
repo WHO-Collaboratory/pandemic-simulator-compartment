@@ -8,7 +8,6 @@ from compartment.helpers import (
     create_transmission_dict,
     extract_admin_units,
     create_intervention_dict,
-    get_gravity_model_travel_matrix,
     get_hemisphere,
     get_temperature,
 )
@@ -26,7 +25,6 @@ class ProcessedSimulation(BaseModel):
     transmission_dict: Dict = Field(default_factory=dict)
     admin_units: List = Field(default_factory=list)
     intervention_dict: Dict = Field(default_factory=dict)
-    travel_matrix: Any = Field(default=None)
     hemisphere: str = Field(default="")
     temperature: Dict = Field(default_factory=dict)
 
@@ -102,9 +100,6 @@ class ValidationPostProcessor:
         disease_type = config.Disease.disease_type
         admin_zones_dicts = [z.model_dump() for z in config.case_file.admin_zones] if config.case_file else []
         admin_unit_dict = config.AdminUnit.model_dump() if config.AdminUnit else None
-        travel_volume_dict = (
-            config.travel_volume.model_dump() if config.travel_volume else None
-        )
 
         # Extract normalized TransmissionEdges and Interventions
         transmission_edge_items = []
@@ -159,11 +154,10 @@ class ValidationPostProcessor:
             if intervention_items
             else {}
         )
-        travel_matrix = (
-            get_gravity_model_travel_matrix(admin_zones_dicts, travel_volume_dict)
-            if travel_volume_dict
-            else None
-        )
+        # NOTE: the travel matrix is *not* built here. Each model declares its
+        # own mobility parameters (conventionally ``travel_sigma``) as custom
+        # fields and builds its own matrix in ``Model.build_travel_matrix()``,
+        # which the framework invokes before ``prepare_initial_state()``.
         hemisphere = get_hemisphere(admin_unit_dict) if admin_unit_dict else ""
         temperature = get_temperature(admin_zones_dicts) if admin_zones_dicts else {}
 
@@ -174,7 +168,6 @@ class ValidationPostProcessor:
             transmission_dict=transmission_dict,
             admin_units=admin_units,
             intervention_dict=intervention_dict,
-            travel_matrix=travel_matrix,
             hemisphere=hemisphere,
             temperature=temperature,
         )

@@ -1,7 +1,7 @@
 import jax.numpy as np
 import logging
 import numpy as onp
-from compartment.helpers import setup_logging
+from compartment.helpers import get_gravity_model_travel_matrix, setup_logging
 from compartment.model import Model
 from compartment.parameters import ValueType
 from compartment.interventions import jax_prop_intervention, jax_timestep_intervention
@@ -325,6 +325,25 @@ class DengueJaxModel(Model):
             max_value=0.01,
         )
 
+        # ---- Mobility ----
+        # Declared as a custom field so it is modeler-owned and per-simulation
+        # editable. Consumed by build_travel_matrix() below.
+        schema.add_disease_parameter(
+            name="travel_sigma",
+            label="Travel Rate (σ)",
+            description=(
+                "Percentage of each region's population away from home on a given "
+                "day. Trips are distributed across destinations by an inverse-square "
+                "gravity model weighted by population and distance. 0 disables "
+                "inter-regional travel."
+            ),
+            value_type=ValueType.PERCENTAGE,
+            default=20.0,
+            min_value=0.0,
+            max_value=100.0,
+            unit="%",
+        )
+
         # ---- Admin zone fields (dengue-specific) ----
         schema.add_admin_zone_field(
             name="seroprevalence",
@@ -397,12 +416,6 @@ class DengueJaxModel(Model):
         self.n_timesteps = config["time_steps"]
         self.admin_units = config["admin_units"]
 
-        # Travel
-        self.travel_matrix = np.fill_diagonal(
-            np.array(config["travel_matrix"]), 1.0, inplace=False
-        )
-        self.sigma = config["travel_volume"]["leaving"]
-
         # Demographics
         self.demographics = config["case_file"]["demographics"]
         self.age_stratification = list(self.demographics.values())
@@ -439,6 +452,18 @@ class DengueJaxModel(Model):
         self.N_v_m = _get("max_vector_capacity", 1.5)
         self.T_0 = _get("reference_temperature", 29.0)
         self.kappa = _get("vector_seed", 1e-5)
+        self.travel_sigma = _get("travel_sigma", 20.0)
+
+    def build_travel_matrix(self, admin_zones):
+        """
+        Inverse-square gravity mobility driven by the ``travel_sigma``
+        custom field.
+
+        The resulting matrix doubles as the spatial mixing matrix in the
+        human force of infection (see ``equation()``).
+        """
+        sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
+        return get_gravity_model_travel_matrix(admin_zones, sigma)
 
     @classmethod
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):

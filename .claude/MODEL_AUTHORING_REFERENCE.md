@@ -1,6 +1,6 @@
 # Claude reference: authoring a new compartmental model
 
-This file is for me (Claude) when the user asks for help adding or modifying a disease model. The companion user-facing doc is [docs/DEVELOPING_MODELS.md](../docs/DEVELOPING_MODELS.md). Use this file as the *authoring playbook*: concrete patterns, file paths, and pitfalls. Keep this terse and pattern-focused.
+This file is for me (Claude) when the user asks for help adding or modifying a disease model. The companion user-facing doc is [docs/guides/developing-models.md](../docs/guides/developing-models.md). Use this file as the *authoring playbook*: concrete patterns, file paths, and pitfalls. Keep this terse and pattern-focused.
 
 ## Mental model in three sentences
 
@@ -22,13 +22,13 @@ This file is for me (Claude) when the user asks for help adding or modifying a d
 | CLI driver wrapper | [compartment/driver.py](../compartment/driver.py) |
 | Artifact generation CLI | [compartment/generate_artifact.py](../compartment/generate_artifact.py) |
 | Smoke test sweep that auto-discovers new models | [tests/test_smoke.py](../tests/test_smoke.py) + [tests/helpers.py](../tests/helpers.py) |
-| **Contact matrices: loading, aggregation, and usage** | [docs/CONTACT_MATRICES.md](../docs/CONTACT_MATRICES.md) — comprehensive guide |
+| **Contact matrices: loading, aggregation, and usage** | [docs/guides/contact-matrices.md](../docs/guides/contact-matrices.md) — comprehensive guide |
 | Contact matrix implementation code | [compartment/contact_matrices/](../compartment/contact_matrices/) — loader, aggregator, Prem data |
-| **Gravity models: spatial mobility and travel matrices** | [docs/GRAVITY_MODEL.md](../docs/GRAVITY_MODEL.md) — comprehensive guide |
-| Gravity model implementation code | [compartment/helpers.py](../compartment/helpers.py) `gravity_model()`, `get_gravity_model_travel_matrix()` |
-| **Interventions: declaration, configuration, and application** | [docs/INTERVENTIONS.md](../docs/INTERVENTIONS.md) — comprehensive guide |
+| **Spatial mobility and travel matrices** | [docs/guides/gravity-model.md](../docs/guides/gravity-model.md) — comprehensive guide |
+| Mobility implementation code | [compartment/model.py](../compartment/model.py) `build_travel_matrix()` / `_ensure_travel_matrix()`; kernels in [compartment/helpers.py](../compartment/helpers.py) `get_gravity_model_travel_matrix()` and per-model (mpox, hantavirus_human) |
+| **Interventions: declaration, configuration, and application** | [docs/guides/interventions.md](../docs/guides/interventions.md) — comprehensive guide |
 | Intervention implementation code | [compartment/runtime.py](../compartment/runtime.py) `Intervention` class, [compartment/model.py](../compartment/model.py) `_apply_interventions()` |
-| **Uncertainty quantification: LHS, distributions, and CI interpretation** | [docs/UNCERTAINTY_QUANTIFICATION.md](../docs/UNCERTAINTY_QUANTIFICATION.md) — comprehensive guide |
+| **Uncertainty quantification: LHS, distributions, and CI interpretation** | [docs/guides/uncertainty-quantification.md](../docs/guides/uncertainty-quantification.md) — comprehensive guide |
 | UQ implementation code | [compartment/run_simulation.py](../compartment/run_simulation.py) orchestration, [compartment/helpers.py](../compartment/helpers.py) `generate_LHS_samples()` |
 
 When in doubt, *read the file* — the framework changes faster than this reference.
@@ -51,9 +51,9 @@ Pick the closest analog before suggesting from scratch.
    - `model.py`
    - `main.py` (copy from `mpox_jax_model/main.py`, swap the class name)
    - `example-config.json` (generate via CLI after the schema is written)
-2. **Write `define_parameters()`** in this order: `set_model_info` → `add_compartment` (mark `infective=True` on FOI sources) → `add_transmission_edge` → `add_intervention` → `set_travel_volume` → demographics / contact matrix → `add_admin_zone_field` → `add_disease_parameter`.
-3. **Write `__init__(self, config)`**. Default to `super().__init__(config)` then add what's missing (typically `self.travel_matrix`, demographics, temperature, model-specific scalars).
-4. **Write `prepare_initial_state(self)`**. Set `self.travel_matrix` (use `jnp.eye(R)` if no travel). Return the `state` array (the population matrix).
+2. **Write `define_parameters()`** in this order: `set_model_info` → `add_compartment` (mark `infective=True` on FOI sources) → `add_transmission_edge` → `add_intervention` → mobility params → demographics / contact matrix → `add_admin_zone_field` → `add_disease_parameter`.
+3. **Write `__init__(self, config)`**. Default to `super().__init__(config)` then add what's missing (demographics, temperature, model-specific scalars). **Don't set `self.travel_matrix` here** — the framework does it.
+4. **Write `prepare_initial_state(self)`**. Return the `state` array (the population matrix). If the model travels, override `build_travel_matrix(admin_zones)` instead (see *Mobility* below).
 5. **Write `equation(self, y, t, p)`**. Lean on `_compute_equations()` first; only drop to manual flows for spatially-coupled or age-stratified FOI. For stochastic/Euler models the return is a per-step delta rather than a true derivative.
 6. **Generate the example config**:
    ```bash
@@ -85,14 +85,44 @@ schema.remove_transmission_edge(variable_name)
 schema.add_intervention(id, label, description,
                         target_rates=[...], modifies_travel=False,
                         adherence=..., transmission_reduction=...)
-schema.set_travel_volume(leaving_default=0.2, ...)
 schema.add_demographic_group(id, label, default_weight, age_range=(low, high))  # age_range optional
 schema.set_contact_override(from_group, to_group, value)                         # bespoke values — beats Prem auto-load
 schema.add_admin_zone_field(name, label, description, value_type, default, ...)
 schema.add_disease_parameter(name, label, description, value_type, default, ...)
 ```
 
-`ValueType` choices: `RATE`, `DAYS`, `PERCENTAGE`, `COUNT`, `DATE`, `BOOLEAN`, `TEXT`, `SELECT`, `FLOAT`, `INTEGER`, `COORDINATE`. `DAYS` and `PERCENTAGE` get auto-converted to per-day fractional rates inside `_load_transmission_params()`.
+`ValueType` choices: `RATE`, `DAYS`, `PERCENTAGE`, `COUNT`, `DATE`, `BOOLEAN`, `TEXT`, `SELECT`, `FLOAT`, `INTEGER`, `COORDINATE`. `DAYS` and `PERCENTAGE` get auto-converted to per-day fractional rates inside `_load_transmission_params()` — **for transmission edges only**. Disease parameters arrive in native units (a `PERCENTAGE` param is `20.0`, not `0.2`); convert at the point of use with `self._to_rate(value, ValueType.PERCENTAGE)`.
+
+## Mobility
+
+There is **no shared mobility library and no framework-level gravity model**. A model that travels owns its mobility end to end:
+
+1. Declare the parameters as ordinary custom fields, so they render in the UI and are editable per simulation. Convention is `travel_sigma` (`PERCENTAGE`, 0–100) plus whatever else the kernel needs:
+   ```python
+   schema.add_disease_parameter(
+       name="travel_sigma", label="Travel Rate (σ)",
+       description="Percentage of each zone's population away from home on a given day.",
+       value_type=ValueType.PERCENTAGE, default=20.0,
+       min_value=0.0, max_value=100.0, unit="%",
+   )
+   ```
+2. Override `build_travel_matrix(self, admin_zones)` to turn them into an `(R, R)` matrix. The framework calls it via `_ensure_travel_matrix()` **before** `prepare_initial_state()` and stores the result on `self.travel_matrix`.
+   ```python
+   def build_travel_matrix(self, admin_zones):
+       sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
+       return get_gravity_model_travel_matrix(admin_zones, sigma)   # compartment/helpers.py
+   ```
+
+**Never name it plain `sigma`.** `build_overridden_config()` routes edge `variable_name`s to the transmission dict and everything else to `Disease`, so a mobility param colliding with an edge name (ebola's `sigma` is its E→I incubation rate) misroutes during uncertainty runs.
+
+Invariants every matrix must hold — `tests/test_travel_matrix.py` enforces them for every registered model: `T[i, j]` is the fraction of zone *i* present in zone *j*, **rows sum to 1**, the diagonal is the stay-home fraction `1 - sigma`, and row/column order matches `admin_zones` (i.e. the population-matrix columns).
+
+Existing kernels to copy from, by decay shape:
+- **inverse-square gravity (geopy)** — `compartment/helpers.py` `get_gravity_model_travel_matrix()`; used by covid, dengue, ebola
+- **power-law gravity, α configurable (Haversine)** — `hantavirus_human_jax_model/model.py` `gravity()`
+- **exponential distance decay** — `mpox_jax_model/model.py` `mobility()`
+
+Models with no inter-zone travel declare nothing and inherit the base class's identity matrix — that's hantavirus, dengue_2strain, test_covid_sir_stochastic, and test_klebsiella_amr.
 
 ## Patterns I reach for in `equation()`
 
@@ -151,7 +181,7 @@ The covid model currently keeps its hardcoded 9-cell POLYMOD overrides for backw
 - **Every compartment-to-compartment movement should be a schema edge** when the flow has the form `rate * source` or `source * rate * sum(infective) / N`. Skipping an edge silently is almost always a bug. **Exceptions** (legitimate manual flows): multi-rate FOI mixing several β values across different infectious sources (hantavirus's `Sm → Em = Sm * (β_mm·Im + β_f·If)`), demographic births (`μ·N`, harmonic-mean), and density-dependent deaths (`a + c·N`). For these: declare the rate constants via `add_disease_parameter()`, apply the flow with `_apply_flow(derivs, source_id, target_id, flow)`, and **declare the target's `*_total` compartment by hand** if the target isn't already an edge target (the framework only auto-generates totals for declared edge targets). See [hantavirus_jax_model/model.py](../compartment/models/hantavirus_jax_model/model.py) for the canonical example.
 - **`infective=True` is critical for `frequency_dependent=True` edges**. Without it, the FOI sum is empty and the model produces zero flow. Mark every compartment that contributes infectious pressure (in dengue that's all primary `Ix` and all secondary `Ixy`).
 - **`value_type=ValueType.DAYS`** means `default=10.0` is interpreted as a 10-day mean ⇒ rate `0.1`. Do not pre-divide.
-- **Travel matrix must exist before `_apply_interventions()`** — it reads `self.travel_matrix`. Set it in `__init__` or `prepare_initial_state()` before the first `equation()` call. Use `jnp.eye(R)` when there's no travel model.
+- **Don't set `self.travel_matrix` by hand.** `_apply_interventions()` reads it, and the framework guarantees it exists by calling `_ensure_travel_matrix()` before `prepare_initial_state()` — including the identity default for models with no mobility. Assigning it in `__init__`/`prepare_initial_state()` will just be overwritten. Override `build_travel_matrix()` instead.
 - **Variants** use `super().define_parameters(schema)` and then mutate. Removing a compartment cascades and removes any edges that reference it. To re-add an edge that the parent referenced via the removed compartment (e.g. an S→I beta after E is gone), call `schema.add_transmission_edge(**_BETA_SI)` — see covid `variants.py` for the canonical pattern.
 - **Stochastic / Euler models** must set `STOCHASTIC = True` (or `SOLVER = "euler"`) and have `equation()` return the **per-step delta**, not the rate. Multiplying by `dt` happens inside `_euler_integrate`.
 - **The "short form" config loader** wraps top-level `admin_zones` and `demographics` into `case_file` automatically. Don't double-nest when writing example configs by hand.

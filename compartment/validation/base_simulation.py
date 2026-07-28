@@ -6,21 +6,6 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
 
-class TravelVolume(BaseModel):
-    leaving: float = Field(default=0.2, ge=0, le=1)
-    returning: Optional[float] = Field(default=None, ge=0, le=1)
-
-    @field_validator("leaving", "returning", mode="before")
-    @classmethod
-    def normalize_percentage(cls, v):
-        if v is None:
-            return v
-        v = float(v)
-        if v > 1:
-            v = v / 100.0
-        return v
-
-
 class AdminUnit(BaseModel):
     id: str
     center_lat: float = Field(ge=-90, le=90)
@@ -98,9 +83,9 @@ class BaseSimulationShared(BaseModel):
     # time_steps is now optional and will be derived from start/end dates if not provided
     time_steps: Optional[int] = Field(default=None, gt=0)
 
-    # Population / mobility
-    # Make travel_volume optional - models can declare if they need it
-    travel_volume: Optional[TravelVolume] = TravelVolume()
+    # Mobility is model-owned: each model declares its own travel parameters
+    # (conventionally ``travel_sigma``) via ``schema.add_disease_parameter()``,
+    # so they arrive in the ``Disease`` block like any other custom field.
 
     case_file: Optional[CaseFile] = None
 
