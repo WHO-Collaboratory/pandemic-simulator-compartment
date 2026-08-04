@@ -38,7 +38,6 @@ DENGUE_BASE_CONFIG = {
         }
     ],
     "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
-    "travel_volume": {"leaving": 20},
     "Interventions": {"items": []},
 }
 

@@ -110,6 +110,38 @@ class MpoxJaxModel(Model):
             transmission_reduction=75.0,
         )
 
+        # ---- Mobility ----
+        # This model uses exponential distance decay rather than a gravity
+        # power law, so it declares its own decay length alongside sigma.
+        # Both are consumed by build_travel_matrix() -> mobility() below.
+        schema.add_disease_parameter(
+            name="travel_sigma",
+            label="Travel Rate (σ)",
+            description=(
+                "Percentage of each zone's population away from home on a given day. "
+                "0 disables inter-zone travel."
+            ),
+            value_type=ValueType.PERCENTAGE,
+            default=20.0,
+            min_value=0.0,
+            max_value=100.0,
+            unit="%",
+        )
+        schema.add_disease_parameter(
+            name="travel_scale_km",
+            label="Travel Decay Length",
+            description=(
+                "Characteristic distance of the exponential mobility decay: trips "
+                "to a zone are weighted by exp(-distance / this value). Larger "
+                "values spread travel further afield."
+            ),
+            value_type=ValueType.FLOAT,
+            default=500.0,
+            min_value=1.0,
+            max_value=20000.0,
+            unit="km",
+        )
+
     # ------------------------------------------------------------------
     # Model interface
     # ------------------------------------------------------------------
@@ -135,13 +167,10 @@ class MpoxJaxModel(Model):
         # Administrative units
         self.admin_units = input["admin_units"]
 
-        # Admin zone data for mobility model (lat, lon, population per zone)
-        case_file_dict = input.get("case_file") or {}
-        self._admin_zones = case_file_dict.get("admin_zones", [])
-
-        # Sigma: fraction of population that leaves each zone per timestep
-        travel_volume = input.get("travel_volume") or {}
-        self._sigma = travel_volume.get("leaving", 0.0) if isinstance(travel_volume, dict) else 0.0
+        # Mobility parameters (declared as custom fields in define_parameters)
+        disease_cfg = input.get("Disease", {}) or {}
+        self.travel_sigma = disease_cfg.get("travel_sigma", 20.0) or 0.0
+        self.travel_scale_km = disease_cfg.get("travel_scale_km", 500.0) or 500.0
 
         # Interventions
         self.intervention_dict = input.get("intervention_dict", {})
@@ -152,6 +181,14 @@ class MpoxJaxModel(Model):
     # ------------------------------------------------------------------
     # Mobility model (defined on the disease class, built from case file)
     # ------------------------------------------------------------------
+
+    def build_travel_matrix(self, admin_zones):
+        """
+        Exponential distance-decay mobility driven by the ``travel_sigma``
+        and ``travel_scale_km`` custom fields.
+        """
+        sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
+        return self.mobility(admin_zones, sigma, scale_km=self.travel_scale_km)
 
     def mobility(self, admin_zones, sigma, scale_km=500.0):
         """
@@ -269,11 +306,7 @@ class MpoxJaxModel(Model):
     # ------------------------------------------------------------------
 
     def prepare_initial_state(self):
-        # Build travel matrix from case file using the disease-level mobility model
-        self.travel_matrix = np.array(
-            self.mobility(self._admin_zones, self._sigma)
-        )
-
+        # The travel matrix is built by the framework via build_travel_matrix().
         return self.population_matrix
 
     def equation(self, y, t, p):

@@ -43,7 +43,6 @@ class TestFlexibleCompartments:
                 }
             ],
             "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
-            "travel_volume": {"leaving": 20},
             "TransmissionEdges": {
                 "items": [
                     {"transmission_edge": {"source": "susceptible", "target": "infected", "value_type": "RATE"}, "value": 0.3},
@@ -67,7 +66,6 @@ class TestFlexibleCompartments:
                  "population": 100000, "infected_population": 1.0},
             ],
             "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
-            "travel_volume": {"leaving": 0},
             "TransmissionEdges": {
                 "items": [
                     {"transmission_edge": {"source": "susceptible", "target": "infected", "value_type": "RATE"}, "value": 0.3},
@@ -104,7 +102,6 @@ class TestFlexibleCompartments:
                  "population": 100000, "infected_population": 1.0},
             ],
             "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
-            "travel_volume": {"leaving": 0},
             "TransmissionEdges": {
                 "items": [
                     {"transmission_edge": {"source": "susceptible", "target": "exposed", "value_type": "RATE"}, "value": 0.3},
@@ -209,7 +206,8 @@ class TestCovidDisease:
         from compartment.models.covid_jax_model.variants import CovidSIRModel
 
         config = {
-            "Disease": {"disease_type": "COVID_SIR"},
+            # travel_sigma is a model-owned custom field, so it lives in Disease.
+            "Disease": {"disease_type": "COVID_SIR", "travel_sigma": 20.0},
             "start_date": "2025-01-01",
             "end_date": "2025-03-01",
             "admin_zones": [
@@ -217,7 +215,6 @@ class TestCovidDisease:
                 {"name": "Zone B", "center_lat": 48.0, "center_lon": 9.0, "population": 500000, "infected_population": 0.0},
             ],
             "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
-            "travel_volume": {"leaving": 20},
             "TransmissionEdges": {
                 "items": [
                     {"transmission_edge": {"source": "susceptible", "target": "infected", "value_type": "RATE"}, "value": 0.3},
@@ -292,7 +289,6 @@ class TestCovidDisease:
                 }
             ],
             "demographics": {"young": 50.0, "elderly": 50.0},
-            "travel_volume": {"leaving": 0},
             "contact_matrix_overrides": {
                 "young":   {"young": 1.0, "elderly": 0.0},
                 "elderly": {"young": 0.0, "elderly": 1.0},
@@ -452,7 +448,6 @@ class TestCovidVariantRuns:
                  "population": 100000, "infected_population": 1.0},
             ],
             "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
-            "travel_volume": {"leaving": 0},
             "TransmissionEdges": {"items": edges},
             "Interventions": {"items": []},
         }
@@ -651,7 +646,6 @@ class TestCovidUncertainty:
                 {"name": "Zone A", "center_lat": 47.0, "center_lon": 8.0, "population": 500000, "infected_population": 1.0},
             ],
             "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
-            "travel_volume": {"leaving": 20},
             "TransmissionEdges": {
                 "items": [
                     {
@@ -720,7 +714,6 @@ class TestCovidUncertainty:
                 {"name": "Zone A", "center_lat": 47.0, "center_lon": 8.0, "population": 100000, "infected_population": 1.0},
             ],
             "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
-            "travel_volume": {"leaving": 20},
             "TransmissionEdges": {
                 "items": [
                     {
@@ -776,7 +769,6 @@ class TestCovidUncertainty:
                 {"name": "Zone A", "center_lat": 47.0, "center_lon": 8.0, "population": 200000, "infected_population": 1.0},
             ],
             "demographics": {"age_0_17": 25, "age_18_55": 50, "age_56_plus": 25},
-            "travel_volume": {"leaving": 20},
             "TransmissionEdges": {
                 "items": [
                     {

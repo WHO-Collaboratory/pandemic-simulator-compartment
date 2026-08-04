@@ -24,9 +24,10 @@
         "d_m": 0.00139,
         "P_star": 0.5,
         "lambda_1": 0.065,
-        "lambda_2": 0.5
+        "lambda_2": 0.5,
+        "travel_sigma": 5.0,
+        "travel_alpha": 1.5
     },
-    "travel_volume": { "leaving": 0.05 },
     "admin_unit_id": "MDG",
     "AdminUnit": {
         "id": "MDG",

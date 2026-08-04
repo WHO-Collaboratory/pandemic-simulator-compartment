@@ -1,7 +1,8 @@
 {
     "Disease": {
         "disease_type": "COVID_SEIHDR",
-        "compartment_list": ["S", "E", "I", "H", "D", "R"]
+        "compartment_list": ["S", "E", "I", "H", "D", "R"],
+        "travel_sigma": 20.0
     },
     "start_date": "2025-11-01",
     "end_date": "2025-12-31",
@@ -42,6 +43,5 @@
         { "name": "Mahajanga",    "center_lat": -16.536991119784563, "center_lon": 46.68467040064395, "population": 3783162, "infected_population": 0.06 },
         { "name": "Toamasina",    "center_lat": -17.82287275056714,  "center_lon": 48.7510838190036,  "population": 3693480, "infected_population": 0.07 },
         { "name": "Toliary",      "center_lat": -22.60126035484297,  "center_lon": 45.01750093141163, "population": 4621930, "infected_population": 0.01 }
-    ],
-    "travel_volume": { "leaving": 20.0 }
+    ]
 }

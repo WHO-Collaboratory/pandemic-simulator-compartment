@@ -29,16 +29,13 @@
         "prop_community": 90.0,
         "etu_risk": 70.0,
         "funeral_risk": 50.0,
+        "travel_sigma": 5.0,
         "num_runs": 10
     },
     "admin_unit_id": "MDG",
     "AdminUnit": {
         "id": "MDG",
         "center_lat": -19.37564815173127
-    },
-    "travel_volume": {
-        "leaving": 0.05,
-        "returning": null
     },
     "interventions": [
         {

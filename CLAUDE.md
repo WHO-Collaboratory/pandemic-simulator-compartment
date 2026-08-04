@@ -7,7 +7,7 @@ Python 3.13+, managed with `uv`. JAX (`odeint`) is the default ODE solver; stoch
 ## Reference docs — read these before doing the matching kind of work
 
 - **Authoring or modifying a disease model** → [.claude/MODEL_AUTHORING_REFERENCE.md](.claude/MODEL_AUTHORING_REFERENCE.md). This is the authoritative playbook with patterns, pitfalls, and the closest-analog index. Always read it first before suggesting a model change.
-- **User-facing model development guide** → [docs/DEVELOPING_MODELS.md](docs/DEVELOPING_MODELS.md). Same material as the authoring reference but framed for human contributors; use it when explaining concepts back to the user.
+- **User-facing model development guide** → [docs/guides/developing-models.md](docs/guides/developing-models.md). Same material as the authoring reference but framed for human contributors; use it when explaining concepts back to the user.
 - **Config schema & required fields** → [README.md](README.md) covers `admin_unit_id`, `Disease`, `case_file`, intervention shapes, etc.
 
 ## Directory map

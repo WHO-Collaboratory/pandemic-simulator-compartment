@@ -185,7 +185,7 @@ class MyModel(Model):
         )
 
         # 4. (optional) Interventions — target_rates lists the edges they reduce.
-        # See INTERVENTIONS.md for comprehensive documentation on declaring and configuring interventions
+        # See interventions.md for comprehensive documentation on declaring and configuring interventions
         schema.add_intervention(
             id="social_isolation",
             label="Social Isolation",
@@ -194,9 +194,15 @@ class MyModel(Model):
             adherence=40.0, transmission_reduction=50.0,
         )
 
-        # 5. (optional) Travel — declares the case-file `travel_volume` block
-        # See GRAVITY_MODEL.md for comprehensive documentation on spatial mobility
-        schema.set_travel_volume(leaving_default=0.2)
+        # 5. (optional) Travel — declare your mobility parameters as custom
+        # fields, then override build_travel_matrix() to turn them into a
+        # matrix. See gravity-model.md for the full treatment.
+        schema.add_disease_parameter(
+            name="travel_sigma", label="Travel Rate (σ)",
+            description="Percentage of each zone's population away from home on a given day.",
+            value_type=ValueType.PERCENTAGE, default=20.0,
+            min_value=0.0, max_value=100.0, unit="%",
+        )
 
         # 6. (optional) Demographic groups + contact matrix — see CovidJaxModel.
         # Declare each group with an inclusive (low, high) age range to opt in
@@ -320,7 +326,7 @@ If you want different aggregation (e.g. one `_total` per group of compartments i
 
 Age-stratified models need an NxN contact matrix where N is the number of demographic groups. The framework supports three ways of supplying one, in order of precedence (later wins over earlier).
 
-> **📚 For a comprehensive guide to contact matrices**, see **[CONTACT_MATRICES.md](./contact-matrices.md)** — detailed documentation on how contact matrices are loaded, aggregated, and used in the platform.
+> **📚 For a comprehensive guide to contact matrices**, see **[contact-matrices.md](./contact-matrices.md)** — detailed documentation on how contact matrices are loaded, aggregated, and used in the platform.
 
 1. **Country-aware Prem 2021 default** (recommended). Declare an inclusive `age_range=(low, high)` on every demographic group. At model instantiation the framework reads the run's `admin_unit_id`, takes the ISO3 prefix (split on `.`), and resolves a 16×16 contact matrix using a three-tier lookup:
    1. **Synthetic matrix** — 177 countries from Prem 2021 (most countries).
@@ -357,19 +363,38 @@ If a model declares demographic groups but supplies neither `age_range` nor any 
 
 Multi-region models use **gravity models** to generate travel matrices describing population flows between administrative zones. The travel matrix `T[i,j]` represents the fraction of region i's population present in region j.
 
-> **📚 For comprehensive documentation on gravity models**, see **[GRAVITY_MODEL.md](./gravity-model.md)** — detailed explanation of spatial mobility, distance-decay functions, and how travel matrices work in disease models.
+> **📚 For comprehensive documentation on gravity models**, see **[gravity-model.md](./gravity-model.md)** — detailed explanation of spatial mobility, distance-decay functions, and how travel matrices work in disease models.
 
 **Quick overview:**
 
-The framework provides automatic gravity-model travel matrices when `travel_volume.leaving` is specified in the config:
+Mobility is **model-owned**: nothing is built for you automatically. A model that travels declares its own parameters as custom fields and defines how they become a matrix:
+
+```python
+# In define_parameters() — surfaces as an editable custom field in the UI
+schema.add_disease_parameter(
+    name="travel_sigma", label="Travel Rate (σ)",
+    value_type=ValueType.PERCENTAGE, default=20.0,
+    min_value=0.0, max_value=100.0, unit="%",
+    description="Percentage of each zone's population away from home on a given day.",
+)
+
+# On the model — the framework calls this before prepare_initial_state()
+def build_travel_matrix(self, admin_zones):
+    # PERCENTAGE disease params arrive as 20.0, not 0.2
+    sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
+    return get_gravity_model_travel_matrix(admin_zones, sigma)
+```
+
+which appears in the config inside the `Disease` block like any other parameter:
 
 ```jsonc
-"travel_volume": {
-    "leaving": 0.2  // 20% of each region's population travels
+"Disease": {
+    "disease_type": "COVID_SEIHDR",
+    "travel_sigma": 20.0    // 20% of each region's population travels
 }
 ```
 
-The default implementation uses the classic inverse-square gravity model: attraction from region i to j is proportional to `(pop_i * pop_j) / distance²`. Models can override this with custom mobility functions (exponential decay, power-law with custom exponent, etc.) by defining their own mobility methods.
+`get_gravity_model_travel_matrix()` (in `compartment/helpers.py`) is the classic inverse-square gravity model: attraction from region i to j is proportional to `(pop_i * pop_j) / distance²`. It's one option, not a default — models needing a different decay shape write their own kernel (mpox uses exponential decay, hantavirus_human a configurable power law). Models with no inter-zone travel declare nothing and inherit an identity matrix.
 
 **Spatial + demographic mixing:** When your model has both multiple regions and age groups, the force of infection combines spatial travel mixing with demographic contact mixing:
 
@@ -384,7 +409,7 @@ omega = contact_matrix @ BETA  # (R, A)
 foi = S * omega
 ```
 
-See [GRAVITY_MODEL.md](./gravity-model.md) for detailed mathematical explanation and usage patterns.
+See [gravity-model.md](./gravity-model.md) for detailed mathematical explanation and usage patterns.
 
 ### Compartment delta grouping
 
@@ -478,7 +503,7 @@ Local-mode configs accept the "short form" — top-level `admin_zones` and `demo
 - `admin_zones` (or `case_file.admin_zones`) — each zone needs `name`, `population`, `center_lat`, `center_lon`, `infected_population` plus any custom `add_admin_zone_field` you declared.
 - `Disease.transmission_edges` (or top-level `TransmissionEdges.items` for the GraphQL form) — one entry per edge you declared.
 
-Optional keys: `interventions`, `travel_volume`, `demographics`, `contact_matrix_overrides`, `demographic_rate_overrides`, plus any `disease_parameters` you declared on the schema.
+Optional keys: `interventions`, `demographics`, `contact_matrix_overrides`, `demographic_rate_overrides`, plus any `disease_parameters` you declared on the schema (including mobility params such as `travel_sigma`, which live inside `Disease`).
 
 The validation layer auto-generates a Pydantic model from your schema and validates the config against it before your model ever sees it. Any required field you forget is rejected with a structured error.
 

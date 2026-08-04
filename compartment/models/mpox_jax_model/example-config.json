@@ -1,7 +1,9 @@
 {
     "Disease": {
         "disease_type": "MPOX",
-        "immunity_period": 60
+        "immunity_period": 60,
+        "travel_sigma": 20.0,
+        "travel_scale_km": 500.0
     },
     "start_date": "2026-03-06",
     "end_date": "2032-03-06",
@@ -43,6 +45,5 @@
         { "name": "Toamasina",    "center_lat": -17.82287275056714,  "center_lon": 48.7510838190036,  "population": 3693480, "infected_population": 0.03 },
         { "name": "Toliary",      "center_lat": -22.60126035484297,  "center_lon": 45.01750093141163, "population": 4621930, "infected_population": 0.01 }
     ],
-    "demographics": { "age_0_17": 25.0, "age_18_55": 50.0, "age_56_plus": 25.0 },
-    "travel_volume": { "leaving": 20.0 }
+    "demographics": { "age_0_17": 25.0, "age_18_55": 50.0, "age_56_plus": 25.0 }
 }

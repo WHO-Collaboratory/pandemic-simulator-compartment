@@ -1,7 +1,8 @@
 {
     "Disease": {
         "disease_type": "VECTOR_BORNE",
-        "immunity_period": 240
+        "immunity_period": 240,
+        "travel_sigma": 20.0
     },
     "start_date": "2026-01-01",
     "end_date": "2029-03-01",
@@ -24,6 +25,5 @@
         { "name": "Toamasina",    "center_lat": -17.82287275056714,  "center_lon": 48.7510838190036,  "population": 3693480, "infected_population": 5.0, "seroprevalence": 30.0, "temp_min": 18.0, "temp_max": 30.0, "temp_mean": 24.0 },
         { "name": "Toliary",      "center_lat": -22.60126035484297,  "center_lon": 45.01750093141163, "population": 4621930, "infected_population": 4.0, "seroprevalence": 25.0, "temp_min": 20.0, "temp_max": 35.0, "temp_mean": 27.0 }
     ],
-    "demographics": { "age_0_17": 25.0, "age_18_55": 50.0, "age_56_plus": 25.0 },
-    "travel_volume": { "leaving": 20.0}
+    "demographics": { "age_0_17": 25.0, "age_18_55": 50.0, "age_56_plus": 25.0 }
 }

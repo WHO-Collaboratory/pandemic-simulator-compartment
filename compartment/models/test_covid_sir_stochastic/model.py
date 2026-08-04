@@ -114,7 +114,7 @@ class CovidSirStochasticModel(Model):
         self._key = jax.random.PRNGKey(seed)
 
     def prepare_initial_state(self):
-        self.travel_matrix = np.eye(self.population_matrix.shape[1])
+        # No inter-zone travel — the base class supplies the identity matrix.
         return self.population_matrix
 
     def equation(self, y, t, p):

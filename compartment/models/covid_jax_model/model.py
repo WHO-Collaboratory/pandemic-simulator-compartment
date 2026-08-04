@@ -1,6 +1,6 @@
 import jax.numpy as np
 import logging
-from compartment.helpers import setup_logging
+from compartment.helpers import get_gravity_model_travel_matrix, setup_logging
 from compartment.model import Model
 from compartment.parameters import ValueType
 
@@ -213,6 +213,25 @@ class CovidJaxModel(Model):
             transmission_reduction=80.0,
         )
 
+        # ---- Mobility ----
+        # Declared as a custom field so it is modeler-owned and per-simulation
+        # editable. Consumed by build_travel_matrix() below.
+        schema.add_disease_parameter(
+            name="travel_sigma",
+            label="Travel Rate (σ)",
+            description=(
+                "Percentage of each region's population away from home on a given "
+                "day. Trips are distributed across destinations by an inverse-square "
+                "gravity model weighted by population and distance. 0 disables "
+                "inter-regional travel."
+            ),
+            value_type=ValueType.PERCENTAGE,
+            default=20.0,
+            min_value=0.0,
+            max_value=100.0,
+            unit="%",
+        )
+
         # ---- Demographics ----
         # age_range enables auto-loading of the country's Prem 2021 contact
         # matrix (aggregated to these bands) when no explicit overrides are
@@ -248,15 +267,20 @@ class CovidJaxModel(Model):
         # base __init__ sets population_matrix to jnp.array(initial_population).T
         # which is already (K, R). No override needed.
 
-        # Travel
-        self.travel_matrix = np.fill_diagonal(
-            np.array(config["travel_matrix"]), 1.0, inplace=False
-        )
-        self.sigma = config["travel_volume"]["leaving"]
-
         # Demographics are populated by Model.__init__ — config weights when
         # supplied, schema default_weight values otherwise.  Group definitions
         # and the contact matrix are declared in define_parameters().
+
+    def build_travel_matrix(self, admin_zones):
+        """
+        Inverse-square gravity mobility driven by the ``travel_sigma``
+        custom field.
+
+        Rows sum to 1 with the diagonal at ``1 - sigma``, so the FOI in
+        ``equation()`` conserves each region's population.
+        """
+        sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
+        return get_gravity_model_travel_matrix(admin_zones, sigma)
 
     def prepare_initial_state(self):
         # Expand (K, R) → (K, A, R) and append _total rows for active compartments.

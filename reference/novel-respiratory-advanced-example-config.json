@@ -9,6 +9,7 @@
     },
     "Disease": {
         "disease_type": "RESPIRATORY",
+        "travel_sigma": 20.0,
         "compartment_list": [
             "S",
             "E",
@@ -172,8 +173,5 @@
             "age_18_55": 55.0,
             "age_56_plus": 35.0
         }
-    },
-    "travel_volume": {
-        "leaving": 20.0    
     }
 }

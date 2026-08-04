@@ -12,10 +12,6 @@ GRAPHQL_QUERY = """query GetSimulationJobById($id: ID!) {
     start_date
     tag_id
     time_steps
-    travel_volume {
-      leaving
-      returning
-    }
     updatedAt
     model_artifact_id
     ModelArtifact {

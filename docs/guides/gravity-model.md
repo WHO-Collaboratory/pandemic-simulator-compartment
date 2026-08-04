@@ -32,46 +32,68 @@ Where:
 - **distance_ij** = geographic distance between regions (great-circle distance in km)
 - **α** (alpha) = distance-decay exponent (controls how quickly travel drops off)
 
-## Implementation
+## Mobility is model-owned
 
-The Pandemic Simulator provides a gravity model implementation in the framework:
+There is **no framework-level default mobility model**. Nothing is built for you automatically: whatever mobility a model has, that model declares the parameters for it and defines how they become a matrix. Models with no inter-zone travel declare nothing and inherit an identity matrix from the base class.
 
-### Classic Gravity Model (Standard Implementation)
+This means a modeler is never fighting a hidden default, and σ shows up in the UI as an ordinary editable field for whichever kernel the model actually uses.
 
-**Location:** `compartment/helpers.py` → `gravity_model()` and `get_gravity_model_travel_matrix()`
+### The two pieces you write
 
-**Formula:**
+**1. Declare the parameters as custom fields** in `define_parameters()`. Convention is `travel_sigma` as a `PERCENTAGE` in 0–100, plus whatever else your kernel needs:
+
+```python
+schema.add_disease_parameter(
+    name="travel_sigma",
+    label="Travel Rate (σ)",
+    description="Percentage of each zone's population away from home on a given day.",
+    value_type=ValueType.PERCENTAGE,
+    default=20.0, min_value=0.0, max_value=100.0, unit="%",
+)
 ```
-attraction(i → j) = (pop_i * pop_j) / distance_ij²
+
+Because it's an ordinary disease parameter it flows through the whole existing pipeline for free: it lands in `custom_fields` in the model artifact, renders as an editable field (with a variance range) on the simulation's Disease step, appears in the results' Custom Parameters section, and participates in Latin-Hypercube uncertainty sampling.
+
+> **Never name it plain `sigma`.** `build_overridden_config()` routes transmission-edge `variable_name`s to the transmission dict and everything else to `Disease`. A mobility parameter that collides with an edge name — ebola's `sigma` is its E→I incubation rate — silently misroutes during uncertainty runs.
+
+**2. Override `build_travel_matrix()`** on the model:
+
+```python
+def build_travel_matrix(self, admin_zones):
+    # PERCENTAGE disease params arrive in native units (20.0, not 0.2).
+    # Only transmission edges are auto-converted.
+    sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
+    return get_gravity_model_travel_matrix(admin_zones, sigma)
 ```
 
-**Distance-decay:** Inverse-square law (α = 2.0), matching Newtonian gravity
+The framework calls this via `Model._ensure_travel_matrix()` immediately **before** `prepare_initial_state()`, and assigns the result to `self.travel_matrix`. That ordering is load-bearing: `_apply_interventions()` reads `self.travel_matrix` from inside `equation()`. Don't assign `self.travel_matrix` yourself — it will be overwritten.
 
-**When used:**
+`admin_zones` arrives in population-matrix column order, each zone carrying `center_lat`, `center_lon`, and `population`.
 
-- Default implementation called by the validation post-processor
-- Used when `travel_volume` is specified in the config
-- Automatically applied unless a model overrides with its own mobility function
+### Available kernels
 
-**Code:**
+Pick the decay shape that fits your disease; these are the three in the repo today.
+
+| Kernel | Where | Attraction from i to j |
+|---|---|---|
+| Inverse-square gravity (geopy geodesic) | `compartment/helpers.py` `get_gravity_model_travel_matrix()` — used by covid, dengue, ebola | `pop_i * pop_j / d²` |
+| Power-law gravity, α configurable (Haversine) | `hantavirus_human_jax_model/model.py` `gravity()` | `pop_j / d^α` |
+| Exponential distance decay | `mpox_jax_model/model.py` `mobility()` | `pop_j * exp(-d / scale_km)` |
+
+The shared helper is one option, not a default. Writing your own is expected when none of these fit:
+
 ```python
 def gravity_model(df, mass_origin_col, mass_dest_col, distance_col, k=1):
-    """
-    Calculates the gravity model for a given dataframe.
-    
-    Returns:
-        pandas dataframe with an additional column 'gravity' containing
-        k * pop_origin * pop_dest / distance²
-    """
+    """k * pop_origin * pop_dest / distance²"""
     df["gravity"] = k * df[mass_origin_col] * df[mass_dest_col] / df[distance_col] ** 2
     return df
 ```
 
-Models can also implement custom mobility functions with different distance-decay characteristics (exponential decay, power-law with custom exponents, etc.) by defining their own `mobility()` or `gravity()` methods.
+Note that with row normalisation the origin mass cancels out, so `pop_i * pop_j / d²` and `pop_j / d²` produce the *same* matrix — the origin term only changes the absolute flow scale, which σ sets anyway.
 
 ## How Travel Matrices Are Built
 
-The standard implementation follows this general pattern:
+Every kernel in the repo follows this pattern, and yours should too — steps 3-5 are what produce the invariants the tests enforce:
 
 ### Step 1: Calculate Pairwise Distances
 
@@ -284,28 +306,35 @@ foi = S * omega  # Shape: (R, A)
 3. **`S * omega`**:
    - Susceptibles in each (region, age) cell get infected at rate determined by both spatial and demographic structure
 
-### Pattern 3: Custom Mobility Models
+### Pattern 3: A Bespoke Kernel
 
-Some models define mobility functions directly on the disease class:
+When none of the existing kernels fit, declare the parameters your formula needs and implement it in `build_travel_matrix()`. Everything the model needs is already on `self` — `Model.__init__` sets an attribute per declared disease parameter:
 
 ```python
 class MyDiseaseModel(Model):
-    def __init__(self, config):
-        super().__init__(config)
-        self._admin_zones = config["case_file"]["admin_zones"]
-        self._sigma = config.get("travel_volume", {}).get("leaving", 0.0)
-    
-    def mobility(self, admin_zones, sigma, scale_km=500.0):
-        """Custom exponential distance-decay model"""
-        # ... implement custom gravity formula ...
-        return travel_matrix
-    
-    def prepare_initial_state(self):
-        # Build travel matrix using custom mobility model
-        self.travel_matrix = np.array(
-            self.mobility(self._admin_zones, self._sigma)
+    @classmethod
+    def define_parameters(cls, schema):
+        schema.add_disease_parameter(
+            name="travel_sigma", label="Travel Rate (σ)",
+            description="Percentage of each zone's population away from home on a given day.",
+            value_type=ValueType.PERCENTAGE, default=20.0,
+            min_value=0.0, max_value=100.0, unit="%",
         )
-        return self.population_matrix
+        schema.add_disease_parameter(
+            name="travel_scale_km", label="Travel Decay Length",
+            description="Characteristic distance of the exponential mobility decay.",
+            value_type=ValueType.FLOAT, default=500.0,
+            min_value=1.0, max_value=20000.0, unit="km",
+        )
+
+    def build_travel_matrix(self, admin_zones):
+        sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
+        return self.mobility(admin_zones, sigma, scale_km=self.travel_scale_km)
+
+    def mobility(self, admin_zones, sigma, scale_km=500.0):
+        """Exponential distance-decay model."""
+        # ... implement the formula, honouring the invariants above ...
+        return travel_matrix
 ```
 
 **When to use:**
@@ -314,15 +343,21 @@ class MyDiseaseModel(Model):
 - Disease-specific behavior changes (e.g., reduced travel during outbreak)
 - Non-standard distance-decay functions
 
+See `mpox_jax_model` (exponential decay) and `hantavirus_human_jax_model` (power law with a configurable α) for worked examples.
+
 ## Configuration
 
 ### In the Config JSON
 
-Travel behavior is controlled by the `travel_volume` object:
+Mobility parameters live inside the `Disease` block, like every other model parameter:
 
 ```json
 {
   "admin_unit_id": "USA",
+  "Disease": {
+    "disease_type": "COVID_SEIHDR",
+    "travel_sigma": 20.0
+  },
   "case_file": {
     "admin_zones": [
       {
@@ -344,58 +379,40 @@ Travel behavior is controlled by the `travel_volume` object:
         "population": 2693976
       }
     ]
-  },
-  "travel_volume": {
-    "leaving": 0.2
   }
 }
 ```
 
 **Parameters:**
 
-- **`leaving`** (float, 0.0-1.0): Fraction of each region's population that travels elsewhere per timestep
-    - `0.0` = no travel (identity matrix)
-    - `0.1` = 10% of people travel (typical for daily commuting)
-    - `0.2` = 20% travel (default in many models)
-    - Values > 1.0 are normalized to [0, 1]
+- **`Disease.travel_sigma`** (float, 0-100): Percentage of each region's population away from home per timestep
+    - `0` = no travel (identity matrix)
+    - `10` = 10% of people travel (typical for daily commuting)
+    - `20` = 20% travel, the default most models ship with
+    - It's a `PERCENTAGE`, so the value is `20.0`, **not** `0.2`
 
-### In Model Schemas
-
-Models can declare travel parameters in `define_parameters()`:
-
-```python
-@classmethod
-def define_parameters(cls, schema):
-    # Set default travel rate
-    schema.set_travel_volume(leaving_default=0.2)
-    
-    # Models can also define custom mobility parameters
-    schema.add_disease_parameter(
-        "mobility_scale_km",
-        description="Distance scale for exponential decay (km)",
-        default=500.0,
-        value_type=ValueType.RATE,
-    )
-```
+Models that need more than σ declare it alongside: mpox adds `travel_scale_km`, hantavirus_human adds `travel_alpha`. Only the parameters a model actually declares are accepted — the auto-generated Pydantic config rejects the rest.
 
 ## Validation and Edge Cases
 
-### Automatic Handling
+### Handled by the kernels in this repo
 
-The framework automatically handles common edge cases:
+1. **Single region** → 1×1 identity matrix `[[1.0]]`
+2. **Zero sigma** → R×R identity matrix (no travel)
+3. **Model declares no mobility** → identity matrix from the base class's `build_travel_matrix()`
+4. **Coincident or very close zones** → distance is clamped (Haversine kernels) or the degenerate pair is dropped and the population stays home (geopy kernel). Either way rows still sum to 1 — no population is lost.
 
-1. **Single region** → Returns 1×1 identity matrix `[[1.0]]`
-2. **Zero sigma** → Returns R×R identity matrix (no travel)
-3. **Missing travel_volume** → Defaults to σ = 0.0 (no travel)
-4. **Very small distances** → Clamped to minimum 1 km to avoid division by zero
+`tests/test_travel_matrix.py` asserts all four for every registered model, plus the row-sum, diagonal, and ordering invariants. If you write a new kernel, it's covered automatically as soon as the model declares `travel_sigma`.
 
-### Warnings
+### What is *not* checked at runtime
 
-The validation post-processor logs warnings for:
+Nothing validates your matrix while a simulation runs — a malformed one produces quietly wrong output rather than an error. In particular there are no runtime warnings for:
 
-- **Negative distances** (indicates coordinate errors)
-- **Extremely large distances** (> 20,000 km, possible coordinate swap)
-- **Row sums ≠ 1.0** (normalization errors)
+- **Negative or implausible distances** (a swapped lat/lon shows up as an odd travel pattern, not a failure)
+- **Row sums ≠ 1.0** — the FOI just silently gains or loses population each step
+- **Row/column order mismatched to the population matrix** — infections get routed into the wrong zones
+
+Cover these in tests instead. `tests/test_travel_matrix.py` has an `assert_valid_travel_matrix()` helper and an ordering test you can extend.
 
 ### Numerical Stability
 
@@ -424,14 +441,16 @@ a = np.clip(a, 0.0, 1.0)
 - **Validate coordinates** — ensure lat/lon are in correct order and valid ranges
 - **Test with small σ first** — easier to debug spatial mixing with limited travel
 - **Check matrix properties** — row sums = 1.0, diagonal ≈ (1 - σ)
-- **Use custom mobility models** when you have disease-specific behavioral assumptions
+- **Write your own kernel** when you have disease-specific behavioral assumptions — that's the expected path, not an escape hatch
+- **Name the parameter `travel_sigma`**, never plain `sigma` — a collision with a transmission-edge name misroutes it during uncertainty runs
 - **Document your distance-decay choice** — different exponents have different interpretations
 
 ### ❌ Don't
 
 - **Don't use σ > 0.5 without justification** — implies more than half the population travels daily
 - **Don't assume symmetry** — flow from A→B ≠ flow from B→A in real systems
-- **Don't ignore edge cases** — always handle single-region and zero-travel scenarios
+- **Don't ignore edge cases** — always handle single-region, zero-travel, and coincident-coordinate scenarios
+- **Don't set `self.travel_matrix` directly** — override `build_travel_matrix()`; the framework overwrites direct assignments
 - **Don't mix up lat/lon order** — standard is (latitude, longitude), but some systems reverse this
 - **Don't forget to normalize** — raw gravity values must be converted to fractions
 
@@ -562,10 +581,12 @@ Compare model predictions to observed mobility:
 
 ## Related Documentation
 
-- **[DEVELOPING_MODELS.md](./developing-models.md)** — How to build custom mobility models in your disease class
-- **[CONTACT_MATRICES.md](./contact-matrices.md)** — Age-specific contact patterns (complementary to spatial mixing)
+- **[developing-models.md](./developing-models.md)** — How to build custom mobility models in your disease class
+- **[contact-matrices.md](./contact-matrices.md)** — Age-specific contact patterns (complementary to spatial mixing)
 - **[.claude/MODEL_AUTHORING_REFERENCE.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/.claude/MODEL_AUTHORING_REFERENCE.md)** — Internal reference for model development
+- **[compartment/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/model.py)** — The `build_travel_matrix()` hook and `_ensure_travel_matrix()`
 - **[compartment/helpers.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/helpers.py)** — Source code for `gravity_model()` and `get_gravity_model_travel_matrix()`
+- **[tests/test_travel_matrix.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_travel_matrix.py)** — The invariants every model's matrix is held to
 
 ## References
 
