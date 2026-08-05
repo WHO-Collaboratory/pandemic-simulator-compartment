@@ -164,6 +164,28 @@ def test_explicit_required_overrides_manifest(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# 'latest' from the registry is intentionally unsupported
+# ---------------------------------------------------------------------------
+def test_registry_latest_lookup_raises_with_both_remedies():
+    """Resolving 'latest' at load time must stay unimplemented.
+
+    It is only reachable from a cloud run loading an undeclared dataset, where
+    guessing a version would silently break reproducibility. Guard it with a test
+    so nobody helpfully implements it -- the raise is the intended behaviour.
+    """
+    from compartment.datasets import registry_client
+
+    with pytest.raises(NotImplementedError) as ei:
+        registry_client.get_latest_published_version("mobility/kenya")
+
+    message = str(ei.value)
+    assert "mobility/kenya" in message
+    # Must tell the caller both ways out, or it's just a dead end.
+    assert "datasets.yaml" in message
+    assert "dataset_pins" in message
+
+
+# ---------------------------------------------------------------------------
 # Parser-exploit guard — pickle and friends are never read
 # ---------------------------------------------------------------------------
 def test_pickle_file_is_refused_not_read(tmp_path):

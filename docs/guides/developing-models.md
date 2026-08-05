@@ -510,7 +510,22 @@ you. If you hand-wrote `__init__` without calling `super()`, add
     Reading a dataset there (or at import time) is slow and breaks tracing. Load
     once in `load_datasets()`, use `self.mobility` in `equation()`.
 
-### 3. Get the data into your local cache
+### 3. Sign in
+
+The dataset CLI authenticates you to the **platform**, not to AWS — you need a
+platform login and outbound HTTPS, and **no AWS credentials or API keys**. Set
+`WHO_API_URL` (and `COGNITO_WEB_CLIENT_ID`) for your environment, then:
+
+```bash
+python -m compartment.datasets login          # opens a browser for WHO SSO
+python -m compartment.datasets login --native # or email/password
+python -m compartment.datasets whoami
+```
+
+Login lasts about a month; tokens refresh automatically. On a machine with no
+browser (e.g. over SSH), use `login --no-browser` and paste the redirect URL back.
+
+### 4. Get the data into your local cache
 
 Datasets live in S3, not Git. Pull a published version into the local cache the
 SDK reads (`~/.cache/who-collaboratory/datasets/`, override with
@@ -518,20 +533,43 @@ SDK reads (`~/.cache/who-collaboratory/datasets/`, override with
 
 ```bash
 python -m compartment.datasets pull mobility/kenya --version 2026-06-01
+python -m compartment.datasets list            # everything you can use
+python -m compartment.datasets list --mine     # just what you own
 ```
 
-To publish your own dataset (uploads land in a quarantine bucket and are scanned
-before they become usable):
+To publish your own dataset, `push` it. The file lands in a **quarantine** bucket
+and is scanned (malware, file-type, size, and content checks) before it becomes
+usable — the CLI cannot publish directly:
 
 ```bash
 python -m compartment.datasets push \
     --file mobility_kenya.csv --slug mobility/kenya \
-    --version 2026-06-01 --visibility private
-python -m compartment.datasets list --mine
+    --version 2026-06-01 --wait
 ```
+
+`--wait` blocks until the scan finishes and exits `0` on `PUBLISHED`, `2` on
+`REJECTED` (so it works as a CI gate). Without it, poll yourself:
+
+```bash
+python -m compartment.datasets status mobility/kenya --version 2026-06-01
+```
+
+A rejection prints the verdict — fix the file and push the same version again.
 
 If a dataset isn't in the cache, `datasets.load()` fails with the exact `pull`
 command to run.
+
+!!! info "Who can see and change your data"
+    Publishing requires membership in the `DISEASE_MODELER` group; ask an admin if
+    `whoami` doesn't list it. Once published, a dataset is **readable by every
+    modeler on the platform** — there is no private tier, so don't upload anything
+    you can't share. Only you (its owner) can push new versions of your slug.
+
+!!! tip "Optional datasets"
+    Set `required: false` in `datasets.yaml` for data your model can run without.
+    `datasets.load()` then returns `None` instead of raising when it's missing, so
+    handle that case. Leave it at the default (`true`) for a genuine dependency, so
+    a missing dataset fails loudly rather than silently simulating on absent input.
 
 ### How versions are resolved (and why runs reproduce)
 

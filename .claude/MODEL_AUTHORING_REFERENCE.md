@@ -30,7 +30,7 @@ This file is for me (Claude) when the user asks for help adding or modifying a d
 | Intervention implementation code | [compartment/runtime.py](../compartment/runtime.py) `Intervention` class, [compartment/model.py](../compartment/model.py) `_apply_interventions()` |
 | **Uncertainty quantification: LHS, distributions, and CI interpretation** | [docs/guides/uncertainty-quantification.md](../docs/guides/uncertainty-quantification.md) — comprehensive guide |
 | UQ implementation code | [compartment/run_simulation.py](../compartment/run_simulation.py) orchestration, [compartment/helpers.py](../compartment/helpers.py) `generate_LHS_samples()` |
-| **External datasets (Bring-Your-Own-Dataset): declare in `datasets.yaml`, load in a hook** | [compartment/datasets/](../compartment/datasets/) — `loader.py` (load+cache), `resolver.py` (pins→path), `manifest.py`; CLI [compartment/datasets_cli.py](../compartment/datasets_cli.py) (`push`/`pull`/`list`) |
+| **External datasets (Bring-Your-Own-Dataset): declare in `datasets.yaml`, load in a hook** | [compartment/datasets/](../compartment/datasets/) — `loader.py` (load+cache), `resolver.py` (pins→path), `manifest.py`, `auth.py` (Cognito login), `api_client.py`; CLI [compartment/datasets_cli.py](../compartment/datasets_cli.py) (`login`/`push`/`pull`/`list`/`status`) |
 
 When in doubt, *read the file* — the framework changes faster than this reference.
 
@@ -183,7 +183,7 @@ A model that needs external data (mobility, case counts, temperature series) dec
 datasets:
   - name: mobility/kenya      # logical id "<namespace>/<slug>", matches Dataset.slug
     version: "2026-06-01"     # exact (reproducible) — or "latest" for own iteration
-    required: true
+    required: true            # false => load() returns None instead of raising
     format: csv
 ```
 
@@ -199,7 +199,10 @@ def load_datasets(self):                              # the one-time hook
 - **Parity is automatic.** `run_simulation` calls `datasets.configure(mode=…, pins=…, model_dir=…)` before the model is built. The identical `datasets.load()` resolves from `~/.cache/who-collaboratory/datasets/<slug>/<version>/` locally and from S3 (via frozen pins downloaded to `/tmp`, hash-verified) in the cloud. Nothing to wire per-model beyond the hook.
 - **Version precedence:** explicit arg → config `dataset_pins` (frozen reproducibility path, the runtime default) → `datasets.yaml` → newest in local cache (`latest`).
 - **Formats:** only `csv`/`tsv`/`json`/`ndjson` are read; the loader **never** `read_pickle`/`read_hdf` or any code-deserializing reader (this is a deliberate parser-exploit defense — do not add one). `generate_artifact` embeds `datasets.yaml` as `dataset_dependencies`; the platform freezes each dependency to a published `DatasetVersion` at job creation, and `GRAPHQL_QUERY` returns those pins.
-- **Getting data locally:** `python -m compartment.datasets pull <slug> --version <v>` populates the cache; `push` publishes a new immutable version (lands in quarantine, promoted after the scan gate). A cache miss errors with the exact `pull` command.
+- **`required: false` for optional data.** `load()` then returns **`None`** rather than raising when the dataset is missing *or* when the SDK was never configured — so the consumer must handle `None`. Needed for demo models, because `Model.__init__` calls `load_datasets()` and unit tests construct models without configuring the SDK (see `test_klebsiella_amr_model`, which passes `required=False` explicitly since there's no manifest to read when unconfigured). Leave it `true` for a genuine dependency so a missing dataset fails loudly.
+- **Getting data locally:** run `python -m compartment.datasets login` first (Cognito/WHO SSO — **no AWS credentials or api key**; needs `WHO_API_URL` + `COGNITO_WEB_CLIENT_ID`). Then `pull <slug> --version <v>` populates the cache, `list` shows what's available, and `push --wait` publishes a new immutable version and blocks for the scan verdict. A cache miss errors with the exact `pull` command.
+- **The CLI cannot publish.** `push` only lands bytes in quarantine as `PENDING_SCAN`; only the `dataset-scan` Lambda sets `PUBLISHED`, and only after GuardDuty plus content validation pass. `status` / `push --wait` report the verdict (exit `0` published, `2` rejected, `3` pending). Don't add a client-side publish path.
+- **Sharing:** every published dataset is readable by every authenticated modeler (no private/org tier); only the slug's owner may push new versions. Publishing requires the `DISEASE_MODELER` Cognito group.
 
 ## Pitfalls I keep tripping on
 

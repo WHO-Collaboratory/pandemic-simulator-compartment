@@ -1,25 +1,34 @@
 """Registry (GraphQL / AppSync) lookups for dataset versions — cloud only.
 
-Reuses the ``cloud_helpers/gql.py`` request pattern to resolve a dataset
-``slug`` to its currently-published ``DatasetVersion``. In Milestone 1 the
-local cache and pinned cloud paths cover every supported flow, so the
-"latest published" lookup is not wired up yet — it raises an actionable error
-rather than silently guessing a version and breaking reproducibility.
+Resolving "latest published" from the registry at load time is **intentionally
+unsupported**, not merely unimplemented. Do not add it.
 
-Later slices implement this against the ``Dataset`` / ``DatasetVersion``
-registry types, selecting scalar metadata only (never the file bytes) to
-respect the 1 MB DynamoDB scan-page guardrail.
+Trace which paths can reach it:
+
+* **local** — never called; ``_newest_local_version`` resolves ``latest`` from
+  what is actually in the cache.
+* **cloud, dataset declared in datasets.yaml** — never called either, whatever the
+  declared version. The platform already resolved it to a concrete ``PUBLISHED``
+  version and froze it onto ``SimulationJob.dataset_pins`` at job creation, so the
+  resolver finds a pin.
+* **cloud, dataset NOT declared** — the only reachable path, and it means a model
+  called ``datasets.load()`` for something it never declared. Silently resolving
+  "latest" there would make cloud runs non-reproducible: the same saved job would
+  read different bytes after someone published a new version, which is precisely
+  the property this feature exists to guarantee.
+
+So the error below is the correct behaviour. It names both remedies.
 """
 
 from __future__ import annotations
 
 
 def get_latest_published_version(slug: str, *, environment: str | None = None) -> str:
-    """Resolve the newest ``PUBLISHED`` DatasetVersion for ``slug``.
+    """Always raises — see the module docstring.
 
-    Deferred to a later milestone. Callers that reach this in cloud mode
-    without a frozen pin get an error telling them how to make the run
-    deterministic.
+    Intentionally unsupported: reaching this means a cloud run asked for a
+    dataset with no frozen pin, and guessing a version there would silently cost
+    reproducibility. The raise is the feature.
     """
     raise NotImplementedError(
         f"Resolving 'latest' for dataset '{slug}' from the registry is not "
