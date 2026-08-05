@@ -1,8 +1,14 @@
 # Bring-Your-Own-Dataset dependencies for the Klebsiella AMR demo model.
 # Read once via load_datasets(); resolves from the local cache in --mode local
 # and from S3 (via version pins frozen on the SimulationJob) in the cloud.
+#
+# required: false because this is a demo model that must stay constructible
+# without a published dataset — it is instantiated by the smoke/travel-matrix
+# suites and by anyone exploring the repo, neither of which configures the
+# datasets SDK. A real model with a genuine data dependency should leave
+# required at its default (true) so a missing dataset fails loudly.
 datasets:
   - name: amr/antibiotic-use
     version: "2026-01-01"
-    required: true
+    required: false
     format: csv

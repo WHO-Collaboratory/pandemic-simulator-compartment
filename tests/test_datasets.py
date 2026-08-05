@@ -128,6 +128,42 @@ def test_load_requires_configure():
 
 
 # ---------------------------------------------------------------------------
+# Optional datasets — required: false degrades instead of raising
+# ---------------------------------------------------------------------------
+def test_optional_dataset_missing_returns_none(tmp_path):
+    """An optional dataset that isn't in the cache yields None, not an error."""
+    datasets.configure(mode="local", cache_root=tmp_path)
+    assert datasets.load("nope/missing", version="9.9.9", required=False) is None
+
+
+def test_optional_dataset_survives_unconfigured_sdk():
+    """required=False tolerates a never-configured SDK.
+
+    This is the path that model unit tests hit: they construct a model directly,
+    so ``Model.__init__`` -> ``load_datasets()`` runs with no resolver at all.
+    A demo model must not explode there.
+    """
+    loader._reset()
+    assert datasets.load("x/y", required=False) is None
+
+
+def test_required_from_manifest_defaults_to_raising(tmp_path):
+    """``required:`` in datasets.yaml drives the default when not passed."""
+    md = _model_dir_with_manifest(tmp_path, "s/d", "1.0.0")
+    datasets.configure(mode="local", cache_root=tmp_path, model_dir=md)
+    # The fixture manifest omits `required`, so it defaults to True -> raises.
+    with pytest.raises(FileNotFoundError):
+        datasets.load("s/d")
+
+
+def test_explicit_required_overrides_manifest(tmp_path):
+    """An explicit required= argument wins over the manifest declaration."""
+    md = _model_dir_with_manifest(tmp_path, "s/d", "1.0.0")
+    datasets.configure(mode="local", cache_root=tmp_path, model_dir=md)
+    assert datasets.load("s/d", required=False) is None
+
+
+# ---------------------------------------------------------------------------
 # Parser-exploit guard — pickle and friends are never read
 # ---------------------------------------------------------------------------
 def test_pickle_file_is_refused_not_read(tmp_path):

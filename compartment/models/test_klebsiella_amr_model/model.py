@@ -602,10 +602,24 @@ class KlebsiellaAmrModel(Model):
         resolves from the local cache in ``--mode local`` and from S3 (via
         frozen pins) in the cloud. Loaded once here at init — never inside
         ``equation()``.
+
+        Passes ``required=False`` explicitly so the model still constructs when
+        the dataset isn't published *or* when the SDK was never configured at
+        all — unit tests instantiate this model directly, and in that state
+        there is no manifest for ``load()`` to read ``required:`` from. ``load()``
+        then returns ``None`` and callers must tolerate it.
         """
         from compartment import datasets
 
-        self.antibiotic_use = datasets.load("amr/antibiotic-use")
+        self.antibiotic_use = datasets.load("amr/antibiotic-use", required=False)
+        if self.antibiotic_use is None:
+            logger.warning(
+                "Klebsiella AMR demo running without the 'amr/antibiotic-use' "
+                "dataset. Push and pull it to exercise the BYOD read path: "
+                "python -m compartment.datasets pull amr/antibiotic-use"
+            )
+            return
+
         logger.info(
             "Loaded 'amr/antibiotic-use' dataset (%d rows, columns=%s)",
             len(self.antibiotic_use),

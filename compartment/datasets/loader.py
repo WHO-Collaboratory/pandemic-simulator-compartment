@@ -17,6 +17,7 @@ once — never at import time, never inside the JAX-traced ``equation()``.
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from pathlib import Path
@@ -25,6 +26,8 @@ import pandas as pd
 
 from compartment.datasets.manifest import DatasetDep, load_manifest
 from compartment.datasets.resolver import Resolver
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +114,18 @@ def configure(
         _cache.clear()
 
 
+def _declared_dep(name: str) -> DatasetDep | None:
+    """Return the ``datasets.yaml`` declaration for ``name``, if any.
+
+    Safe before :func:`configure` — an unconfigured SDK simply has no manifest
+    to consult, in which case the caller falls back to treating the dataset as
+    required.
+    """
+    if _resolver is None:
+        return None
+    return (_resolver.manifest or {}).get(name)
+
+
 def _require_resolver() -> Resolver:
     if _resolver is None:
         raise RuntimeError(
@@ -121,16 +136,53 @@ def _require_resolver() -> Resolver:
     return _resolver
 
 
-def load(name: str, version: str | None = None) -> pd.DataFrame:
+# Raised when a dataset simply isn't available: the SDK was never configured
+# (we're outside a dataset-aware run, e.g. a unit test constructing a model
+# directly), the file isn't in the cache, or the version can't be resolved.
+# Distinct from a *malformed* dataset, which must always surface.
+_UNAVAILABLE = (RuntimeError, FileNotFoundError, ValueError)
+
+
+def load(
+    name: str, version: str | None = None, *, required: bool | None = None
+) -> pd.DataFrame | None:
     """Return dataset ``name`` as a DataFrame, loading + caching once.
 
     ``name`` is the logical id ``"<namespace>/<slug>"``. ``version`` overrides
     the pin/manifest version. The return type is inferred from the resolved
     file's extension. Repeated calls for the same ``(slug, version)`` return
     the identical cached frame.
+
+    ``required`` controls what happens when the dataset can't be resolved:
+
+    * ``True``  — raise (the default, so a genuine data dependency fails loudly
+      rather than silently simulating on missing inputs).
+    * ``False`` — log a warning and return ``None``.
+    * ``None``  — defer to ``required:`` in the model's ``datasets.yaml``,
+      falling back to ``True`` when there's no declaration to consult.
+
+    Pass ``required=False`` for a dataset the model can run without — notably in
+    demo models, whose ``load_datasets()`` would otherwise break any code path
+    that constructs the model without configuring the SDK first.
     """
-    resolver = _require_resolver()
-    resolved = resolver.resolve(name, explicit_version=version)
+    effective_required = required
+    if effective_required is None:
+        dep = _declared_dep(name)
+        effective_required = dep.required if dep is not None else True
+
+    try:
+        resolver = _require_resolver()
+        resolved = resolver.resolve(name, explicit_version=version)
+    except _UNAVAILABLE as exc:
+        if effective_required:
+            raise
+        logger.warning(
+            "Optional dataset '%s' is unavailable; continuing without it (%s)",
+            name,
+            exc,
+        )
+        return None
+
     key = (resolved.slug, resolved.version)
 
     with _lock:
