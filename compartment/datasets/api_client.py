@@ -33,14 +33,14 @@ class ApiError(RuntimeError):
 
 
 def base_url() -> str:
-    url = os.getenv("WHO_API_URL")
-    if not url:
-        raise ApiError(
-            0,
-            "Set WHO_API_URL to the platform base URL "
-            "(e.g. https://dev.pandemic-simulator.com).",
-        )
-    return url.rstrip("/")
+    """Base URL of the environment that owns datasets.
+
+    A constant, not configuration: there is one dataset catalog and the CLI
+    always targets it. ``WHO_API_URL`` remains available for pointing at a local
+    ``next dev`` while developing the routes, but is not part of normal use --
+    see the note in :mod:`compartment.datasets.auth`.
+    """
+    return os.getenv("WHO_API_URL", auth.DEFAULT_API_URL).rstrip("/")
 
 
 class ApiClient:

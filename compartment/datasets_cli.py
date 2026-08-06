@@ -20,11 +20,18 @@ scan gate (GuardDuty malware scanning plus content validation) can promote it to
 Every published dataset is readable by every authenticated modeler. Only the owner
 of a slug may push new versions of it.
 
+**There is one dataset catalog, shared by every environment.** The CLI always
+targets it — no endpoint or environment to configure, and therefore no way to
+publish to the wrong place because a shell variable was stale. Other environments
+read the same datasets cross-account, so a dataset published once is available to
+every simulation everywhere.
+
 Environment (``.env`` supported):
-    WHO_API_URL             platform base URL, e.g. https://dev.pandemic-simulator.com
-    COGNITO_WEB_CLIENT_ID   Cognito app-client id used for login
-    DATASETS_ENV            environment name for the token cache (default "dev")
     WHO_DATASET_CACHE       local dataset cache root (shared with the SDK)
+
+For local development against a ``next dev`` server, ``WHO_API_URL``,
+``COGNITO_WEB_CLIENT_ID`` and ``DATASETS_ENV`` override the built-in target; they
+are not needed in normal use.
 """
 
 from __future__ import annotations

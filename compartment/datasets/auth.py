@@ -43,6 +43,26 @@ import requests
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
+# Datasets have exactly ONE home. There is no per-environment dataset catalog:
+# one environment owns the buckets, the scan gate, and the registry, and every
+# other environment reads from it cross-account. So the CLI's target is a
+# constant, not something the caller configures.
+#
+# This is deliberate ergonomics as much as architecture. When the target came
+# from ambient environment variables, a stale WHO_API_URL in a shell meant
+# publishing to the wrong place with no indication -- and since every published
+# dataset is readable by every modeler, "the wrong place" is a visible mistake.
+# Hardcoding removes that failure mode entirely.
+#
+# The overrides below exist for local development against `next dev` and for the
+# eventual case of a second deployment; they are not part of normal use.
+DATASETS_ENVIRONMENT = "uat"
+DEFAULT_API_URL = "https://uat.pandemic-simulator.com"
+DEFAULT_COGNITO_CLIENT_ID = "2m0jiv8l45dio9v6gftp1r83g2"  # uat-who-web-client
+DEFAULT_HOSTED_UI_DOMAIN = (
+    "https://uat-pandemic-simulator.auth.us-east-1.amazoncognito.com"
+)
+
 # Fixed loopback ports, matching the callback URLs registered on WhoWebClient in
 # app/backend/auth/packages/src/functions/cognito/Cognito.ts. Cognito requires an
 # exact pre-registered redirect_uri and only permits http:// for the literal host
@@ -67,7 +87,13 @@ class AuthError(RuntimeError):
 # Environment resolution
 # ---------------------------------------------------------------------------
 def _env_name() -> str:
-    return os.getenv("DATASETS_ENV", "dev")
+    """Profile key for the token cache.
+
+    Constant in normal use — it only varies when someone points the CLI at a
+    non-default deployment, and then their tokens shouldn't collide with the real
+    ones.
+    """
+    return os.getenv("DATASETS_ENV", DATASETS_ENVIRONMENT)
 
 
 def _region() -> str:
@@ -76,21 +102,21 @@ def _region() -> str:
 
 def _client_id() -> str:
     """Cognito app-client id for the CLI (the public ``WhoWebClient``)."""
-    cid = os.getenv("COGNITO_WEB_CLIENT_ID") or os.getenv("WHO_COGNITO_CLIENT_ID")
-    if not cid:
-        raise AuthError(
-            "Set COGNITO_WEB_CLIENT_ID to the platform's Cognito web app-client id "
-            "(ask a platform admin, or read it from the environment's .env)."
-        )
-    return cid
+    return (
+        os.getenv("COGNITO_WEB_CLIENT_ID")
+        or os.getenv("WHO_COGNITO_CLIENT_ID")
+        or DEFAULT_COGNITO_CLIENT_ID
+    )
 
 
 def _hosted_ui_domain() -> str:
-    """Base URL of the Cognito hosted UI for this environment."""
+    """Base URL of the Cognito hosted UI for the dataset-owning environment."""
     explicit = os.getenv("COGNITO_HOSTED_UI_DOMAIN")
     if explicit:
         return explicit.rstrip("/")
-    # Mirrors the UserPoolDomain prefix in Cognito.ts: "<stage>-pandemic-simulator".
+    if _env_name() == DATASETS_ENVIRONMENT:
+        return DEFAULT_HOSTED_UI_DOMAIN
+    # Overridden environment: mirror the UserPoolDomain prefix in Cognito.ts.
     return (
         f"https://{_env_name()}-pandemic-simulator.auth.{_region()}.amazoncognito.com"
     )

@@ -231,3 +231,61 @@ def test_only_registered_loopback_ports_are_accepted():
         auth._bind_loopback(8080)
     assert "must be one of" in str(ei.value)
     assert auth.LOOPBACK_PORTS == (34981, 34982, 34983)
+
+
+# ---------------------------------------------------------------------------
+# Single dataset catalog: the CLI target is fixed, not configured
+# ---------------------------------------------------------------------------
+class TestFixedTarget:
+    """There is one dataset catalog, so the CLI must not depend on ambient config.
+
+    Before this, the endpoint and client id came from environment variables. A
+    stale value in a shell published to the wrong environment silently -- and
+    since every published dataset is readable by every modeler, that is a visible
+    mistake, not a private one. These tests pin the target down.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _no_overrides(self, monkeypatch):
+        for var in (
+            "COGNITO_WEB_CLIENT_ID",
+            "WHO_COGNITO_CLIENT_ID",
+            "COGNITO_HOSTED_UI_DOMAIN",
+            "WHO_API_URL",
+            "DATASETS_ENV",
+        ):
+            monkeypatch.delenv(var, raising=False)
+
+    def test_client_id_defaults_without_configuration(self):
+        assert auth._client_id() == auth.DEFAULT_COGNITO_CLIENT_ID
+
+    def test_hosted_ui_defaults_to_the_owning_environment(self):
+        assert auth._hosted_ui_domain() == auth.DEFAULT_HOSTED_UI_DOMAIN
+        assert auth.DATASETS_ENVIRONMENT in auth.DEFAULT_HOSTED_UI_DOMAIN
+
+    def test_api_base_url_defaults_without_configuration(self):
+        from compartment.datasets import api_client
+
+        assert api_client.base_url() == auth.DEFAULT_API_URL
+        assert auth.DATASETS_ENVIRONMENT in api_client.base_url()
+
+    def test_no_missing_configuration_error_is_possible(self):
+        """Neither accessor may raise for want of configuration.
+
+        A modeler with a fresh checkout and no env file must be able to run
+        `login` immediately.
+        """
+        auth._client_id()
+        auth._hosted_ui_domain()
+
+    def test_token_cache_profile_is_the_owning_environment(self):
+        assert auth._env_name() == auth.DATASETS_ENVIRONMENT
+
+    def test_overrides_still_work_for_local_development(self, monkeypatch):
+        """Pointing at a local `next dev` must remain possible."""
+        from compartment.datasets import api_client
+
+        monkeypatch.setenv("WHO_API_URL", "http://localhost:3000/")
+        monkeypatch.setenv("COGNITO_WEB_CLIENT_ID", "local-client")
+        assert api_client.base_url() == "http://localhost:3000"  # trailing / trimmed
+        assert auth._client_id() == "local-client"

@@ -513,8 +513,8 @@ you. If you hand-wrote `__init__` without calling `super()`, add
 ### 3. Sign in
 
 The dataset CLI authenticates you to the **platform**, not to AWS — you need a
-platform login and outbound HTTPS, and **no AWS credentials or API keys**. Set
-`WHO_API_URL` (and `COGNITO_WEB_CLIENT_ID`) for your environment, then:
+platform login and outbound HTTPS, and **no AWS credentials, API keys, or
+configuration**:
 
 ```bash
 python -m compartment.datasets login          # opens a browser for WHO SSO
@@ -524,6 +524,13 @@ python -m compartment.datasets whoami
 
 Login lasts about a month; tokens refresh automatically. On a machine with no
 browser (e.g. over SSH), use `login --no-browser` and paste the redirect URL back.
+
+!!! info "One dataset catalog, shared by every environment"
+    There is a single place datasets live, and the CLI always targets it — there
+    is no environment to pick and nothing to point it at. A dataset you publish
+    once is available to every simulation in every environment, which read it
+    directly. That also means you can't accidentally publish somewhere else
+    because a shell variable was stale.
 
 ### 4. Get the data into your local cache
 
