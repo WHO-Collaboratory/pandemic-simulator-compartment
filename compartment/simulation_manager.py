@@ -49,12 +49,29 @@ class SimulationManager:
                 pred = jax.device_get(pred)
             out = np.asarray(pred)
         else:
-            logger.info("solver: odeint")
-            pred = odeint(step_fn, init_state, ts, params)
+            disease_type = self._get_disease_type()
+            if disease_type == "VECTOR_BORNE":
+                logger.info(f"solver: odeint (loosened tolerances for {disease_type})")
+                pred = odeint(step_fn, init_state, ts, params, rtol=1e-4, atol=1e-6)
+            else:
+                logger.info("solver: odeint")
+                pred = odeint(step_fn, init_state, ts, params)
             out = jax.device_get(pred)
 
         logger.info("run_simulation function ENDING")
         return np.array(out)
+
+    def _get_disease_type(self):
+        """Return the model's disease type, or ``None`` if it doesn't declare one.
+
+        ``Model.disease_type`` raises ``NotImplementedError`` for models that
+        neither define a schema nor override the property, so solver tuning must
+        not depend on it being available.
+        """
+        try:
+            return self.model.disease_type
+        except NotImplementedError:
+            return None
 
     def _euler_integrate(self, step_fn, y0, ts, params):
         """Fixed-step Euler integration.

@@ -534,7 +534,16 @@ class DengueJaxModel(Model):
         current_day = numeric_day + t
         n_regions = self.travel_matrix.shape[0]
 
-        # ---- Unpack all compartments ----
+        # Zero ONLY host infected compartments when they are < 1
+        # Indices based on unpacking order of y:
+        # 14..17 -> I1, I2, I3, I4
+        # 38..49 -> I12, I13, I14, I21, I23, I24, I31, I32, I34, I41, I42, I43
+        I_indices = np.array([14, 15, 16, 17,
+                            38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49])
+        y = y.at[I_indices].set(np.where(y[I_indices] < 1.0, 0.0, y[I_indices]))
+
+
+        # Unpack all compartments AFTER enforcing the I-threshold
         error_val = 1e-6
         (
             SV, EV1, EV2, EV3, EV4, IV1, IV2, IV3, IV4,
