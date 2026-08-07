@@ -56,6 +56,7 @@ nav:
   - Home: index.md
   - Guides:
     - Developing Models: guides/developing-models.md
+    - Adding Your Own Data: guides/adding-datasets.md
     - Interventions Guide: guides/interventions.md
     - Contact Matrices: guides/contact-matrices.md
     - Gravity Model: guides/gravity-model.md

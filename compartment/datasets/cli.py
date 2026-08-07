@@ -10,8 +10,9 @@
 scan runs asynchronously, so nothing blocks on it — poll ``check-status`` with
 the upload-id it prints.
 
-Environment:
-    PANSIM_DATASET_API   Dataset API Function URL (required)
+Environment (all optional — the defaults are what modelers should use):
+    PANSIM_DATASET_API   Dataset API Function URL. Defaults to the UAT
+                         deployment; override only to point at a rebuild.
     PANSIM_WEBAPP_URL    Web app to open for the session token
                          (default https://uat.pandemic-simulator.com)
     PANSIM_HOME          Token cache directory (default ~/.pansim)
