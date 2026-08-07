@@ -754,6 +754,11 @@ class ModelParameterSchema:
     # Editorial / publication metadata (optional — omitted when not set).
     metadata: Optional[ModelMetadata] = None
 
+    # Free-form Markdown documentation sourced from a ``model.md`` file in the
+    # model's folder (optional — omitted when not present). Rendered on the
+    # results page "You Should Know" accordion via Tailwind Typography.
+    model_documentation: Optional[str] = None
+
     # Model-level run mode: DETERMINISTIC or STOCHASTIC.
     # Derived from the model class's STOCHASTIC attribute.
     run_mode: str = "DETERMINISTIC"
@@ -849,6 +854,13 @@ class ModelParameterSchema:
             "run_mode": self.run_mode,
             # Editorial / publication metadata (omitted when not set)
             **({"metadata": self.metadata.to_dict()} if self.metadata else {}),
+            # Free-form Markdown documentation from the model's model.md file
+            # (omitted when not present). Rendered on the results page.
+            **(
+                {"documentation": self.model_documentation}
+                if self.model_documentation
+                else {}
+            ),
             # num_runs is surfaced solely as a "disease_parameter" custom field
             # (with default_value/min/max in its metadata) — declare it via
             # schema.add_disease_parameter(name="num_runs", ...). It is

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import sys
 from abc import ABC
+from pathlib import Path
 from typing import Any, ClassVar
 
 import numpy as np
@@ -333,9 +335,39 @@ class Model(ABC):
 
         # run_mode is derived from the class-level STOCHASTIC flag (not
         # a schema field) since it reflects the integrator, not a parameter.
-        built.run_mode = "STOCHASTIC" if getattr(cls, "STOCHASTIC", False) else "DETERMINISTIC"
+        built.run_mode = (
+            "STOCHASTIC" if getattr(cls, "STOCHASTIC", False) else "DETERMINISTIC"
+        )
+
+        # Optional free-form Markdown documentation: if a ``model.md`` file
+        # sits alongside the model's module, read it into the schema so it is
+        # emitted in the artifact JSON (under ``documentation``) and rendered
+        # on the results page. Missing/unreadable files are silently ignored.
+        doc = cls._read_model_documentation()
+        if doc:
+            built.model_documentation = doc
 
         return built
+
+    @classmethod
+    def _read_model_documentation(cls) -> str | None:
+        """
+        Return the contents of a ``model.md`` file in the model's folder, if any.
+
+        The file is expected to live next to the subclass's module
+        (e.g. ``compartment/models/<name>/model.md``). Returns ``None`` when the
+        module path can't be resolved, the file is absent, or it is empty.
+        """
+        module = sys.modules.get(cls.__module__)
+        module_file = getattr(module, "__file__", None)
+        if not module_file:
+            return None
+        md_path = Path(module_file).parent / "model.md"
+        try:
+            text = md_path.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeDecodeError):
+            return None
+        return text or None
 
     # ------------------------------------------------------------------
     # Shared parameter helpers (inherited by all subclasses)
@@ -863,9 +895,9 @@ class Model(ABC):
             parts = key.split(".")
             if len(parts) == 3 and parts[0] == "intervention":
                 _, intervention_id, field_name = parts
-                config.intervention_dict.setdefault(intervention_id, {})[
-                    field_name
-                ] = val
+                config.intervention_dict.setdefault(intervention_id, {})[field_name] = (
+                    val
+                )
             elif len(parts) == 1:
                 name = parts[0]
                 if name in edge_vars:
@@ -1306,9 +1338,7 @@ class Model(ABC):
         Return an array shaped like ``y``, typically
         ``jnp.stack([derivs[c] for c in self.compartment_list])``.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} must implement equation()."
-        )
+        raise NotImplementedError(f"{type(self).__name__} must implement equation().")
 
     def _resolve_step_function(self):
         """
@@ -1323,7 +1353,5 @@ class Model(ABC):
         """
         cls = type(self)
         if cls.equation is Model.equation:
-            raise NotImplementedError(
-                f"{cls.__name__} must implement equation()."
-            )
+            raise NotImplementedError(f"{cls.__name__} must implement equation().")
         return self.equation
