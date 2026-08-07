@@ -6,7 +6,7 @@ This document explains how contact matrices are created, loaded, aggregated, and
 
 Contact matrices quantify **age-specific social mixing patterns** — how frequently people in different age groups come into contact with each other. These mixing patterns are critical for modeling respiratory and other contact-transmitted diseases, as they determine the force of infection across demographic groups.
 
-The Pandemic Simulator uses **country-specific synthetic contact matrices** from [Prem et al. 2021](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009098), covering 177 countries with 16 five-year age bands (0-4, 5-9, ..., 75+). When a country's ISO code is not in the Prem dataset, the framework falls back to a **precomputed income-level average** (grouped by World Bank income classification), and if no income group is available, to a **global average** across all 177 countries.
+The Pandemic Simulator uses **country-specific synthetic contact matrices** from [Prem et al. 2021](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009098), covering 177 countries with 16 five-year age bands (0-4, 5-9, ..., 75+). When a country's ISO code is not in the Prem dataset, the framework uses a **precomputed income-level average** grouped by [World Bank income classification](https://blogs.worldbank.org/en/opendata/understanding-country-income--world-bank-group-income-classifica), and if no income group is available, a **global average** across all 177 countries is used.
 
 ## Three Ways to Supply a Contact Matrix
 
@@ -394,8 +394,9 @@ print("Prevalence shape:", prevalence.shape)
 ## References
 
 - **Prem et al. 2021:** ["Projecting contact matrices in 177 geographical regions: An update and comparison with empirical data for the COVID-19 era"](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009098), *PLOS Computational Biology*
-- **POLYMOD Study:** Original empirical contact survey data from 8 European countries (Mossong et al. 2008)
 - **Synthetic Contact Matrices Repository:** [https://github.com/kieshaprem/synthetic-contact-matrices](https://github.com/kieshaprem/synthetic-contact-matrices)
+- **POLYMOD Study:** Original empirical contact survey data from 8 European countries (Mossong et al. 2008)
+- **World Bank income classification:** [Understanding country income: World Bank Group income classifications for FY26 (July 1, 2025–June, 2026)](https://blogs.worldbank.org/en/opendata/understanding-country-income--world-bank-group-income-classifica)
 
 ---
 
