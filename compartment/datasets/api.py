@@ -16,6 +16,12 @@ DEFAULT_TIMEOUT_SECONDS = 30
 # own, much longer budget than the JSON API calls.
 TRANSFER_TIMEOUT_SECONDS = 900
 
+# Function URL from `tofu output dataset_api_url` (shared-services, UAT).
+# Datasets exist only in UAT, so there is one URL for everyone and modelers
+# need no environment variable. Stable unless the Lambda is destroyed and
+# recreated; override with PANSIM_DATASET_API when pointing at a rebuild.
+DEFAULT_API_URL = "https://tuuga2x6umbh76lwibwkovxqxi0nidvq.lambda-url.us-east-1.on.aws"
+
 
 class ApiError(Exception):
     """Raised when the dataset API returns a non-2xx response."""
@@ -25,7 +31,7 @@ class DatasetApi:
     """Thin wrapper over the dataset API's five routes."""
 
     def __init__(self, base_url: str | None = None):
-        base_url = base_url or os.environ.get("PANSIM_DATASET_API", "")
+        base_url = base_url or os.environ.get("PANSIM_DATASET_API") or DEFAULT_API_URL
         if not base_url:
             raise ApiError(
                 "Set PANSIM_DATASET_API to the dataset API Function URL "
