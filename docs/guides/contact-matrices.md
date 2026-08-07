@@ -2,6 +2,29 @@
 
 This document explains how contact matrices are created, loaded, aggregated, and used within the Pandemic Simulator's compartmental modeling framework.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Contact Matrix Methods](#contact-matrix-methods)
+  - [Asymmetric Matrices](#asymmetric-matrices)
+  - [Matrix Interpretation Example](#matrix-interpretation-example)
+- [Aggregation: From 16 Bands to Your Model's Age Groups](#aggregation-from-16-bands-to-your-models-age-groups)
+  - [Aggregation Algorithm](#aggregation-algorithm)
+  - [Why This Works](#why-this-works)
+  - [Example](#example)
+- [Three Ways to Add a Contact Matrix in Code](#three-ways-to-add-a-contact-matrix-in-code)
+  - [1. Built-in Contact Matrix Default (Recommended)](#1-built-in-contact-matrix-default-recommended)
+  - [2. Custom Contact Matrix in Code](#2-custom-contact-matrix-in-code)
+  - [3. Temporarily Testing Custom Contact Matrix](#3-temporarily-testing-custom-contact-matrix)
+- [Using Contact Matrices in Your Model](#using-contact-matrices-in-your-model)
+  - [In define_parameters()](#in-define_parameters)
+  - [In equation()](#in-equation)
+- [Validation and Warnings](#validation-and-warnings)
+- [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
+- [Related Documentation](#related-documentation)
+- [References](#references)
+
 ## Overview
 
 Contact matrices quantify **age-specific social mixing patterns** — how frequently people in different age groups come into contact with each other. These mixing patterns are critical for modeling respiratory and other contact-transmitted diseases, as they determine the force of infection across demographic groups.
@@ -28,6 +51,12 @@ This asymmetry is critical for force-of-infection calculations because:
 - But they may contact larger groups (e.g., working-age caregivers) frequently
 - The FOI on the elderly depends on the **prevalence** in those working-age groups **times** the contact rate
 
+**Further reading** — using asymmetric contact matrices in force-of-infection calculations:
+
+- Wallinga, Teunis & Kretzschmar 2006, ["Using Data on Social Contacts to Estimate Age-specific Transmission Parameters for Respiratory-spread Infectious Agents"](https://doi.org/10.1093/aje/kwj317), *American Journal of Epidemiology*
+- Mossong et al. 2008 (POLYMOD), ["Social Contacts and Mixing Patterns Relevant to the Spread of Infectious Diseases"](https://doi.org/10.1371/journal.pmed.0050074), *PLOS Medicine*
+- Franco et al. 2022, ["Inferring age-specific differences in susceptibility to and infectiousness upon SARS-CoV-2 infection based on Belgian social contact data"](https://journals.plos.org/ploscompbiol/article?id=10.1371%2Fjournal.pcbi.1009965), *PLOS Computational Biology*
+
 ### Matrix Interpretation Example
 
 For a 3-group model (children, adults, elderly):
@@ -47,10 +76,11 @@ Elderly      2.0     3.0     5.0
 
 ## Aggregation: From 16 Bands to Your Model's Age Groups
 
-The Prem matrices are 16×16 (five-year age bands), but your model may have fewer, broader groups (e.g., 0-17, 18-55, 56+). The framework aggregates using **fractional-membership weighting**.
+The Prem matrices are 16×16 (five-year age bands), but your model may have fewer, broader groups (e.g., 0-17, 18-55, 56+). The framework will automatically aggregate to your specified age groups.
 
 ### Aggregation Algorithm
 
+ 
 Given a 16×16 source matrix **M** and target age ranges, the aggregated A×A matrix is:
 
 ```
@@ -71,7 +101,7 @@ The asymmetric row/column treatment preserves the "mean total contacts per perso
 
 **Key property:** Aggregating a Prem matrix back to its own 16 bands returns the original matrix exactly.
 
-### Fractional Membership Example
+### Example
 
 If your model has a group `age_0_17` (0-17 years), it overlaps Prem bands:
 
@@ -82,33 +112,37 @@ If your model has a group `age_0_17` (0-17 years), it overlaps Prem bands:
 
 The aggregator computes these overlaps automatically for every source-target pair.
 
+This "sum over contact columns, average over participant rows" scheme is a standard published aggregation — essentially `hhh4contacts::aggregateC()` (Meyer & Held 2017) with uniform weights, resting on the methodology of Arregui et al. 2018 (see [References](#references)).
+
 ## Three Ways to Add a Contact Matrix in Code
 
 The framework supports three approaches for defining contact matrices. They are listed below from lowest to highest precedence: when more than one approach specifies the same matrix cell, the one listed later overrides the earlier ones.
 
 ### 1. Built-in Contact Matrix Default (Recommended)
 
-This approach provides realistic, country-specific mixing patterns without requiring you to manually specify contact rates.
+This approach provides realistic, country-specific mixing patterns without requiring you to manually specify contact rates. This method uses the three-tier matrix lookup detailed below:
+
+**Three-tier matrix lookup:**
+
+| Tier | Condition | Source |
+|------|-----------|--------|
+| 1 | Country code is in the Prem 2021 paper (177 countries) | Country-specific synthetic 16×16 matrix |
+| 2 | Country code has a World Bank income classification in the CSV | Average of all Prem matrices at that income level |
+| 3 | Neither | Global average across all 177 Prem country matrices |
+
+
+* Each country's income-group assignment is defined in the [contact_matrices_economics.csv](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/contact_matrices/data/contact_matrices_economics.csv), which maps every country to its tier and World Bank income classification.
+
+* World Bank income classification: The four income groups are: **High income**, **Upper middle income**, **Lower middle income**, **Low income**. Each group's precomputed average is stored in `income_defaults.npz` and loaded once on first use. If the income group assignment ever needs to change, regenerate this file with `python tools/build_income_matrices.py`.
+
+**How it works:**
 
 - Declare an inclusive `age_range=(low, high)` on every demographic group in your model schema
 - At model instantiation, the framework:
   1. Reads the simulation's `admin_unit_id` (e.g., `"USA"`, `"DEU.1_1"`)
   2. Extracts the ISO3 country code
   3. Resolves a 16×16 source matrix using a **three-tier lookup** (see below)
-  4. Aggregates the matrix down to your declared age bands using [fractional-membership weighting](#aggregation-from-16-bands-to-your-models-age-groups)
-
-**Three-tier matrix lookup:**
-
-| Tier | Condition | Source |
-|------|-----------|--------|
-| 1 | ISO3 is in the Prem 2021 bundle (177 countries) | Country's own synthetic 16×16 matrix |
-| 2 | ISO3 has a World Bank income classification in the bundled CSV | Precomputed average of all Prem matrices at that income level |
-| 3 | Neither | Global average across all 177 country matrices |
-
-
-* Each country's income-group assignment is defined in the [`contact_matrices_economics.csv`](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/contact_matrices/data/contact_matrices_economics.csv), which maps every country to its tier and World Bank income classification.
-
-* World Bank income classification: The four income groups are: **High income**, **Upper middle income**, **Lower middle income**, **Low income**. Each group's precomputed average is stored in `income_defaults.npz` and loaded once on first use. If the income group assignment ever needs to change, regenerate this file with `python tools/build_income_matrices.py`.
+  4. Aggregates the matrix down to your declared age bands using [aggregation methods detailed above](#aggregation-from-16-bands-to-your-models-age-groups)
 
 
 **Example:**
@@ -195,67 +229,6 @@ def define_parameters(cls, schema):
 }
 ```
 
-## Implementation Details
-
-### Code Structure
-
-```
-compartment/contact_matrices/
-├── __init__.py           # Public API, PREM_BAND_EDGES constant
-├── loader.py             # load_country_matrix(), income_matrix(), iso_income_group(), default_matrix()
-├── aggregator.py         # aggregate_to_bands()
-└── data/
-    ├── contact_all.npz              # Bundled Prem 2021 matrices (177 countries)
-    ├── income_defaults.npz          # Precomputed income-level averages (4 groups)
-    └── contact_matrices_economics.csv  # ISO → income group mapping
-```
-
-To regenerate `income_defaults.npz` (e.g., if the CSV is updated):
-```bash
-python tools/build_income_matrices.py
-```
-
-### Key Functions
-
-#### `load_country_matrix(iso3: str) -> np.ndarray | None`
-- Returns the 16×16 Prem matrix for the given ISO3 code
-- Case-insensitive: `"usa"` and `"USA"` both work
-- Returns `None` if the country is not in the bundle
-
-#### `iso_income_group(iso3: str | None) -> str | None`
-- Returns the World Bank income level for an ISO that lacks a synthetic matrix (e.g., `"High income"`)
-- Returns `None` for ISO codes that have their own synthetic matrix, have no income classification, or are unknown
-- Used internally by `_build_contact_matrix` for the tier-2 fallback
-
-#### `income_matrix(level: str) -> np.ndarray | None`
-- Returns the precomputed average 16×16 matrix for one of the four income groups
-- `level` must be one of `INCOME_LEVELS`: `"High income"`, `"Upper middle income"`, `"Lower middle income"`, `"Low income"`
-- Loaded once from `income_defaults.npz` and cached; returns a copy
-- Returns `None` for an unrecognised level
-
-#### `default_matrix() -> np.ndarray`
-- Returns the global-average 16×16 matrix
-- Computed as the mean across all 177 country matrices
-- Cached after first call
-
-#### `aggregate_to_bands(matrix: np.ndarray, target_ranges: list[tuple[int, int]]) -> np.ndarray`
-- Collapses a 16×16 Prem matrix to A×A bands
-- `target_ranges`: list of inclusive (low, high) age tuples, e.g., `[(0, 17), (18, 55), (56, 120)]`
-- Returns an A×A matrix in the same units (mean daily contacts per person)
-
-### Model Integration
-
-The `Model` base class method `_build_contact_matrix(config)` orchestrates the entire process:
-
-1. Check if the model declares demographic groups — if not, return `None`
-2. Resolve effective group IDs (config demographics take precedence over schema defaults)
-3. Start with an identity matrix (A×A)
-4. If conditions are met (all groups have `age_range`, no overrides), resolve a source matrix using the **three-tier lookup**: synthetic → income-level average → global average
-5. Apply schema-level overrides (if any)
-6. Apply config-level overrides (if any)
-7. Return the final matrix as a JAX/NumPy array
-
-The resulting matrix is stored in `self.contact_matrix` and used by the model's `equation()` function to compute age-stratified force of infection.
 
 ## Using Contact Matrices in Your Model
 
@@ -388,8 +361,6 @@ print("Prevalence shape:", prevalence.shape)
 
 ## Related Documentation
 
-- **[DEVELOPING_MODELS.md](./developing-models.md)** — General guide to authoring new models, includes contact matrix section
-- **[.claude/MODEL_AUTHORING_REFERENCE.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/.claude/MODEL_AUTHORING_REFERENCE.md)** — Internal reference for model development patterns and pitfalls
 - **[compartment/contact_matrices/](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/contact_matrices/)** — Source code for loader, aggregator, and bundled data
 - **[tests/test_contact_matrices.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_contact_matrices.py)** — Unit tests demonstrating aggregation behavior
 - **[tests/test_demographics.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_demographics.py)** — Integration tests for `_build_contact_matrix()`
@@ -398,10 +369,14 @@ print("Prevalence shape:", prevalence.shape)
 
 - **Prem et al. 2021:** ["Projecting contact matrices in 177 geographical regions: An update and comparison with empirical data for the COVID-19 era"](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009098), *PLOS Computational Biology*
 - **Synthetic Contact Matrices Repository:** [https://github.com/kieshaprem/synthetic-contact-matrices](https://github.com/kieshaprem/synthetic-contact-matrices)
+- **Aggregation method — `hhh4contacts::aggregateC()`:** Meyer & Held 2017, ["Incorporating social contact data in spatio-temporal models for infectious disease spread"](https://doi.org/10.1093/biostatistics/kxw051), *Biostatistics* (see the [`aggregateC` reference](https://cran.r-project.org/web/packages/hhh4contacts/refman/hhh4contacts.html#aggregateC), which sums over contact columns and averages over participant rows — uniform weights by default, matching this framework's aggregation methods)
+- **Aggregation method (foundational):** Arregui et al. 2018, ["Projecting social contact matrices to different demographic structures"](https://doi.org/10.1371/journal.pcbi.1006638), *PLOS Computational Biology*
 - **POLYMOD Study:** Original empirical contact survey data from 8 European countries [Mossong et al. 2008](https://doi.org/10.1371/journal.pmed.0050074)
+- **Asymmetric contact matrices in force-of-infection calculations:** Wallinga, Teunis & Kretzschmar 2006, ["Using Data on Social Contacts to Estimate Age-specific Transmission Parameters for Respiratory-spread Infectious Agents"](https://doi.org/10.1093/aje/kwj317), *American Journal of Epidemiology*
+- **Asymmetric contact matrices (applied, COVID-19):** Franco et al. 2022, ["Inferring age-specific differences in susceptibility to and infectiousness upon SARS-CoV-2 infection based on Belgian social contact data"](https://journals.plos.org/ploscompbiol/article?id=10.1371%2Fjournal.pcbi.1009965), *PLOS Computational Biology*
 - **World Bank income classification:** [Understanding country income: World Bank Group income classifications for FY26 (July 1, 2025–June, 2026)](https://blogs.worldbank.org/en/opendata/understanding-country-income--world-bank-group-income-classifica)
 
 ---
 
-**Last Updated:** July 20, 2026  
+**Last Updated:** August 7, 2026  
 **Version:** 0.2.0
