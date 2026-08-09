@@ -252,7 +252,6 @@ low_level_workers = 2  # parallel UQ runs within each
 ## Related Documentation
 
 - **[INTERVENTIONS.md](./interventions.md)** — Varying intervention effectiveness
-- **[DEVELOPING_MODELS.md](./developing-models.md)** — Model development guide
 - **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; shades the mean/lower/upper parameter uncertainty bands from UNCERTAINTY output
 - **[compartment/run_simulation.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/run_simulation.py)** — UQ orchestration code
 - **[compartment/helpers.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/helpers.py)** — LHS implementation (`generate_LHS_samples`)
