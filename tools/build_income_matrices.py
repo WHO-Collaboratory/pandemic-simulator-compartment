@@ -3,7 +3,7 @@
 Reads contact_matrices_economics.csv to identify which income group each
 country belongs to.  For each of the four World Bank income levels, averages
 the Prem 2021 synthetic matrices of all countries classified as
-"Synthetic POLYMOD" at that income level, then writes the result to
+"Prem - Synthetic POLYMOD" at that income level, then writes the result to
 compartment/contact_matrices/data/income_defaults.npz.
 
 Run from the repo root:
@@ -40,11 +40,11 @@ def main() -> None:
             if not k.startswith("__")
         }
 
-    # Parse CSV: collect ISO3 codes that have Synthetic POLYMOD + a known income.
+    # Parse CSV: collect ISO3 codes that have Prem - Synthetic POLYMOD + a known income.
     income_to_isos: dict[str, list[str]] = {lvl: [] for lvl in INCOME_LEVELS}
     with open(_CSV, newline="") as f:
         for row in csv.DictReader(f):
-            if row["Matrix Group"] == "Synthetic POLYMOD" and row["Income"] in INCOME_LEVELS:
+            if row["Tier"] == "Prem - Synthetic POLYMOD" and row["Income"] in INCOME_LEVELS:
                 income_to_isos[row["Income"]].append(row["ISO"])
 
     # Compute and report averages.
