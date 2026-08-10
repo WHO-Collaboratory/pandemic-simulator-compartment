@@ -31,7 +31,7 @@ INCOME_LEVELS: tuple[str, ...] = (
 
 # Built once at import time: ISO3 → income level for countries that lack a
 # synthetic matrix but do have an assigned income group in the CSV.
-# ISOs with Matrix Group == "Synthetic POLYMOD" are intentionally excluded —
+# ISOs with Tier == "Prem - Synthetic POLYMOD" are intentionally excluded —
 # they are served by load_country_matrix() and never need this lookup.
 def _build_iso_income_map() -> dict[str, str]:
     result: dict[str, str] = {}
@@ -39,7 +39,7 @@ def _build_iso_income_map() -> dict[str, str]:
         return result
     with open(_CSV_PATH, newline="") as f:
         for row in csv.DictReader(f):
-            matrix_group = row.get("Matrix Group", "")
+            matrix_group = row.get("Tier", "")
             if matrix_group in INCOME_LEVELS:
                 result[row["ISO"]] = matrix_group
     return result

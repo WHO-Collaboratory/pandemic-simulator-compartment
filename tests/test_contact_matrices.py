@@ -185,7 +185,7 @@ class TestIncomeMatrix:
 
 class TestIsoIncomeGroup:
     def test_known_income_only_iso(self):
-        # ASM (American Samoa) has Matrix Group = "High income" in the CSV
+        # ASM (American Samoa) has Tier = "High income" in the CSV
         assert iso_income_group("ASM") == "High income"
         assert iso_income_group("asm") == "High income"  # case-insensitive
 
@@ -194,7 +194,7 @@ class TestIsoIncomeGroup:
         assert iso_income_group("USA") is None
 
     def test_global_average_iso_returns_none(self):
-        # JEY (Jersey) has Matrix Group = "Global Average"
+        # JEY (Jersey) has Tier = "Global Average"
         assert iso_income_group("JEY") is None
 
     def test_none_input_returns_none(self):
@@ -205,13 +205,13 @@ class TestIsoIncomeGroup:
         assert iso_income_group("ZZZ") is None
 
     def test_lower_middle_income_iso(self):
-        # HTI (Haiti) has Matrix Group = "Lower middle income"
+        # HTI (Haiti) has Tier = "Lower middle income"
         assert iso_income_group("HTI") == "Lower middle income"
 
     def test_low_income_iso(self):
-        # SOM (Somalia) has Matrix Group = "Low income"
+        # SOM (Somalia) has Tier = "Low income"
         assert iso_income_group("SOM") == "Low income"
 
     def test_upper_middle_income_iso(self):
-        # DMA (Dominica) has Matrix Group = "Upper middle income"
+        # DMA (Dominica) has Tier = "Upper middle income"
         assert iso_income_group("DMA") == "Upper middle income"
