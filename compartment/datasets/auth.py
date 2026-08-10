@@ -16,6 +16,11 @@ import time
 import webbrowser
 from pathlib import Path
 
+try:
+    import termios
+except ImportError:  # Windows has no tty line discipline to reconfigure.
+    termios = None
+
 CACHE_DIR = Path(os.environ.get("PANSIM_HOME", Path.home() / ".pansim"))
 CACHE_PATH = CACHE_DIR / "dataset-session.json"
 
@@ -72,14 +77,74 @@ def _prompt_for_token() -> str:
     except Exception:
         pass
 
+    print("Session token: ", end="", file=sys.stderr, flush=True)
     try:
-        token = input("Session token: ").strip()
+        token = _read_pasted_line().strip()
     except (EOFError, KeyboardInterrupt):
         raise AuthError("No session token provided.")
 
     if not token:
         raise AuthError("No session token provided.")
     return token
+
+
+def _read_pasted_line() -> str:
+    """Read one pasted line of any length from the terminal.
+
+    A session token runs past 1100 characters, and macOS caps a canonical-mode
+    input line at MAX_CANON (1024 bytes): once that buffer fills the tty driver
+    drops everything that follows, the newline included, so Enter does nothing
+    until the user deletes a character. Reading with ICANON off has no cap.
+    Piped or redirected stdin never went through the line discipline, so it
+    takes the ordinary read.
+    """
+    if termios is None or not sys.stdin.isatty():
+        return sys.stdin.readline()
+    try:
+        return _read_noncanonical(sys.stdin.fileno())
+    except termios.error:
+        # Some pseudo-terminals refuse tcsetattr; a capped read beats none.
+        return sys.stdin.readline()
+
+
+def _read_noncanonical(fd: int) -> str:
+    """Collect characters until Enter with the tty's line discipline disabled.
+
+    ECHO stays on so a paste is still visible, matching the old prompt. Losing
+    ICANON means the driver no longer handles erase itself, hence the backspace
+    branch below; it is enough for a fat-fingered paste, not a line editor.
+    """
+    saved = termios.tcgetattr(fd)
+    mode = termios.tcgetattr(fd)
+    mode[3] &= ~termios.ICANON  # lflag
+    mode[6] = list(mode[6])  # cc
+    mode[6][termios.VMIN] = 1  # block until at least one byte arrives
+    mode[6][termios.VTIME] = 0
+
+    chars: list[str] = []
+    try:
+        termios.tcsetattr(fd, termios.TCSANOW, mode)
+        while True:
+            char = sys.stdin.read(1)
+            if char == "" or char in "\r\n":  # EOF or Enter
+                break
+            if char == "\x03":
+                raise KeyboardInterrupt
+            if char == "\x04":  # Ctrl-D
+                break
+            if char in ("\x7f", "\b"):
+                if chars:
+                    chars.pop()
+                continue
+            chars.append(char)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, saved)
+        # Enter echoed a bare carriage return, leaving the cursor mid-line.
+        print(file=sys.stderr)
+
+    line = "".join(chars)
+    # Terminals with bracketed paste enabled wrap the payload in markers.
+    return line.replace("\x1b[200~", "").replace("\x1b[201~", "")
 
 
 # ---------------------------------------------------------------------------
