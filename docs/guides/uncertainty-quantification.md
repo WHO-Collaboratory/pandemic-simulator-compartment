@@ -3,40 +3,18 @@
 This document explains how to quantify and communicate parameter uncertainty in compartmental disease models using the Pandemic Simulator's built-in parameter uncertainty quantification (UQ) system.
 
 
-## Run Modes: DETERMINISTIC vs. UNCERTAINTY
-
-The simulator supports two run modes:
-
-### DETERMINISTIC Mode
-
-```json
-{
-  "run_mode": "DETERMINISTIC"
-}
-```
-
 **Behavior:**
 
 - Runs model **once** with parameter point estimates
 - Returns a single trajectory for each compartment
 - Fast (seconds to minutes)
-- Use for: initial exploration, testing, baseline scenarios
 
-### UNCERTAINTY Mode
-
-```json
-{
-  "run_mode": "UNCERTAINTY",
-  "n_simulations": 30
-}
-```
 
 **Behavior:**
 
 - Runs model **N times** with sampled parameters (default: 30)
 - Returns **median, lower bound (2.5%), upper bound (97.5%)** for each compartment
 - Slower (minutes to hours, depending on N and model complexity)
-- Use for: final results, communicating parameter uncertainty, policy analysis
 
 **Note:** Both modes still run **with and without interventions** in parallel (control run), so you get parameter uncertainty bands for both scenarios.
 
@@ -233,20 +211,6 @@ The framework uses a **95% simulation-based interval** by default:
 - **lower:** 2.5th percentile of simulation results
 - **upper:** 97.5th percentile of simulation results
 
-
-### Parallelization
-
-The framework runs simulations in **parallel** using multiprocessing:
-
-```python
-# From run_simulation.py
-top_level_workers = 2  # with vs. without interventions
-low_level_workers = 2  # parallel UQ runs within each
-```
-
-**Total parallelism:** Up to `top_level_workers * low_level_workers` cores used.
-
-**Tuning:** On machines with many cores, increase `low_level_workers` in the code for faster UQ runs.
 
 
 ## Related Documentation
