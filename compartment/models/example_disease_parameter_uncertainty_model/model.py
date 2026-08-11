@@ -71,19 +71,21 @@ class ExampleDiseaseParameterUncertaintyModel(Model):
         # )
 
         # --- Optional: interventions ---
-        # schema.add_intervention(
-        #     id="my_intervention",
-        #     label="My Intervention",
-        #     description="Reduces transmission while active",
-        #     target_rates=["beta"],
-        #     adherence=50.0,
-        #     transmission_reduction=50.0,
-        # )
+        schema.add_intervention(
+            id="my_intervention",
+            label="My Intervention",
+            description="Reduces transmission while active",
+            target_rates=["beta"],
+            adherence=50.0,
+            transmission_reduction=50.0,
+        )
 
         # --- Optional: age-stratified demographics + contact matrix ---
-        # schema.add_demographic_group("age_0_17",  "Children", default_weight=33.3, age_range=(0, 17))
-        # schema.add_demographic_group("age_18_55", "Adults",   default_weight=44.4, age_range=(18, 55))
-        # schema.add_demographic_group("age_56_plus","Elderly", default_weight=22.3, age_range=(56, 120))
+        schema.add_demographic_group("age_0_4",    "Young children", default_weight=6.0,  age_range=(0, 4))
+        schema.add_demographic_group("age_5_17",   "School-age",     default_weight=16.0, age_range=(5, 17))
+        schema.add_demographic_group("age_18_49",  "Young adults",   default_weight=42.0, age_range=(18, 49))
+        schema.add_demographic_group("age_50_64",  "Older adults",   default_weight=19.0, age_range=(50, 64))
+        schema.add_demographic_group("age_65_plus","Seniors",        default_weight=17.0, age_range=(65, 120))
 
     def __init__(self, config):
         super().__init__(config)
