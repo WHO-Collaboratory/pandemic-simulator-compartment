@@ -24,6 +24,35 @@ import json
 import sys
 from pathlib import Path
 
+from compartment.datasets import artifact_refs_for_model_dir
+
+
+# ---------------------------------------------------------------------------
+# Dataset references
+# ---------------------------------------------------------------------------
+
+
+def _model_dir_for_class(model_class) -> Path | None:
+    """Directory holding a model class's source, or None if it isn't on disk."""
+    module = sys.modules.get(model_class.__module__)
+    module_file = getattr(module, "__file__", None)
+    return Path(module_file).parent if module_file else None
+
+
+def _attach_datasets(artifact: dict, model_dir: Path | None) -> dict:
+    """Merge the model's datasets.yaml references into its artifact JSON.
+
+    Emits a top-level ``datasets`` list of ``{name, version, filename}`` so
+    downstream consumers can resolve which data the model was built against.
+    Models without a datasets.yaml are left untouched — no empty key.
+    """
+    if model_dir is None:
+        return artifact
+    refs = artifact_refs_for_model_dir(model_dir)
+    if refs:
+        artifact["datasets"] = refs
+    return artifact
+
 
 # ---------------------------------------------------------------------------
 # Model registry (mirrors the one in validation but avoids circular imports)
@@ -156,6 +185,8 @@ def main():
         model_classes = _discover_models_from_dir(args.model_dir)
         output_dir = Path(args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+        # Every variant in a model dir shares that dir's datasets.yaml.
+        source_dir = Path(args.model_dir.rstrip("/"))
         for model_class in model_classes:
             try:
                 schema = model_class._build_parameter_schema()
@@ -163,16 +194,19 @@ def main():
                 print(f"Skipping {model_class.__name__}: define_parameters() not implemented.", file=sys.stderr)
                 continue
             output_path = output_dir / f"{schema.disease_type}.json"
+            artifact = _attach_datasets(schema.to_artifact_dict(), source_dir)
             with open(output_path, "w") as f:
-                f.write(json.dumps(schema.to_artifact_dict(), indent=2) + "\n")
+                f.write(json.dumps(artifact, indent=2) + "\n")
             print(f"Artifact written to {output_path}", file=sys.stderr)
         return
 
     # Single-class mode: --model-dir (first class) or explicit disease_type
     if args.model_dir:
         model_class = _discover_models_from_dir(args.model_dir)[0]
+        model_dir = Path(args.model_dir.rstrip("/"))
     else:
         model_class = _get_model_class(args.disease_type)
+        model_dir = _model_dir_for_class(model_class)
 
     try:
         schema = model_class._build_parameter_schema()
@@ -184,7 +218,7 @@ def main():
         sys.exit(1)
 
     # --- Artifact JSON ---
-    artifact = schema.to_artifact_dict()
+    artifact = _attach_datasets(schema.to_artifact_dict(), model_dir)
     artifact_json = json.dumps(artifact, indent=2)
 
     if args.output:

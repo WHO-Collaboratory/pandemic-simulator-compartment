@@ -10,6 +10,10 @@ results/
 .DS_Store
 compartment/models/*/artifacts/*
 
+# Dataset payloads live in S3, not git — datasets.yaml is the tracked part, and
+# `datasets pull --dest data/` refetches the bytes on any machine that needs them.
+compartment/models/*/data/
+
 .tmp/
 TODO.md
 DONE.md
