@@ -6,15 +6,15 @@ from compartment.model import Model, ValueType
 logger = logging.getLogger(__name__)
 
 
-class ExampleDiseaseParameterUncertaintyModel(Model):
+class ExampleParameterUncertaintyDeclarativeModel(Model):
     """A simple SIR compartmental model for Example Disease with Parameter Uncertainty."""
 
     @classmethod
     def define_parameters(cls, schema):
         schema.set_model_info(
-            disease_type="example_disease_parameter_uncertainty",
-            label="Example Disease with Parameter Uncertainty",
-            description="A SIR model for an example disease with parameter uncertainty",
+            disease_type="example_parameter_uncertainty_declarative",
+            label="Example Disease with Declarative Parameter Uncertainty",
+            description="A SIR model for an example disease with declarative parameter uncertainty",
         )
 
         # --- Compartments ---
@@ -123,6 +123,6 @@ class ExampleDiseaseParameterUncertaintyModel(Model):
         rates["gamma"] = params["gamma"]
 
         # _compute_equations handles mass-action / frequency-dependent FOI,
-        # _total accumulation, and skips compartments not active in this variant.
+        # _total accumulation, and skips compartments not active in this model.
         derivs = self._compute_equations(states, rates)
         return jnp.stack([derivs[c] for c in self.compartment_list])

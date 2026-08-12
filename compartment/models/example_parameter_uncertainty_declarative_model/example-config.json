@@ -1,6 +1,6 @@
 {
     "Disease": {
-        "disease_type": "example_disease_stochastic"
+        "disease_type": "example_parameter_uncertainty_declarative"
     },
     "start_date": "2026-01-01",
     "end_date": "2026-12-31",
@@ -17,11 +17,11 @@
                     "items": [
                         {
                             "field_key": "value",
-                            "has_variance": false,
+                            "has_variance": true,
                             "distribution_type": "UNIFORM",
                             "disease_param": "BETA",
-                            "min": 0,
-                            "max": 0
+                            "min": 0.2,
+                            "max": 0.4
                         }
                     ]
                 }
@@ -39,9 +39,7 @@
                             "field_key": "value",
                             "has_variance": false,
                             "distribution_type": "UNIFORM",
-                            "disease_param": "GAMMA",
-                            "min": 0,
-                            "max": 0
+                            "disease_param": "GAMMA"
                         }
                     ]
                 }
@@ -51,11 +49,22 @@
     "Interventions": {
         "items": [
             {
-                "Intervention": { "name": "MY_INTERVENTION", "display_name": "My Intervention" },
+                "Intervention": { "name": "MY_INTERVENTION", "display_name": "My intervention" },
                 "adherence_min": 50.0,
                 "transmission_percentage": 50.0,
                 "start_date": "2026-03-01",
-                "end_date": "2026-06-01"
+                "end_date": "2026-06-01",
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "adherence_min",
+                            "has_variance": true,
+                            "distribution_type": "UNIFORM",
+                            "min": 40.0,
+                            "max": 60.0
+                        }
+                    ]
+                }
             }
         ]
     },
