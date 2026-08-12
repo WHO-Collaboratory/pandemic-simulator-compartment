@@ -1,0 +1,71 @@
+{
+    "Disease": {
+        "disease_type": "example_stochastic"
+    },
+    "start_date": "2026-01-01",
+    "end_date": "2026-12-31",
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": {
+                    "source": "susceptible",
+                    "target": "infected",
+                    "value_type": "RATE"
+                },
+                "value": 0.3,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "BETA",
+                            "min": 0,
+                            "max": 0
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "infected",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 10.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA",
+                            "min": 0,
+                            "max": 0
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": { "name": "MY_INTERVENTION", "display_name": "My Intervention" },
+                "adherence_min": 50.0,
+                "transmission_percentage": 50.0,
+                "start_date": "2026-03-01",
+                "end_date": "2026-06-01"
+            }
+        ]
+    },
+    "admin_zones": [
+        {
+            "name": "Example Zone",
+            "center_lat": 40.7128,
+            "center_lon": -74.006,
+            "population": 1000000,
+            "infected_population": 0.01
+        }
+    ]
+}
