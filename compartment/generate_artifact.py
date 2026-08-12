@@ -24,19 +24,12 @@ import json
 import sys
 from pathlib import Path
 
-from compartment.datasets import artifact_refs_for_model_dir
+from compartment.datasets import artifact_refs_for_model_dir, model_dir_for_class
 
 
 # ---------------------------------------------------------------------------
 # Dataset references
 # ---------------------------------------------------------------------------
-
-
-def _model_dir_for_class(model_class) -> Path | None:
-    """Directory holding a model class's source, or None if it isn't on disk."""
-    module = sys.modules.get(model_class.__module__)
-    module_file = getattr(module, "__file__", None)
-    return Path(module_file).parent if module_file else None
 
 
 def _attach_datasets(artifact: dict, model_dir: Path | None) -> dict:
@@ -206,7 +199,7 @@ def main():
         model_dir = Path(args.model_dir.rstrip("/"))
     else:
         model_class = _get_model_class(args.disease_type)
-        model_dir = _model_dir_for_class(model_class)
+        model_dir = model_dir_for_class(model_class)
 
     try:
         schema = model_class._build_parameter_schema()

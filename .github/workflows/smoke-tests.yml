@@ -52,6 +52,28 @@ jobs:
             uv run python -m pytest "$TEST_FILE" -v
           fi
 
+  # The whole unit suite, minus the per-model integration smoke tests the
+  # `test` matrix above already covers. Runs in seconds, so it gates every
+  # push and PR rather than only the files someone remembered to name.
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Unit tests
+        run: uv run python -m pytest tests/ -m "not integration" -q
+
   artifact-tests:
     runs-on: ubuntu-latest
     steps:
