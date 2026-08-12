@@ -8,8 +8,10 @@ a median with an uncertainty band.
 ## Key details
 
 - **Compartments:** `S`, `A` (asymptomatic, infectious), `Sym` (symptomatic,
-infectious), `R`. `A` and `Sym` are combined into one **Infected** curve for
-graphing via `COMPARTMENT_DELTA_GROUPING`.
+  infectious), `R`, plus a cumulative `I_total` tracker. `A` and `Sym` are
+  combined into one **Infected** curve for graphing via
+  `COMPARTMENT_DELTA_GROUPING`, and `I_total` feeds the cumulative "total
+  infected" figure.
 - **Stochastic (**`STOCHASTIC = True`**):** integrated with fixed-step Euler; each
 step draws new infections and recoveries from Poisson distributions
 (tau-leaping) around the deterministic rates.

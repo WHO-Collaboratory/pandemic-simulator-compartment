@@ -71,12 +71,26 @@ class ExampleDiseaseStochasticModel(Model):
         # --- Compartments ---
         # Two infectious compartments — asymptomatic and symptomatic — both
         # contribute to the force of infection, so both are marked infective.
-        # They are grouped back into a single cumulative "Infected Total" for
-        # graphing (see _add_total_compartments below).
+        # They are combined into a single "Infected" curve for graphing via
+        # COMPARTMENT_DELTA_GROUPING above.
         schema.add_compartment("S", "Susceptible", "Population susceptible to infection")
         schema.add_compartment("A", "Asymptomatic", "Infectious but showing no symptoms", infective=True)
         schema.add_compartment("Sym", "Symptomatic", "Infectious and showing symptoms", infective=True)
         schema.add_compartment("R", "Recovered", "Recovered and immune")
+
+        # Cumulative tracker for the combined "Infected" group. Like DengueJaxModel,
+        # we suppress the framework's per-edge _total compartments (see
+        # _add_total_compartments) and declare our own aggregate total here. The
+        # delta/"total infected" chart reads the I_total column (group name "I" ->
+        # "I_total"); without it the total would collapse to the final-day
+        # occupancy of A + Sym (~0 once the outbreak ends).
+        schema.add_compartment(
+            "I_total",
+            "Infected Total",
+            "Cumulative infections (asymptomatic + symptomatic combined)",
+        )
+
+        schema.add_compartment("R_total", "Recovered Total", "Cumulative recoveries")
 
         # --- Transmission edges ---
         # We suppress the framework's per-target _total compartments (see
@@ -173,9 +187,8 @@ class ExampleDiseaseStochasticModel(Model):
     @classmethod
     def _add_total_compartments(cls, schema):
         # Suppress the framework's per-edge _total compartments (same approach
-        # as DengueJaxModel). The two infectious compartments are combined for
-        # the graph purely via COMPARTMENT_DELTA_GROUPING above — the simplest
-        # way to show one merged "Infected" curve.
+        # as DengueJaxModel). We declare our own aggregate I_total in
+        # define_parameters() instead, and accumulate into it in equation().
         pass
 
     def __init__(self, config):
@@ -288,5 +301,10 @@ class ExampleDiseaseStochasticModel(Model):
         derivs[C.A] = new_asymp - new_rec_a
         derivs[C.Sym] = new_sym - new_rec_s
         derivs[C.R] = new_rec_a + new_rec_s
+
+        # Cumulative combined infected tracker (inflow only) so the
+        # "total infected" chart reads cumulative incidence
+        derivs["I_total"] = new_infections
+        derivs["R_total"] = new_rec_a + new_rec_s
 
         return jnp.stack([derivs[c] for c in self.compartment_list])
