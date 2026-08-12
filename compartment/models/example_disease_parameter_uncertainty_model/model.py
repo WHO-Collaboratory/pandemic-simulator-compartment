@@ -110,7 +110,7 @@ class ExampleDiseaseParameterUncertaintyModel(Model):
 
         states = {c: y[i] for i, c in enumerate(self.compartment_list)}
 
-        I = states[C.I]  # noqa: E741
+        I = states[C.I]  
         non_total = [c for c in C if not c.endswith("_total")]
         N_total = sum(states[c] for c in non_total)
         prop_infective = I.sum() / (N_total.sum() + 1e-10)
