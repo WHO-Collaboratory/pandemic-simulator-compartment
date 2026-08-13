@@ -36,6 +36,18 @@ class ExampleStochasticModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare the model's compartments, transmission edges, and parameters.
+
+        Called once by the framework to build the model schema, from which the
+        config validator and parameter set are generated. Also declares the
+        aggregate ``I_total`` / ``R_total`` cumulative compartments and the
+        stochastic run count.
+
+        Args:
+            schema: The schema builder to populate with model info, metadata,
+                compartments, transmission edges, disease parameters, and the
+                intervention.
+        """
         schema.set_model_info(
             disease_type="example_stochastic",
             label="Example Disease with Stochasticity",
@@ -186,12 +198,28 @@ class ExampleStochasticModel(Model):
 
     @classmethod
     def _add_total_compartments(cls, schema):
+        """Suppress the framework's automatic per-edge ``_total`` compartments.
+
+        Overrides the base behavior so no per-target cumulative compartments
+        are auto-added; this model declares its own aggregate ``I_total`` and
+        ``R_total`` in ``define_parameters`` instead.
+
+        Args:
+            schema: The schema builder (intentionally left unchanged).
+        """
         # Suppress the framework's per-edge _total compartments (same approach
         # as DengueJaxModel). We declare our own aggregate I_total in
         # define_parameters() instead, and accumulate into it in equation().
         pass
 
     def __init__(self, config):
+        """Initialize the model and seed its PRNG for stochastic draws.
+
+        Args:
+            config: The validated simulation configuration. If it is a dict
+                containing a ``seed``, that seed is used for reproducible
+                trajectories; otherwise the PRNG is seeded from system entropy.
+        """
         super().__init__(config)
         # Stochastic models need a PRNG key for the random draws in equation().
         # Default to system entropy so each run differs; pass "seed" in the
@@ -213,6 +241,23 @@ class ExampleStochasticModel(Model):
 
     @classmethod
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
+        """Seed the initial infected across the two infectious compartments.
+
+        The base implementation seeds a single ``I`` compartment, which this
+        model does not have. Infectious individuals are split between ``A``
+        (asymptomatic) and ``Sym`` (symptomatic) using the schema's default
+        asymptomatic fraction.
+
+        Args:
+            admin_zones: Admin zone dicts providing ``population`` and the
+                ``infected_population`` percentage.
+            compartment_list: Ordered compartment names, used for column
+                indexing.
+            **kwargs: Additional keyword arguments (unused).
+
+        Returns:
+            A (zones x compartments) array of initial populations.
+        """
         # The base implementation seeds a single "I" compartment, but this model
         # has no "I" — infectious individuals live in A (asymptomatic) and Sym
         # (symptomatic). Split the initial infected between them using the
@@ -238,6 +283,12 @@ class ExampleStochasticModel(Model):
         return initial_population
 
     def prepare_initial_state(self):
+        """Return the initial compartment populations for the solver.
+
+        Returns:
+            The population matrix (admin zones x compartments) used as the
+            solver's initial state.
+        """
         return self.population_matrix
 
     def equation(self, y, t, p):
@@ -248,6 +299,14 @@ class ExampleStochasticModel(Model):
         so new infections can be split into an asymptomatic (``A``) and a
         symptomatic (``Sym``) compartment, which are combined into one
         "Infected" curve for graphing via COMPARTMENT_DELTA_GROUPING.
+
+        Args:
+            y: Current compartment values, ordered by ``compartment_list``.
+            t: Current time in days since the simulation start date.
+            p: Packed parameter tuple, unpacked via ``_unpack_params``.
+
+        Returns:
+            The stacked per-compartment deltas for this step.
         """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)

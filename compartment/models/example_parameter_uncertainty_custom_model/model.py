@@ -11,6 +11,16 @@ class ExampleParameterUncertaintyCustomModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare the model's compartments, transmission edges, and parameters.
+
+        Called once by the framework to build the model schema, from which the
+        config validator and parameter set are generated.
+
+        Args:
+            schema: The schema builder to populate with model info,
+                compartments, transmission edges, disease parameters, and the
+                intervention consumed by ``custom_intervention``.
+        """
         schema.set_model_info(
             disease_type="example_parameter_uncertainty_custom",
             label="Example Disease with Parameter Uncertainty and Custom Equation",
@@ -114,6 +124,12 @@ class ExampleParameterUncertaintyCustomModel(Model):
         # schema.add_demographic_group("age_56_plus","Elderly", default_weight=22.3, age_range=(56, 120))
 
     def __init__(self, config):
+        """Initialize the model from a validated simulation config.
+
+        Args:
+            config: The validated simulation configuration produced by the
+                framework's config loader.
+        """
         super().__init__(config)
         # Add any model-specific initialisation here (e.g. temperature).
 
@@ -128,6 +144,12 @@ class ExampleParameterUncertaintyCustomModel(Model):
     #     return get_gravity_model_travel_matrix(admin_zones, sigma)
 
     def prepare_initial_state(self):
+        """Return the initial compartment populations for the solver.
+
+        Returns:
+            The population matrix (admin zones x compartments) used as the
+            solver's initial state.
+        """
         return self.population_matrix
 
 
@@ -152,6 +174,14 @@ class ExampleParameterUncertaintyCustomModel(Model):
         The full effect matches the framework's formula,
         ``beta * (1 - adherence * transmission_reduction)``, scaled by the ramp.
         ``jnp.clip`` keeps this JAX-traceable since ``t`` is a traced value.
+
+        Args:
+            t: Current time in days since the simulation start date (a traced
+                JAX value).
+            beta: The baseline transmission rate to scale.
+
+        Returns:
+            The transmission rate after applying the ramped intervention.
         """
         # Look up the intervention loaded from config by its schema id. The
         # ``id in self.intervention_dict`` check matches the built-in helper so
@@ -198,6 +228,19 @@ class ExampleParameterUncertaintyCustomModel(Model):
         return beta * scale
 
     def equation(self, y, t, p):
+        """Compute the compartment derivatives for a single integration step.
+
+        Builds the SIR derivatives by hand and applies ``custom_intervention``
+        to the transmission rate instead of the built-in intervention helper.
+
+        Args:
+            y: Current compartment values, ordered by ``compartment_list``.
+            t: Current time in days since the simulation start date.
+            p: Packed parameter tuple, unpacked via ``_unpack_params``.
+
+        Returns:
+            The stacked per-compartment derivatives (dy/dt).
+        """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)
 
