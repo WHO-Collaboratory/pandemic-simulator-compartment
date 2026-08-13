@@ -1337,30 +1337,6 @@ class ParameterSchemaBuilder:
             )
         )
 
-    # ----- Number of runs (stochastic models only) -------------------------
-
-    def set_num_runs(
-        self,
-        default: int,
-        min_value: int = 1,
-        max_value: int = 100,
-    ) -> None:
-        """
-        Set the number of stochastic trajectories for this model.
-
-        Only meaningful for models with ``STOCHASTIC = True``.  Omit this
-        call on deterministic models — they always run once.
-
-        Args:
-            default: Default trajectory count used when no per-run override is
-                provided (e.g. ``10`` for a large model, ``30`` for a small one).
-            min_value: Hard lower bound enforced by the UI.
-            max_value: Hard upper bound enforced by the UI.
-        """
-        self._num_runs = default
-        self._num_runs_min = min_value
-        self._num_runs_max = max_value
-
     # ----- Custom fields (enforced contract) --------------------------------
 
     def add_admin_zone_field(
