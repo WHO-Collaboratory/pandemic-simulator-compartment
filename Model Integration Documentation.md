@@ -29,7 +29,7 @@ This guide follows three models that ship with the repository. Read the one clos
 
 | Directory | `disease_type` | What it demonstrates |
 | :---- | :---- | :---- |
-| `compartment/models/example_parameter_uncertainty_declarative_model` | `example_parameter_uncertainty_declarative` | The **default path**. A SIR model where the framework generates the equations from declared transmission edges. Includes age demographics, an intervention, and parameter uncertainty. Its `variants.py` adds a Hospitalized compartment as `example_parameter_uncertainty_declarative_hospitalized`. |
+| `compartment/models/example_parameter_uncertainty_declarative_model` | `example_parameter_uncertainty_declarative` | The **default path**. A SIR model where the framework generates the equations from declared transmission edges. Includes age demographics, an intervention, and parameter uncertainty. |
 | `compartment/models/example_parameter_uncertainty_custom_model` | `example_parameter_uncertainty_custom` | The same SIR model with the equations **written by hand**, plus a custom intervention that ramps up and down instead of switching on and off. |
 | `compartment/models/example_stochastic_model` | `example_stochastic` | A **stochastic** SIR model (tau-leaping, Euler integration, multiple trajectories) with split asymptomatic / symptomatic infectious compartments. |
 
@@ -43,10 +43,9 @@ This guide follows three models that ship with the repository. Read the one clos
   - [Installing Python](#installing-python)
   - [Create a virtual environment](#create-a-virtual-environment)
   - [Git workflow](#git-workflow)
-- [Add a new model or alter an existing model](#add-a-new-model-or-alter-an-existing-model)
-  - [Add a new model](#add-a-new-model)
-  - [Alter an existing model](#alter-an-existing-model)
+- [Add a new model](#add-a-new-model)
 - [Writing the model](#writing-the-model)
+  - [How the framework uses your class](#how-the-framework-uses-your-class)
   - [model.py](#modelpy)
   - [Automated vs. manual equations](#automated-vs-manual-equations)
   - [Optional functions to override](#optional-functions-to-override)
@@ -54,7 +53,6 @@ This guide follows three models that ship with the repository. Read the one clos
   - [Stochastic models](#stochastic-models)
   - [Parameter uncertainty](#parameter-uncertainty)
   - [main.py](#mainpy)
-  - [variants.py](#variantspy)
   - [model.md](#modelmd)
   - [Documentation for your model](#documentation-for-your-model)
 - [example-config.json](#example-configjson)
@@ -199,7 +197,7 @@ Commit regularly as you work. A commit is a checkpoint you can return to.
 git status                # see what changed
 git diff                  # review the changes
 git add .                 # stage everything (or: git add <filename>)
-git commit -m "Add hospitalized compartment to example model"
+git commit -m "Add asymptomatic compartment to example model"
 git log --oneline         # view your commits
 ```
 
@@ -211,14 +209,9 @@ git log --oneline         # view your commits
 
 ---
 
-## Add a new model or alter an existing model
+## Add a new model
 
-Before integrating your model, verify it runs correctly locally. There are two starting points:
-
-- **Create a new model** when your model differs substantially from existing ones, for example because it uses different equations.
-- **Alter an existing model** when you want to build on its structure, for example by adding a compartment. See [variants.py](#variantspy).
-
-### Add a new model
+Before integrating your model, verify it runs correctly locally.
 
 The scaffold command creates the directory layout with a working SIR template. Only the directory name is required; the disease name cannot contain spaces.
 
@@ -290,41 +283,122 @@ python -m compartment.models.example_parameter_uncertainty_declarative_model.mai
 python -m compartment.models.example_parameter_uncertainty_declarative_model.main --mode local --config_file compartment\models\example_parameter_uncertainty_declarative_model\example-config.json --output_file results\example-declarative-test.json
 ```
 
-### Alter an existing model
-
-To extend an existing model instead of writing one from scratch, add a `variants.py` file to its directory. The declarative example does this to add a Hospitalized compartment. This should only be done for very simple modifications such as adding or removing a compartment from a model.
-
-Navigate to the model directory:
-
-**macOS / Linux**
-```shell
-cd ~/Desktop/pandemic-simulator-compartment/compartment/models/example_parameter_uncertainty_declarative_model
-```
-
-**Windows Command Prompt**
-```shell
-cd %USERPROFILE%\Desktop\pandemic-simulator-compartment\compartment\models\example_parameter_uncertainty_declarative_model
-```
-
-If `variants.py` already exists, edit it. Otherwise create it — these commands do not erase an existing file:
-
-**macOS / Linux**
-```shell
-touch variants.py
-```
-
-**Windows Command Prompt**
-```shell
-type nul >> variants.py
-```
-
-See [variants.py](#variantspy) for what to put in it.
-
 ---
 
 ## Writing the model
 
 The template inherits most behavior from the base `Model` class. **Do not modify the base class.** Customize by overriding methods in your own `model.py`.
+
+### How the framework uses your class
+
+If you are new to object-oriented Python, this section explains the handful of ideas the framework relies on. Everything here uses the example models, so you can open the files and follow along. If these ideas are already familiar, skip to [model.py](#modelpy).
+
+#### Classes and instances
+
+A **class** is a blueprint. `ExampleStochasticModel` is a class: it describes what a stochastic example-disease model *is* and what it can *do*, but it isn't running anything by itself.
+
+An **instance** is one actual model built from that blueprint, with real numbers in it. You never build one yourself — the framework does it. It calls your class once with the loaded config, then copies that instance and empties the copy's interventions to produce the control run. That's where the two runs in every output file come from: two instances of your one class.
+
+Inside the class, `self` means "this particular instance." When `equation()` reads `self.population_matrix`, it's reading *this run's* population, not some shared global value. That's exactly why the intervention run and the control run can hold different numbers without interfering with each other, even though they came from the same class.
+
+#### Inheritance: getting behavior for free
+
+**Inheritance** means one class starts with everything another class already has. You write the differences, not the whole thing.
+
+The parentheses in a class definition name the class you are inheriting from:
+
+```python
+class ExampleParameterUncertaintyDeclarativeModel(Model):
+```
+
+Read that as: "the declarative example model **is a** `Model`, and starts out with everything `Model` can do." The class that gives is called the **parent** (or base class); the class that receives is the **child** (or subclass).
+
+This is why the example model files are so short. `Model` already knows how to load a config, build the population matrix, apply interventions, run the solver, and format the output. `example_parameter_uncertainty_declarative_model/model.py` is about 160 lines because it only has to supply what's specific to this disease — its compartments, its rates, its equation.
+
+All three example models inherit directly from `Model`:
+
+```
+Model                                          (the framework's base class)
+  ├─ ExampleParameterUncertaintyDeclarativeModel
+  ├─ ExampleParameterUncertaintyCustomModel
+  └─ ExampleStochasticModel
+```
+
+#### Overriding: changing inherited behavior
+
+**Overriding** means writing a method in your class with the same name as one you inherited. Yours is the one that runs. The parent's version still exists, but your version takes precedence for your class.
+
+This is how you customize the framework without touching it. The base `Model` automatically creates a cumulative `<target>_total` compartment for every transmission edge target. `example_stochastic_model` doesn't want that, because its two infectious compartments should share one combined total. So it overrides the method and does nothing:
+
+```python
+@classmethod
+def _add_total_compartments(cls, schema):
+    pass  # I_total and R_total are declared in define_parameters() instead
+```
+
+`pass` means "do nothing." Because this version replaces the inherited one, the automatic totals are never created, and the model declares its own instead.
+
+Overriding is also why the guide keeps saying **do not rename these functions**. The framework looks for methods by name — it calls `equation()`, `define_parameters()`, and `prepare_initial_state()` on whatever class you give it. Name yours `equation`, and yours runs. Name it `my_equation`, and the framework never finds it, so the parent's version (or an error) is what you get.
+
+Note the direction of control here: you almost never call these methods yourself. You *provide* them, and the framework calls them at the right moment — `define_parameters()` once when building the schema, `equation()` at every step of the solver. Your job is to fill in the blanks the framework asks for.
+
+#### `super()`: extending instead of replacing
+
+Sometimes you don't want to replace the inherited behavior — you want to run it *and then* add to it. `super()` means "the parent's version of this method."
+
+Almost every model's `__init__` starts this way:
+
+```python
+def __init__(self, config):
+    super().__init__(config)
+    # Model-specific initialisation goes here.
+```
+
+The first line runs `Model.__init__`, which does all the shared setup — loading the config, building the population matrix, wiring up interventions. Only after that does your own code run. This is why the attributes listed under [Optional functions to override](#optional-functions-to-override) (`self.population_matrix`, `self.interventions`, and so on) are available *after* the `super()` call and not before: the parent is what creates them.
+
+`example_stochastic_model` uses exactly this pattern to add one thing of its own — a random number generator seed:
+
+```python
+def __init__(self, config):
+    super().__init__(config)          # let Model do all the standard setup
+    seed = config.get("seed") if isinstance(config, dict) else None
+    if seed is None:
+        seed = int(time.time() * 1000) % (2**31)
+    self._key = jax.random.PRNGKey(seed)   # then add what only this model needs
+```
+
+Leave out the `super()` call and you replace the parent's behavior entirely instead of building on it — none of the shared setup would run, so `self.population_matrix` and `self.interventions` would never be created. A few models in the repository (dengue, for example) deliberately skip `super().__init__()` to do their own setup, and they have to set `self.compartment_list` by hand.
+
+#### Class attributes: settings the framework reads
+
+Most of what you write lives inside methods. A few things are set directly on the class instead, and apply to every instance of it. These are **class attributes**, and the framework reads them to decide how to treat your model:
+
+```python
+class ExampleStochasticModel(Model):
+    STOCHASTIC = True                       # use Euler integration, run many trajectories
+    COMPARTMENT_DELTA_GROUPING = {          # combine A + Sym into one "Infected" curve
+        "S": ["S"],
+        "I": ["A", "Sym"],
+        "R": ["R"],
+    }
+```
+
+They are written in capitals by convention, to signal that they are fixed settings rather than values that change during a run. Note that setting `STOCHASTIC = True` is not something you *do* — it's something you *declare*, and the framework changes its behavior in response.
+
+#### `cls` vs. `self`, and `@classmethod`
+
+You'll see two different first arguments in the example models, and the difference is practical.
+
+- **`self`** — an ordinary method, called on one instance. It can read that run's data. `equation(self, y, t, p)` is an instance method, because it needs `self.travel_matrix`, `self.interventions`, and the rest of this run's state.
+- **`cls`** with a `@classmethod` decorator above it — a method called on the class itself, before any instance exists. `define_parameters(cls, schema)` is a classmethod because the framework needs your model's compartments and parameters *in order to* validate a config and build an instance. There is no instance yet, so there is no `self` to use.
+
+This is also why `define_parameters` can't read `self.beta`: at the time it runs, no config has been loaded and no rates exist. It only *declares* that `beta` exists and what its bounds are.
+
+#### A note on the leading underscore
+
+Methods and attributes beginning with `_` — `_compute_equations`, `_apply_flow`, `_apply_interventions`, `self._key` — are internal to the framework by convention. Python does not enforce this; the underscore is a signal that says "this is machinery, not part of the public interface."
+
+You are expected to *call* the underscore helpers listed in this guide, and to override `_add_total_compartments` when you need to. Treat anything else with an underscore as something that may change between releases.
 
 ### model.py
 
@@ -633,71 +707,6 @@ if __name__ == "__main__":
     )
 ```
 
-### variants.py
-
-Use `variants.py` to create alternative versions of a model without duplicating it. Import the base class, subclass it, and override what you want to change. Any `Model` subclass in `variants.py` that declares a unique disease type is discovered and registered automatically — **there is no registry file to edit.**
-
-`example_parameter_uncertainty_declarative_model/variants.py` adds a Hospitalized compartment:
-
-```python
-from compartment.model import ValueType
-from compartment.models.example_parameter_uncertainty_declarative_model.model import (
-    ExampleParameterUncertaintyDeclarativeModel,
-)
-
-
-class ExampleDiseaseHospitalized(ExampleParameterUncertaintyDeclarativeModel):
-    """SIHR variant: infected individuals recover directly (I->R) or are
-    hospitalized (I->H) before recovering (H->R). Only I is infectious."""
-
-    @classmethod
-    def define_parameters(cls, schema):
-        # Inherit S/I/R, beta/gamma, demographics, and my_intervention.
-        super().define_parameters(schema)
-
-        # Give the variant its own identity. It must live on the schema, not
-        # just a DISEASE_TYPE class attribute, because the config validator is
-        # generated from the schema. set_model_info() may only be called once
-        # and the parent already called it, so clear disease_type first.
-        schema._disease_type = None
-        schema.set_model_info(
-            disease_type="example_parameter_uncertainty_declarative_hospitalized",
-            label="Example Disease (Declarative, with Hospitalization)",
-            description="SIHR variant of the declarative parameter-uncertainty example.",
-        )
-
-        schema.add_compartment("H", "Hospitalized", "Infected individuals requiring hospitalization")
-        schema.add_transmission_edge(
-            source="infected", target="hospitalized", variable_name="zeta",
-            label="Hospitalization Rate (I->H)", default=0.05, unit="per day",
-        )
-        schema.add_transmission_edge(
-            source="hospitalized", target="recovered", variable_name="eta",
-            label="Hospital Stay (H->R)", default=14.0,
-            value_type=ValueType.DAYS, unit="days",
-        )
-
-    def equation(self, y, t, p):
-        ...
-        rates["zeta"] = params["zeta"]   # I -> H
-        rates["eta"] = params["eta"]     # H -> R
-        derivs = self._compute_equations(states, rates)
-        return jnp.stack([derivs[c] for c in self.compartment_list])
-```
-
-Each variant needs its own config file. The hospitalized variant uses `hospitalized-config.json`, which adds the two new edges:
-
-```json
-{
-    "transmission_edge": {
-        "source": "infected",
-        "target": "hospitalized",
-        "value_type": "RATE"
-    },
-    "value": 0.05
-}
-```
-
 ### model.md
 
 Optional, and not created by the scaffold — add it yourself in the model directory. Use [Markdown syntax](https://www.markdownguide.org/basic-syntax/). Its contents appear in the **"You should know"** section of the results page; without the file, that section is omitted.
@@ -865,7 +874,7 @@ python -m compartment.generate_artifact example_stochastic
 python -m compartment.generate_artifact example_stochastic --output artifact.json
 ```
 
-To generate one artifact per variant (from `model.py` **and** `variants.py`) into a directory:
+To generate an artifact for every model registered in a model directory, writing each to its own file:
 
 **macOS / Linux**
 ```shell
@@ -879,11 +888,10 @@ python -m compartment.generate_artifact \
 python -m compartment.generate_artifact --model-dir compartment\models\example_parameter_uncertainty_declarative_model --output-dir compartment\models\example_parameter_uncertainty_declarative_model\artifacts
 ```
 
-For the declarative example this writes two files, one per registered disease type:
+Each file is named after the disease type it was generated from:
 
 ```
 Artifact written to .../artifacts/example_parameter_uncertainty_declarative.json
-Artifact written to .../artifacts/example_parameter_uncertainty_declarative_hospitalized.json
 ```
 
 **Note:** `compartment/models/*/artifacts/` is in `.gitignore`, so generated artifacts stay local and are not committed.
@@ -959,12 +967,6 @@ python -m compartment.models.example_stochastic_model.main \
     --mode local \
     --config_file compartment/models/example_stochastic_model/example-config.json \
     --output_file results/example-stochastic-test.json
-
-# Hospitalized variant (defined in variants.py, run through the same main.py)
-python -m compartment.models.example_parameter_uncertainty_declarative_model.main \
-    --mode local \
-    --config_file compartment/models/example_parameter_uncertainty_declarative_model/hospitalized-config.json \
-    --output_file results/example-hospitalized-test.json
 ```
 
 **Windows Command Prompt**
@@ -972,8 +974,6 @@ python -m compartment.models.example_parameter_uncertainty_declarative_model.mai
 python -m compartment.models.example_parameter_uncertainty_custom_model.main --mode local --config_file compartment\models\example_parameter_uncertainty_custom_model\example-config.json --output_file results\example-custom-test.json
 
 python -m compartment.models.example_stochastic_model.main --mode local --config_file compartment\models\example_stochastic_model\example-config.json --output_file results\example-stochastic-test.json
-
-python -m compartment.models.example_parameter_uncertainty_declarative_model.main --mode local --config_file compartment\models\example_parameter_uncertainty_declarative_model\hospitalized-config.json --output_file results\example-hospitalized-test.json
 ```
 
 > `--mode cloud` is for the Pandemic Simulator web app and is not supported for local use.
@@ -1028,13 +1028,8 @@ Additional test files:
 
 ```shell
 # Model can be discovered, loaded, and used by the framework
-python -m pytest tests/test_artifact.py -v -m integration -k example
+python -m pytest tests/test_artifact.py -v
 
-# Artifact generation resolves the right disease_type and is invocation-independent
-python -m pytest tests/test_generate_artifact_model_dir.py -v -m integration -k example
-
-# Full unit suite (fast)
-python -m pytest tests/ -x -q
 ```
 
 The `-k` flag is a pytest keyword filter: it runs every discovered test whose name contains the given substring, so `-k example` matches all three example models (any directory whose name contains `example`). Replace `example` with your own model's directory name to narrow it to just your model.
