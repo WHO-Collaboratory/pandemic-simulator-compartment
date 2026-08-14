@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [main]
   workflow_call:
-    secrets:
-      AWS_ACCOUNT_ID:
-        required: true
-      AWS_ROLE_NAME:
-        required: true
   workflow_dispatch:
 
 permissions:
@@ -55,7 +50,7 @@ jobs:
         if: hashFiles(format('compartment/models/{0}/datasets.yaml', matrix.model)) != ''
         uses: aws-actions/configure-aws-credentials@v5
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
+          role-to-assume: arn:aws:iam::977099019210:role/GithubUAT-GithubRole-EjE56hj6cwzK
           aws-region: us-east-1
 
       # This is a no-op for models without datasets.yaml. For dataset-backed
@@ -98,7 +93,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
+          role-to-assume: arn:aws:iam::977099019210:role/GithubUAT-GithubRole-EjE56hj6cwzK
           aws-region: us-east-1
 
       - name: Stage all declared datasets
