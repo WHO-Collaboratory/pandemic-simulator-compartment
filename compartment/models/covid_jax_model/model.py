@@ -216,7 +216,7 @@ class CovidJaxModel(Model):
         # ---- Mobility ----
         # Declared as a custom field so it is modeler-owned and per-simulation
         # editable. Consumed by build_travel_matrix() below.
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="travel_sigma",
             label="Travel Rate (σ)",
             description=(

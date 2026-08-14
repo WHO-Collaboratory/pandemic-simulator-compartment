@@ -84,7 +84,7 @@ class BaseSimulationShared(BaseModel):
     time_steps: Optional[int] = Field(default=None, gt=0)
 
     # Mobility is model-owned: each model declares its own travel parameters
-    # (conventionally ``travel_sigma``) via ``schema.add_disease_parameter()``,
+    # (conventionally ``travel_sigma``) via ``schema.add_parameter()``,
     # so they arrive in the ``Disease`` block like any other custom field.
 
     case_file: Optional[CaseFile] = None

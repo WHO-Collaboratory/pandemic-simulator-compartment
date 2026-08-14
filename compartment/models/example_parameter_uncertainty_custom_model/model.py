@@ -65,7 +65,7 @@ class ExampleParameterUncertaintyCustomModel(Model):
             unit="days",
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="ramp_up_days",
             label="Intervention Ramp-Up (days)",
             description="Days for the intervention to climb from baseline to full adherence.",
@@ -77,7 +77,7 @@ class ExampleParameterUncertaintyCustomModel(Model):
             required=False,
             enable_variance=False,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="ramp_down_days",
             label="Intervention Ramp-Down (days)",
             description="Days for adherence to fall back to baseline after the intervention ends.",
@@ -94,7 +94,7 @@ class ExampleParameterUncertaintyCustomModel(Model):
         # Declare your mobility parameters as custom fields, then define how
         # they build the matrix in build_travel_matrix() below. Without this,
         # the base class supplies an identity matrix (no inter-zone travel).
-        # schema.add_disease_parameter(
+        # schema.add_parameter(
         #     name="travel_sigma",
         #     label="Travel Rate (σ)",
         #     description="Percentage of each zone's population away from home per day.",

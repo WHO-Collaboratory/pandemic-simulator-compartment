@@ -140,7 +140,7 @@ class ExampleStochasticModel(Model):
 
         # Fraction of new infections that are asymptomatic; the rest are
         # symptomatic. Read as self.asymptomatic_fraction (a percentage).
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="asymptomatic_fraction",
             label="Asymptomatic Fraction",
             description="Percentage of new infections that never develop symptoms.",
@@ -155,7 +155,7 @@ class ExampleStochasticModel(Model):
 
         # Number of stochastic trajectories to simulate. run_simulation reads
         # this to decide how many runs to average for the median + interval.
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="num_runs",
             label="Number of Runs",
             description="Number of stochastic trajectories to simulate.",
@@ -170,7 +170,7 @@ class ExampleStochasticModel(Model):
         # Declare your mobility parameters as custom fields, then define how
         # they build the matrix in build_travel_matrix() below. Without this,
         # the base class supplies an identity matrix (no inter-zone travel).
-        # schema.add_disease_parameter(
+        # schema.add_parameter(
         #     name="travel_sigma",
         #     label="Travel Rate (σ)",
         #     description="Percentage of each zone's population away from home per day.",

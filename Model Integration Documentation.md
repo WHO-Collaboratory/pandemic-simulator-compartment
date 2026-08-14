@@ -635,7 +635,7 @@ The `example_stochastic_model` tells the `SimulationManager` to integrate with f
 The number of trajectories is a declared parameter, so users can change it in the UI:
 
 ```python
-schema.add_disease_parameter(
+schema.add_parameter(
     name="num_runs",
     label="Number of Runs",
     description="Number of stochastic trajectories to simulate.",
@@ -850,7 +850,7 @@ If a required field is missing, the framework raises a `ValidationError`, logs w
 }
 ```
 
-Model-specific parameters declared with `add_disease_parameter()` go in the `Disease` block. `example_parameter_uncertainty_custom_model` passes its ramp settings this way:
+Model-specific parameters declared with `add_parameter()` go in the `Disease` block. `example_parameter_uncertainty_custom_model` passes its ramp settings this way:
 
 ```json
 "Disease": {

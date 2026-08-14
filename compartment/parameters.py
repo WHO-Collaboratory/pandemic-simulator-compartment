@@ -863,7 +863,7 @@ class ModelParameterSchema:
             ),
             # num_runs is surfaced solely as a "disease_parameter" custom field
             # (with default_value/min/max in its metadata) — declare it via
-            # schema.add_disease_parameter(name="num_runs", ...). It is
+            # schema.add_parameter(name="num_runs", ...). It is
             # intentionally NOT emitted at the artifact root; the runtime falls
             # back to the model-class NUM_RUNS default when no value is provided.
             # Compartment graph
@@ -1390,7 +1390,7 @@ class ParameterSchemaBuilder:
             )
         )
 
-    def add_disease_parameter(
+    def add_parameter(
         self,
         name: str,
         label: str,
@@ -1575,7 +1575,7 @@ class ParameterSchemaBuilder:
                     )
 
         # If a disease parameter named "num_runs" was declared via
-        # add_disease_parameter(), use its default/min/max to populate the
+        # add_parameter(), use its default/min/max to populate the
         # artifact-level fields so ModelArtifact.num_runs stays accurate.
         num_runs_param = next(
             (p for p in self._disease_parameters if p.name == "num_runs"), None

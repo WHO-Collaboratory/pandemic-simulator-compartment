@@ -196,7 +196,7 @@ class DengueJaxModel(Model):
         schema.add_compartment("R_total", "Recovered Total", "Cumulative recoveries")
 
         # ---- Disease parameters ----
-        schema.add_disease_parameter(
+        schema.add_parameter(
             # FOR FUTURE IMPLEMENTATION
             name="num_serotypes",
             label="Number of Serotypes",
@@ -208,7 +208,7 @@ class DengueJaxModel(Model):
             min_value=4,
             max_value=4,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="immunity_period",
             label="Cross-Immunity Period",
             description="Duration of cross-serotype immunity after primary infection (days). 0 = no cross-immunity.",
@@ -220,7 +220,7 @@ class DengueJaxModel(Model):
             max_value=730,
             unit="days",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="latent_period",
             label="Host Latent Period",
             description="Mean duration of the exposed (E) period before becoming infectious (days).",
@@ -232,7 +232,7 @@ class DengueJaxModel(Model):
             max_value=30.0,
             unit="days",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="infectious_period",
             label="Host Infectious Period",
             description="Mean duration of the infectious (I) period before recovery (days).",
@@ -244,7 +244,7 @@ class DengueJaxModel(Model):
             max_value=30.0,
             unit="days",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="hospitalization_rate",
             label="Hospitalization Rate",
             description="Proportion of secondary infections that progress to hospitalization.",
@@ -255,7 +255,7 @@ class DengueJaxModel(Model):
             min_value=0.0,
             max_value=1.0,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="hospital_stay",
             label="Hospital Stay Duration",
             description="Mean duration of hospitalization before recovery (days).",
@@ -267,7 +267,7 @@ class DengueJaxModel(Model):
             max_value=30.0,
             unit="days",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="vector_activation_energy",
             label="Vector Activation Energy",
             description="Arrhenius thermal activation energy for vector mortality rate.",
@@ -278,7 +278,7 @@ class DengueJaxModel(Model):
             min_value=0.001,
             max_value=1.0,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="boltzmann_constant",
             label="Boltzmann-Arrhenius Constant",
             description="Boltzmann constant used in the thermal response model (eV/K).",
@@ -290,7 +290,7 @@ class DengueJaxModel(Model):
             max_value=1e-3,
             unit="eV/K",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="max_vector_capacity",
             label="Maximum Vector Carrying Capacity",
             description="Maximum mosquito carrying capacity as a multiple of the human population.",
@@ -301,7 +301,7 @@ class DengueJaxModel(Model):
             min_value=0.1,
             max_value=20.0,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="reference_temperature",
             label="Reference Temperature",
             description="Baseline temperature for the Arrhenius thermal response model (°C).",
@@ -313,7 +313,7 @@ class DengueJaxModel(Model):
             max_value=40.0,
             unit="°C",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="vector_seed",
             label="Vector Seed (kappa)",
             description="Small constant added to each infectious vector compartment to prevent numerical extinction.",
@@ -328,7 +328,7 @@ class DengueJaxModel(Model):
         # ---- Mobility ----
         # Declared as a custom field so it is modeler-owned and per-simulation
         # editable. Consumed by build_travel_matrix() below.
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="travel_sigma",
             label="Travel Rate (σ)",
             description=(

@@ -287,7 +287,7 @@ class KlebsiellaAmrModel(Model):
 
         # ---- Disease-specific parameters ----
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="hospital_transmission_mult",
             label="Hospital Transmission Multiplier",
             description=(
@@ -303,7 +303,7 @@ class KlebsiellaAmrModel(Model):
             max_value=50.0,
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="fitness_cost_esbl",
             label="Fitness Cost ESBL (%)",
             description="Relative fitness cost of ESBL strains vs. wild-type",
@@ -316,7 +316,7 @@ class KlebsiellaAmrModel(Model):
             unit="%",
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="fitness_cost_crk",
             label="Fitness Cost CRK (%)",
             description="Relative fitness cost of carbapenem-resistant strains vs. wild-type",
@@ -329,7 +329,7 @@ class KlebsiellaAmrModel(Model):
             unit="%",
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="super_colonization_coeff",
             label="Super-colonization Coefficient",
             description=(
@@ -344,7 +344,7 @@ class KlebsiellaAmrModel(Model):
             max_value=1.0,
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="treatment_susceptibility",
             label="Treatment Susceptibility Increase",
             description=(
@@ -359,7 +359,7 @@ class KlebsiellaAmrModel(Model):
             max_value=5.0,
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="treatment_clearance_mult",
             label="Treatment Clearance Multiplier",
             description=(
@@ -374,7 +374,7 @@ class KlebsiellaAmrModel(Model):
             max_value=20.0,
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="plasmid_loss_rate",
             label="Plasmid Loss Rate",
             description=(
@@ -389,7 +389,7 @@ class KlebsiellaAmrModel(Model):
             max_value=1.0,
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="import_esbl",
             label="ESBL Import (per 100k)",
             description=(
@@ -404,7 +404,7 @@ class KlebsiellaAmrModel(Model):
             max_value=5000.0,
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="import_crk",
             label="CRK Import (per 100k)",
             description=(
@@ -419,7 +419,7 @@ class KlebsiellaAmrModel(Model):
             max_value=1000.0,
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="admission_rate",
             label="Hospital Admission Rate",
             description="Daily fraction of community population admitted to hospital",
@@ -432,7 +432,7 @@ class KlebsiellaAmrModel(Model):
             unit="per day",
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="discharge_rate",
             label="Hospital Discharge Rate",
             description="Daily fraction of hospital population discharged (1/mean LOS)",
@@ -445,7 +445,7 @@ class KlebsiellaAmrModel(Model):
             unit="per day",
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="ceph_consumption_community",
             label="Community Cephalosporin Consumption",
             description=(
@@ -461,7 +461,7 @@ class KlebsiellaAmrModel(Model):
             unit="DDD/1000/day",
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="ceph_consumption_hospital",
             label="Hospital Cephalosporin Consumption",
             description=(
@@ -477,7 +477,7 @@ class KlebsiellaAmrModel(Model):
             unit="DDD/1000/day",
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="carb_consumption_hospital",
             label="Hospital Carbapenem Consumption",
             description=(
@@ -493,7 +493,7 @@ class KlebsiellaAmrModel(Model):
             unit="DDD/1000/day",
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="treatment_duration",
             label="Treatment Duration",
             description="Average duration of an antibiotic treatment course",
