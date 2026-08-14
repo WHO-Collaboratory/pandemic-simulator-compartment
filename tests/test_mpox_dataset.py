@@ -6,6 +6,7 @@ import pytest
 from compartment.models.mpox_jax_model.model import MpoxJaxModel
 
 
+@pytest.mark.integration
 def test_transition_schedule_applies_to_arbitrary_regions():
     model = object.__new__(MpoxJaxModel)
     model.admin_units = ["BRA-SP", "Pacific Island 7", "any-other-zone"]

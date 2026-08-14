@@ -46,6 +46,16 @@ def discover_models() -> dict[str, tuple[str, str, pathlib.Path]]:
 MODEL_CONFIGS = discover_models()
 
 
+def model_datasets_are_available(model_dir: pathlib.Path) -> bool:
+    """Whether a model has no manifest or all of its datasets are staged."""
+    from compartment.datasets.manifest import find_manifest, load_manifest
+
+    manifest = find_manifest(model_dir)
+    if manifest is None:
+        return True
+    return all(entry.path.is_file() for entry in load_manifest(manifest))
+
+
 def import_class(dotted_path: str):
     """Import a class from a dotted module path."""
     import importlib

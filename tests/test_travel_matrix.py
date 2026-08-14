@@ -31,7 +31,7 @@ from compartment.parameters import ValueType
 from compartment.runtime import Intervention
 from compartment.validation import load_simulation_config
 
-from helpers import MODEL_CONFIGS, import_class
+from helpers import MODEL_CONFIGS, MODELS_DIR, import_class, model_datasets_are_available
 
 
 # Three well-separated zones with distinct populations. ``id`` is required —
@@ -43,7 +43,11 @@ ZONES = [
     {"id": "z2", "name": "C", "center_lat": 52.0, "center_lon": 13.0, "population": 1_000_000},
 ]
 
-MODEL_DIRS = sorted(MODEL_CONFIGS)
+MODEL_DIRS = sorted(
+    model_dir
+    for model_dir in MODEL_CONFIGS
+    if model_datasets_are_available(MODELS_DIR / model_dir)
+)
 
 
 def _model_class(model_dir):

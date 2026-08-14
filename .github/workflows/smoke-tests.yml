@@ -8,10 +8,6 @@ on:
   workflow_call:
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
   discover:
     runs-on: ubuntu-latest
@@ -21,9 +17,18 @@ jobs:
       - uses: actions/checkout@v4
       - id: find
         run: |
-          models=$(ls -d compartment/models/*/example-config.json 2>/dev/null | xargs -I{} dirname {} | xargs -I{} basename {} | jq -R . | jq -sc .)
-          echo "models=$models" >> "$GITHUB_OUTPUT"
-          echo "Discovered models: $models"
+          models=()
+          for config in compartment/models/*/example-config.json; do
+            model_dir=$(dirname "$config")
+            if [ -f "$model_dir/datasets.yaml" ]; then
+              echo "Skipping $(basename "$model_dir"): declares external datasets."
+              continue
+            fi
+            models+=("$(basename "$model_dir")")
+          done
+          models_json=$(printf '%s\n' "${models[@]}" | jq -R . | jq -sc .)
+          echo "models=$models_json" >> "$GITHUB_OUTPUT"
+          echo "Discovered models: $models_json"
 
   test:
     needs: discover
@@ -45,21 +50,6 @@ jobs:
 
       - name: Install dependencies
         run: uv sync
-
-      - name: Configure AWS credentials
-        if: hashFiles(format('compartment/models/{0}/datasets.yaml', matrix.model)) != ''
-        uses: aws-actions/configure-aws-credentials@v5
-        with:
-          role-to-assume: arn:aws:iam::977099019210:role/GithubUAT-GithubRole-EjE56hj6cwzK
-          aws-region: us-east-1
-
-      # This is a no-op for models without datasets.yaml. For dataset-backed
-      # models it downloads every declared version to its manifest file path.
-      - name: Stage datasets for ${{ matrix.model }}
-        if: hashFiles(format('compartment/models/{0}/datasets.yaml', matrix.model)) != ''
-        run: |
-          uv run python -m compartment.datasets stage \
-            --model-dir compartment/models/${{ matrix.model }}
 
       - name: Smoke test ${{ matrix.model }}
         run: uv run python -m pytest tests/test_smoke.py -v -m integration -k "${{ matrix.model }}"
@@ -89,20 +79,6 @@ jobs:
 
       - name: Install dependencies
         run: uv sync
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5
-        with:
-          role-to-assume: arn:aws:iam::977099019210:role/GithubUAT-GithubRole-EjE56hj6cwzK
-          aws-region: us-east-1
-
-      - name: Stage all declared datasets
-        run: |
-          find compartment/models -name datasets.yaml -print0 \
-            | while IFS= read -r -d '' manifest; do
-                uv run python -m compartment.datasets stage \
-                  --model-dir "$(dirname "$manifest")"
-              done
 
       - name: Unit tests
         run: uv run python -m pytest tests/ -m "not integration" -q
