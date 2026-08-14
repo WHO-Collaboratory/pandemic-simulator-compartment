@@ -1446,6 +1446,9 @@ class ParameterSchemaBuilder:
             )
         )
 
+    # Deprecated alias kept so models written against the old name keep working.
+    add_disease_parameter = add_parameter
+
     # ----- Demographics ----------------------------------------------------
 
     def add_demographic_group(
