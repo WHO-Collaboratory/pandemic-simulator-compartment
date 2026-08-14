@@ -173,6 +173,27 @@ Three precedence layers, latest wins:
 
 The covid model currently keeps its hardcoded 9-cell POLYMOD overrides for backward compatibility — they take precedence over Prem. Removing them is a known follow-up.
 
+## Modeler-supplied data
+
+A model that needs a data file declares it in a `datasets.yaml` next to `model.py` and reads it with `self.dataset(name)`, which returns a `Path`:
+
+```yaml
+# compartment/models/<name>/datasets.yaml
+datasets:
+  - name: kenya-contact-matrix
+    version: "1"                    # quote it — unquoted 1.10 becomes 1.1
+    file: data/kenya-contacts.csv   # relative to datasets.yaml
+```
+```python
+contacts = pd.read_csv(self.dataset("kenya-contact-matrix"))
+```
+
+`dataset()` is a `classmethod`, so it also works from `get_initial_population()` and other classmethods. It resolves the manifest entry and checks the file exists, raising `ManifestError` with the exact `datasets pull` command when it doesn't. Code: [compartment/datasets/resolve.py](../compartment/datasets/resolve.py); user guide: [docs/guides/adding-datasets.md](../docs/guides/adding-datasets.md).
+
+The same call works locally and in the cloud. Locally the file arrives via `python -m compartment.datasets pull <name>@<version> --dest data/` (`compartment/models/*/data/` is gitignored — only the manifest is tracked). In the cloud, `disease-pipeline`'s *Stage datasets* step downloads each entry before `docker build`, so it is baked into the model image at the same relative path. Limit: **500 MB per dataset**, because it lands in the image.
+
+Distinct from the bundled Prem 2021 contact matrices under `compartment/contact_matrices/`, which are repo data loaded by relative path and are not datasets in this sense.
+
 ## Pitfalls I keep tripping on
 
 - **`super().__init__()` must be called when the model is "migrated"** (i.e. uses `define_parameters()`). It's what populates `self.beta`, `self.gamma`, contact matrix, intervention runtime objects. If I see `AttributeError: ... has no attribute 'beta'`, the cause is usually a forgotten `super().__init__()` or a typo in `variable_name`.
@@ -181,6 +202,7 @@ The covid model currently keeps its hardcoded 9-cell POLYMOD overrides for backw
 - **Every compartment-to-compartment movement should be a schema edge** when the flow has the form `rate * source` or `source * rate * sum(infective) / N`. Skipping an edge silently is almost always a bug. **Exceptions** (legitimate manual flows): multi-rate FOI mixing several β values across different infectious sources (hantavirus's `Sm → Em = Sm * (β_mm·Im + β_f·If)`), demographic births (`μ·N`, harmonic-mean), and density-dependent deaths (`a + c·N`). For these: declare the rate constants via `add_disease_parameter()`, apply the flow with `_apply_flow(derivs, source_id, target_id, flow)`, and **declare the target's `*_total` compartment by hand** if the target isn't already an edge target (the framework only auto-generates totals for declared edge targets). See [hantavirus_jax_model/model.py](../compartment/models/hantavirus_jax_model/model.py) for the canonical example.
 - **`infective=True` is critical for `frequency_dependent=True` edges**. Without it, the FOI sum is empty and the model produces zero flow. Mark every compartment that contributes infectious pressure (in dengue that's all primary `Ix` and all secondary `Ixy`).
 - **`value_type=ValueType.DAYS`** means `default=10.0` is interpreted as a 10-day mean ⇒ rate `0.1`. Do not pre-divide.
+- **Don't build a data-file path by hand.** `Path(__file__).parent / "data" / "contacts.csv"` appears to work and then silently reads stale data the moment `datasets.yaml` bumps the version — and resolves to nothing in the cloud if the file was never declared, since only declared datasets get staged into the image. Use `self.dataset(name)`.
 - **Don't set `self.travel_matrix` by hand.** `_apply_interventions()` reads it, and the framework guarantees it exists by calling `_ensure_travel_matrix()` before `prepare_initial_state()` — including the identity default for models with no mobility. Assigning it in `__init__`/`prepare_initial_state()` will just be overwritten. Override `build_travel_matrix()` instead.
 - **Variants** use `super().define_parameters(schema)` and then mutate. Removing a compartment cascades and removes any edges that reference it. To re-add an edge that the parent referenced via the removed compartment (e.g. an S→I beta after E is gone), call `schema.add_transmission_edge(**_BETA_SI)` — see covid `variants.py` for the canonical pattern.
 - **Stochastic / Euler models** must set `STOCHASTIC = True` (or `SOLVER = "euler"`) and have `equation()` return the **per-step delta**, not the rate. Multiplying by `dt` happens inside `_euler_integrate`.

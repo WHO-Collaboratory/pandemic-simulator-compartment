@@ -163,6 +163,23 @@ class CLASS_NAME(Model):
         super().__init__(config)
         # Add any model-specific initialisation here (e.g. temperature).
 
+    # --- Optional: your own data ---
+    # To use a data file, declare it in a datasets.yaml next to this model and
+    # read it with self.dataset(name). The same call works locally and in the
+    # cloud — never build the path by hand.
+    #
+    #   # datasets.yaml
+    #   datasets:
+    #     - name: my-contact-matrix
+    #       version: "1"
+    #       file: data/contacts.csv
+    #
+    #   import pandas as pd
+    #   contacts = pd.read_csv(self.dataset("my-contact-matrix"))
+    #
+    # Upload it once with `python -m compartment.datasets push`, and see
+    # docs/guides/adding-datasets.md. Limit: 500 MB per dataset.
+
     # --- Optional: spatial travel support ---
     # The framework calls this before prepare_initial_state() and stores the
     # result on self.travel_matrix. The default returns the identity matrix,

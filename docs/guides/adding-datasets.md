@@ -123,6 +123,64 @@ What the statuses mean:
 Your file is deleted from the holding area either way. Nothing unscanned is
 ever published.
 
+## Step 5 — Use it in your model
+
+Read the file with `self.dataset()`, passing the `name` from your
+`datasets.yaml`:
+
+```python
+import pandas as pd
+
+class MyModel(Model):
+    def build_travel_matrix(self, admin_zones):
+        contacts = pd.read_csv(self.dataset("kenya-contact-matrix"))
+        ...
+```
+
+`self.dataset(...)` hands back the path to the file. Open it however you like —
+pandas, numpy, `json`, anything. The simulator does not care what is in it.
+
+**This one line works everywhere.** On your machine it points at the file in
+your `data/` folder. When your model runs in the cloud, it points at the copy
+built into your model's image. You never write a path, and you never write an
+S3 address.
+
+!!! warning "Do not build the path yourself"
+    Writing something like `Path(__file__).parent / "data" / "kenya-contacts.csv"`
+    appears to work and then breaks: the moment you bump the version in
+    `datasets.yaml`, your model is still reading the old file. Use
+    `self.dataset()` and the version follows automatically.
+
+If the file is not where the manifest says it is, you get told exactly what to
+run:
+
+```
+kenya-contact-matrix@1 is declared in .../datasets.yaml but
+.../data/kenya-contacts.csv does not exist. Download it with:
+  python -m compartment.datasets pull kenya-contact-matrix@1 --dest .../data
+```
+
+This is normal on a fresh clone — data files are not stored in git, only your
+`datasets.yaml` is. Run the `pull` it suggests.
+
+### A complete example
+
+The [MPOX model](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/mpox_jax_model/model.py)
+uses `self.dataset()` to load a time-varying schedule of infection and recovery
+multipliers, interpolating between the elapsed-day checkpoints in the CSV.
+Its
+[manifest](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/mpox_jax_model/datasets.yaml)
+and small
+[CSV](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/mpox_jax_model/data/transition-rate-multipliers.csv)
+are committed as a runnable example. The schedule is applied uniformly rather
+than using administrative-zone lookups, so the model works with any solution's
+country, zone names, number of zones, and start date.
+
+That CSV is a deliberate exception to the normal rule above so automated tests
+and fresh clones can run the example without downloading anything. Do not
+commit ordinary model datasets; publish and pull those with the dataset
+commands.
+
 ---
 
 ## Using a dataset someone else uploaded
@@ -183,7 +241,11 @@ uploaded:
 underscores. They must start with a letter or number, and cannot contain
 slashes. Names can be up to 128 characters, filenames up to 256.
 
-**Size.** Up to 5 GB per file.
+**Size.** Up to **500 MB per dataset**. Every dataset your model declares is
+built into your model's cloud image, so this is a limit on how big that image
+gets, not on what the virus scanner can handle. If your file is bigger:
+compress it, drop columns you do not use, coarsen the resolution, or split it
+into several smaller datasets. You are told before the upload starts, not after.
 
 **Visibility.** Every dataset is visible to everyone using the simulator. Do not
 upload anything confidential or containing personal data.
@@ -211,6 +273,18 @@ You do not have to do anything for this. It means anyone looking at a model run
 later can see exactly which data it was built from. Models without a
 `datasets.yaml` simply do not get this section.
 
+This list is also what puts your data in the cloud. When your model is released,
+the pipeline reads it, downloads each dataset, and builds them into the model's
+image — which is why `self.dataset()` finds the file when the model runs. Two
+consequences worth knowing:
+
+- **A dataset must be published before the release.** If `datasets.yaml` names
+  something that was never pushed (or was rejected), the release fails with a
+  message naming the missing dataset. Better there than in a simulation someone
+  is waiting on.
+- **Changing data means a new release.** Bumping a version in `datasets.yaml`
+  changes nothing until the model is released again.
+
 ---
 
 ## If something goes wrong
@@ -221,6 +295,9 @@ later can see exactly which data it was built from. Models without a
 | `must contain a top-level 'datasets:' list` | The file's shape is wrong. | It must start with `datasets:` and a list of entries under it. |
 | `no such file ...` | A `file:` path does not point at anything. | Paths are relative to `datasets.yaml`, not to where you are standing. |
 | `... is listed twice` | The same name and version appear twice. | Remove the duplicate or change one version. |
+| `over the 500 MB per-dataset limit` | The file is too big to build into a model image. | Shrink or split it. See **Size** above. |
+| `does not declare 'name'` | The name you passed to `self.dataset()` is not in `datasets.yaml`. | The message lists the names that are declared — usually a typo. |
+| `is declared ... but ... does not exist` | The manifest is right but the file is not downloaded. | Run the `pull` command in the message. Normal on a fresh clone. |
 | `already exists. Datasets are immutable` | That version is published. | Bump the version. |
 | `Session token is invalid or expired` | Your token has run out (about an hour). | Run the command again and paste a fresh token. |
 | `was not issued by the expected Cognito user pool` | You copied the token from the wrong site. | Copy it from the same site the CLI opened for you, not a different environment. |

@@ -43,6 +43,27 @@ MANIFEST_FILENAME = "datasets.yaml"
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _FILENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$")
 
+# Largest single dataset we accept, mirroring MAX_UPLOAD_SIZE_BYTES on the
+# dataset API and the scan-complete Lambda. The binding constraint is not the
+# malware scanner (GuardDuty handles 5 GiB) but the model container image:
+# every dataset a model declares is baked into its image by the `datasets
+# stage` step, and Lambda caps an image at 10 GB.
+#
+# Checked client-side too, so an oversized file is caught before it is uploaded
+# rather than after the scan rejects it. Keep this exactly in step with
+# dataset_max_upload_size_bytes in infra/tofu/shared-services — a client limit
+# looser than the server's produces a confusing late rejection, and a tighter
+# one silently blocks uploads the platform would accept.
+MAX_DATASET_BYTES = 500 * 1024 * 1024  # 524288000
+
+
+def human_bytes(size: int) -> str:
+    """Format a byte count for a modeler-facing message."""
+    megabytes = size / (1024 * 1024)
+    if megabytes >= 10:
+        return f"{megabytes:,.0f} MB"
+    return f"{megabytes:,.1f} MB"
+
 
 class ManifestError(Exception):
     """Raised when a datasets.yaml is missing, malformed, or invalid."""

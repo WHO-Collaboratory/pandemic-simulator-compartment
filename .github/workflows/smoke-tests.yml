@@ -17,9 +17,18 @@ jobs:
       - uses: actions/checkout@v4
       - id: find
         run: |
-          models=$(ls -d compartment/models/*/example-config.json 2>/dev/null | xargs -I{} dirname {} | xargs -I{} basename {} | jq -R . | jq -sc .)
-          echo "models=$models" >> "$GITHUB_OUTPUT"
-          echo "Discovered models: $models"
+          models=()
+          for config in compartment/models/*/example-config.json; do
+            model_dir=$(dirname "$config")
+            if [ -f "$model_dir/datasets.yaml" ]; then
+              echo "Skipping $(basename "$model_dir"): declares external datasets."
+              continue
+            fi
+            models+=("$(basename "$model_dir")")
+          done
+          models_json=$(printf '%s\n' "${models[@]}" | jq -R . | jq -sc .)
+          echo "models=$models_json" >> "$GITHUB_OUTPUT"
+          echo "Discovered models: $models_json"
 
   test:
     needs: discover
@@ -51,6 +60,28 @@ jobs:
           if [ -f "$TEST_FILE" ]; then
             uv run python -m pytest "$TEST_FILE" -v
           fi
+
+  # The whole unit suite, minus the per-model integration smoke tests the
+  # `test` matrix above already covers. Runs in seconds, so it gates every
+  # push and PR rather than only the files someone remembered to name.
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Unit tests
+        run: uv run python -m pytest tests/ -m "not integration" -q
 
   artifact-tests:
     runs-on: ubuntu-latest

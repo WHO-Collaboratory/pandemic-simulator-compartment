@@ -9,6 +9,7 @@ Python 3.13+, managed with `uv`. JAX (`odeint`) is the default ODE solver; stoch
 - **Authoring or modifying a disease model** → [.claude/MODEL_AUTHORING_REFERENCE.md](.claude/MODEL_AUTHORING_REFERENCE.md). This is the authoritative playbook with patterns, pitfalls, and the closest-analog index. Always read it first before suggesting a model change.
 - **User-facing model development guide** → [docs/guides/developing-models.md](docs/guides/developing-models.md). Same material as the authoring reference but framed for human contributors; use it when explaining concepts back to the user.
 - **Config schema & required fields** → [README.md](README.md) covers `admin_unit_id`, `Disease`, `case_file`, intervention shapes, etc.
+- **A model needs its own data file** → [docs/guides/adding-datasets.md](docs/guides/adding-datasets.md). Declare it in a `datasets.yaml` beside `model.py` and read it with `self.dataset(name)`; never hand-build a path.
 
 ## Directory map
 
@@ -29,6 +30,8 @@ compartment/
     ├── main.py              # CLI wrapper
     ├── example-config.json
     ├── variants.py          # OPTIONAL — fixed-compartment variants
+    ├── datasets.yaml        # OPTIONAL — modeler-supplied data, read via self.dataset(name)
+    ├── data/                # OPTIONAL — dataset payloads (gitignored; `datasets pull` refetches)
     └── artifacts/           # OPTIONAL — generated artifact JSON
 
 tests/
@@ -94,6 +97,7 @@ python -m py_compile compartment/path/to/file.py
 - **`*_total` compartments are auto-generated** for every edge target. Don't declare them by hand unless the flow is manual or you're overriding `_add_total_compartments()` (dengue does).
 - **`value_type=ValueType.DAYS`** means `default=10.0` represents a 10-day mean (auto-converted to a `0.1/day` rate at load). Don't pre-divide.
 - **Local-mode config "short form"**: top-level `admin_zones` and `demographics` are auto-wrapped into `case_file` by `load_config_from_json`. Don't double-nest in hand-written configs.
+- **Modeler data goes through `datasets.yaml`.** Declare `{name, version, file}` beside `model.py`, read it with `self.dataset(name)` → `Path`. Resolves identically locally (via `datasets pull --dest data/`) and in the cloud (the release pipeline stages each entry into the model image). 500 MB per dataset, because it ships in the image. Never hand-build `Path(__file__).parent / "data" / ...` — it goes stale on a version bump and finds nothing in the cloud.
 
 ## Workflow notes
 
@@ -109,3 +113,4 @@ python -m py_compile compartment/path/to/file.py
 - Don't declare `*_total` compartments for typical models.
 - Don't override `disease_type` as a property when `set_model_info()` already sets it.
 - Don't suggest editing `compartment/validation/post_processor.py` to register a new disease type — its default dispatch already handles any registered model.
+- Don't read a model's data file with a hand-built relative path, and don't commit dataset payloads to `compartment/models/*/data/` — declare them in `datasets.yaml` and use `self.dataset(name)`.

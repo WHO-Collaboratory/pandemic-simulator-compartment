@@ -1324,6 +1324,52 @@ class Model(ABC):
 
         self.travel_matrix = xp.asarray(self.build_travel_matrix(admin_zones))
 
+    # ------------------------------------------------------------------
+    # Modeler data
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def dataset(cls, name: str) -> Path:
+        """
+        Absolute path to a dataset this model declares in its
+        ``datasets.yaml``.
+
+        Read the file however suits it — the framework only resolves the
+        path, so any format works::
+
+            df = pd.read_csv(self.dataset("kenya-contact-matrix"))
+            zones = json.loads(self.dataset("kenya-admin-zones").read_text())
+
+        The same call works locally and in the cloud. Locally the file
+        arrives via ``python -m compartment.datasets pull --dest data/``;
+        in the cloud the release pipeline bakes it into the model image at
+        the same relative path.  Never build the path by hand — a literal
+        ``Path(__file__).parent / "data" / ...`` resolves to nothing once
+        the version in ``datasets.yaml`` is bumped.
+
+        Args:
+            name: The dataset's ``name:`` in ``datasets.yaml``.
+
+        Raises:
+            ManifestError: No ``datasets.yaml``, ``name`` not declared in
+                it, or the file is not on disk — each with the fix.
+        """
+        # Imported here rather than at module scope: compartment.model is
+        # imported by every model, and this keeps yaml parsing off that path
+        # for the models that use no datasets.
+        from compartment.datasets import dataset_path, model_dir_for_class
+
+        model_dir = model_dir_for_class(cls)
+        if model_dir is None:
+            from compartment.datasets import ManifestError
+
+            raise ManifestError(
+                f"Cannot locate the source directory for {cls.__name__}, so its "
+                f"datasets.yaml cannot be read. This happens when the class is "
+                f"defined dynamically rather than in a model.py on disk."
+            )
+        return dataset_path(model_dir, name)
+
     def prepare_initial_state(self):
         pass
 
