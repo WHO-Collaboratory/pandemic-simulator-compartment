@@ -33,6 +33,31 @@ This guide follows three models that ship with the repository. Read the one clos
 | `compartment/models/example_parameter_uncertainty_custom_model` | `example_parameter_uncertainty_custom` | The same SIR model with the equations **written by hand**, plus a custom intervention that ramps up and down instead of switching on and off. |
 | `compartment/models/example_stochastic_model` | `example_stochastic` | A **stochastic** SIR model (tau-leaping, Euler integration, multiple trajectories) with split asymptomatic / symptomatic infectious compartments. |
 
+### What a local run represents
+
+Your model code is identical whether it runs locally on your own machine or remotely in the Pandemic Simulator. The only thing that changes is where its inputs come from.
+
+Running locally, you hand the model a JSON file. In the Simulator, the frontend collects the user's choices and the backend supplies the population and geography — then passes them to your model in that same shape. So `example-config.json` is a stand-in for a filled-in UI form plus the backend data behind it, and a model that runs locally will run in the Simulator.
+
+Think of your model directory as having two halves: what the user can touch, and what only you control.
+
+| In your model | What it becomes in the UI |
+| :---- | :---- |
+| `example-config.json` | The user's form selections, plus backend data — populations from WorldPop, admin zone coordinates from OpenStreetMap. Editing it locally is you standing in for the user. |
+| `schema.set_model_info()` | Your model's name and description in the model picker. |
+| `schema.add_compartment()` | The compartments offered for the model, which users can select or deselect. |
+| `schema.add_transmission_edge()` | The arrows between compartments, each with a control whose default, minimum, and maximum are the ones you declared. |
+| `schema.add_parameter()` | An extra input field, for anything that isn't a flow between compartments. |
+| `schema.add_intervention()` | An intervention the user can switch on and give dates, adherence, and a transmission reduction. |
+| `schema.add_demographic_group()` | The age breakdown available for the run. |
+| `model.md` | The "You should know" panel on the results page. |
+| `main.py` | The file that starts a run. Locally you launch it yourself from the terminal; in the Simulator the platform launches it for you when a user starts a simulation. |
+| `equation()` | **Nothing.** It runs only in the backend. No UI user can see or change it. |
+
+The rule of thumb: **anything you declare on the `schema` becomes something a user can see or change. Anything you write in `equation()` is yours alone.** Widening a parameter's `min_value` widens a slider for every future user; rewriting `equation()` changes the model's behavior without changing the UI at all.
+
+A local run also produces the same results JSON the Simulator charts, which is why the [results viewer](#visualize-model-results) looks like the results page.
+
 ---
 
 ## Table of Contents
@@ -299,9 +324,9 @@ A **class** is a blueprint. `ExampleStochasticModel` is a class: it describes wh
 
 An **instance** is one actual model built from that blueprint, with real numbers in it. You never build one yourself — the framework does it. It calls your class once with the loaded config, then copies that instance and empties the copy's interventions to produce the control run. That's where the two runs in every output file come from: two instances of your one class.
 
-Inside the class, `self` means "this particular instance." When `equation()` reads `self.population_matrix`, it's reading *this run's* population, not some shared global value. That's exactly why the intervention run and the control run can hold different numbers without interfering with each other, even though they came from the same class.
+Inside the class, `self` means "this particular instance." The two runs differ by a single attribute: the framework empties `self.intervention_dict` on the control instance. So when `equation()` applies interventions, the first instance finds `my_intervention` and scales `beta` down, while the control finds nothing and leaves `beta` alone. Same class, same code, two different curves — because `self` points at a different instance each time.
 
-#### Inheritance: getting behavior for free
+#### Inheritance
 
 **Inheritance** means one class starts with everything another class already has. You write the differences, not the whole thing.
 
@@ -393,12 +418,6 @@ You'll see two different first arguments in the example models, and the differen
 - **`cls`** with a `@classmethod` decorator above it — a method called on the class itself, before any instance exists. `define_parameters(cls, schema)` is a classmethod because the framework needs your model's compartments and parameters *in order to* validate a config and build an instance. There is no instance yet, so there is no `self` to use.
 
 This is also why `define_parameters` can't read `self.beta`: at the time it runs, no config has been loaded and no rates exist. It only *declares* that `beta` exists and what its bounds are.
-
-#### A note on the leading underscore
-
-Methods and attributes beginning with `_` — `_compute_equations`, `_apply_flow`, `_apply_interventions`, `self._key` — are internal to the framework by convention. Python does not enforce this; the underscore is a signal that says "this is machinery, not part of the public interface."
-
-You are expected to *call* the underscore helpers listed in this guide, and to override `_add_total_compartments` when you need to. Treat anything else with an underscore as something that may change between releases.
 
 ### model.py
 
