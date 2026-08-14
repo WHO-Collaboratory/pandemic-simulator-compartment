@@ -163,6 +163,24 @@ kenya-contact-matrix@1 is declared in .../datasets.yaml but
 This is normal on a fresh clone — data files are not stored in git, only your
 `datasets.yaml` is. Run the `pull` it suggests.
 
+### A complete example
+
+The [MPOX model](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/mpox_jax_model/model.py)
+uses `self.dataset()` to load a time-varying schedule of infection and recovery
+multipliers, interpolating between the elapsed-day checkpoints in the CSV.
+Its
+[manifest](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/mpox_jax_model/datasets.yaml)
+and small
+[CSV](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/mpox_jax_model/data/transition-rate-multipliers.csv)
+are committed as a runnable example. The schedule is applied uniformly rather
+than using administrative-zone lookups, so the model works with any solution's
+country, zone names, number of zones, and start date.
+
+That CSV is a deliberate exception to the normal rule above so automated tests
+and fresh clones can run the example without downloading anything. Do not
+commit ordinary model datasets; publish and pull those with the dataset
+commands.
+
 ---
 
 ## Using a dataset someone else uploaded

@@ -2,6 +2,7 @@ import jax.numpy as np
 import jax
 import numpy as onp
 import logging
+import pandas as pd
 from compartment.helpers import setup_logging
 from compartment.model import Model
 from compartment.parameters import ValueType
@@ -163,6 +164,7 @@ class MpoxJaxModel(Model):
         self.start_date = input["start_date"]
         self.start_date_ordinal = self.start_date.toordinal()
         self.n_timesteps = input["time_steps"]
+        self.transition_schedule = self._load_transition_schedule()
 
         # Administrative units
         self.admin_units = input["admin_units"]
@@ -177,6 +179,33 @@ class MpoxJaxModel(Model):
         self.intervention_statuses = {"ring_vaccination": False}
 
         self.payload = input
+
+    def _load_transition_schedule(self):
+        """Load a region-independent event-rate schedule from modeler data."""
+        table = pd.read_csv(self.dataset("mpox-transition-multipliers"))
+        required = {"day", "infection", "recovery"}
+        missing = required - set(table.columns)
+        if missing:
+            names = ", ".join(sorted(missing))
+            raise ValueError(f"Dataset is missing column(s): {names}")
+        if table.empty or table["day"].iloc[0] != 0:
+            raise ValueError("Dataset schedule must start at day 0")
+        if not table["day"].is_monotonic_increasing or table["day"].duplicated().any():
+            raise ValueError("Dataset days must be unique and increasing")
+        if (table[["infection", "recovery"]] < 0).any().any():
+            raise ValueError("Dataset multipliers cannot be negative")
+        return {
+            column: np.asarray(table[column].to_numpy())
+            for column in ("day", "infection", "recovery")
+        }
+
+    def _transition_multiplier(self, transition, t):
+        """Interpolate a transition multiplier for elapsed simulation day ``t``."""
+        return np.interp(
+            t,
+            self.transition_schedule["day"],
+            self.transition_schedule[transition],
+        )
 
     # ------------------------------------------------------------------
     # Mobility model (defined on the disease class, built from case file)
@@ -326,6 +355,7 @@ class MpoxJaxModel(Model):
         beta, self.intervention_statuses = self.ring_vaccination_intervention(
             params["beta"], t, prop_infective
         )
+        beta = beta * self._transition_multiplier("infection", t)
 
         # Force of infection with spatial coupling via travel matrix.
         # T[i, j] = fraction of zone i's population present in zone j.
@@ -336,7 +366,10 @@ class MpoxJaxModel(Model):
 
         # Base class auto-handles gamma (I->R) and omega (R->S).
         # beta is skipped here — spatially-coupled S->I flow applied manually below.
-        rates = {"gamma": params["gamma"], "omega": params["omega"]}
+        rates = {
+            "gamma": params["gamma"] * self._transition_multiplier("recovery", t),
+            "omega": params["omega"],
+        }
         derivs = self._compute_equations(states, rates, skip_edges={"beta"})
 
         # Manually apply spatially-coupled S->I flow and accumulate into I_total

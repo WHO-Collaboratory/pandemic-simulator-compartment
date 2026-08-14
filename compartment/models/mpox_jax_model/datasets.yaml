@@ -1,0 +1,4 @@
+datasets:
+  - name: mpox-transition-multipliers
+    version: "1"
+    file: data/transition-rate-multipliers.csv
