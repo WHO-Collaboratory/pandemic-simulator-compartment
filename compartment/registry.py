@@ -1,8 +1,8 @@
 """
-Central model registry — single source of truth for disease_type → model class.
+Central model registry — unique model_key routing with disease_type aliases.
 
-Discovery is automatic: every Model subclass that declares a DISEASE_TYPE class
-attribute is registered.  No manual list to maintain.
+Discovery is automatic: every Model subclass receives a stable MODEL_KEY and is
+registered under it. A disease_type remains a shortcut while it is unambiguous.
 
 Adding a new model:
   1. Create compartment/models/<dir>/model.py with a Model subclass.
@@ -25,10 +25,10 @@ DISEASE_TYPE_ALIASES: dict[str, str] = {
 }
 
 
-def _build_registry() -> dict:
+def _discover_model_classes() -> list[type]:
     from compartment.model import Model
 
-    registry: dict[str, type] = {}
+    classes: list[type] = []
     models_dir = Path(__file__).parent / "models"
 
     for model_dir in sorted(models_dir.iterdir()):
@@ -47,23 +47,52 @@ def _build_registry() -> dict:
                     and cls.__module__ == module_name
                     and hasattr(cls, "DISEASE_TYPE")
                 ):
-                    if cls.DISEASE_TYPE in registry:
-                        if registry[cls.DISEASE_TYPE] is cls:
-                            continue
-                        raise RuntimeError(
-                            f"Duplicate DISEASE_TYPE '{cls.DISEASE_TYPE}': "
-                            f"'{registry[cls.DISEASE_TYPE].__name__}' and '{cls.__name__}' "
-                            f"both claim the same disease type."
-                        )
-                    registry[cls.DISEASE_TYPE] = cls
+                    if cls not in classes:
+                        classes.append(cls)
 
-    return registry
+    return classes
 
 
-MODEL_REGISTRY: dict[str, type] = _build_registry()
+def _build_registries(model_classes: list[type]) -> tuple[dict[str, type], dict[str, type]]:
+    """Build unique model-key routes and unambiguous disease-type aliases."""
+    from compartment.model import model_key_for_class
+
+    model_registry: dict[str, type] = {}
+    disease_claims: dict[str, list[type]] = {}
+
+    for cls in model_classes:
+        model_key = getattr(cls, "MODEL_KEY", None) or model_key_for_class(
+            cls, cls.DISEASE_TYPE
+        )
+        cls.MODEL_KEY = model_key
+        if model_key in model_registry and model_registry[model_key] is not cls:
+            raise RuntimeError(f"Duplicate MODEL_KEY '{model_key}'")
+        model_registry[model_key] = cls
+        disease_claims.setdefault(cls.DISEASE_TYPE, []).append(cls)
+
+    disease_registry = {
+        disease_type: classes[0]
+        for disease_type, classes in disease_claims.items()
+        if len(classes) == 1
+    }
+    return model_registry, disease_registry
 
 
-def resolve(disease_type: str) -> type | None:
-    """Return the model class for a disease_type, resolving legacy aliases."""
-    canonical = DISEASE_TYPE_ALIASES.get(disease_type, disease_type)
-    return MODEL_REGISTRY.get(canonical)
+MODEL_KEY_REGISTRY, DISEASE_TYPE_REGISTRY = _build_registries(
+    _discover_model_classes()
+)
+
+# Backward-compatible public registry: unique disease types keep their familiar
+# key; only ambiguous disease types expand into one model_key entry per class.
+MODEL_REGISTRY: dict[str, type] = dict(DISEASE_TYPE_REGISTRY)
+for model_key, model_class in MODEL_KEY_REGISTRY.items():
+    if model_class.DISEASE_TYPE not in DISEASE_TYPE_REGISTRY:
+        MODEL_REGISTRY[model_key] = model_class
+
+
+def resolve(identifier: str) -> type | None:
+    """Resolve a unique model_key or an unambiguous legacy disease_type."""
+    if identifier in MODEL_KEY_REGISTRY:
+        return MODEL_KEY_REGISTRY[identifier]
+    canonical = DISEASE_TYPE_ALIASES.get(identifier, identifier)
+    return DISEASE_TYPE_REGISTRY.get(canonical)

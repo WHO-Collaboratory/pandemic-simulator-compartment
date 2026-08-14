@@ -140,7 +140,7 @@ class MyModel(Model):
     def define_parameters(cls, schema):
         # 1. Identity (required, exactly once)
         schema.set_model_info(
-            disease_type="MY_DISEASE",         # machine key — used everywhere
+            disease_type="MY_DISEASE",         # disease family; duplicates are allowed
             label="My Disease",                # UI / artifact name
             description="A short SIR model for my disease",
         )
@@ -229,6 +229,9 @@ class MyModel(Model):
 What the base class does for you after `define_parameters()`:
 
 - `cls.DISEASE_TYPE` — set from `schema.set_model_info()` if not already declared.
+- `cls.MODEL_KEY` — stable internal routing key (`DISEASE_TYPE_<uuid>`), generated
+  from the fully-qualified model class name. Multiple models may therefore use
+  the same `disease_type` without colliding; do not set this key yourself.
 - `cls.COMPARTMENT_LIST` — a plain ordered `list[str]` of compartment IDs.
 - `cls.COMPARTMENTS` — a `CompartmentRegistry` exposing attribute-style access (`cls.COMPARTMENTS.S` → `"S"`) and an `infective_ids` property.
 - **Automatic `_total` compartments**: for every transmission edge target, the framework appends a cumulative `<target>_total` compartment to the schema (e.g. `I_total`, `H_total`). You do **not** need to declare these. They are filtered out of API outputs and used internally to compute compartment deltas. To opt out, override `_add_total_compartments(cls, schema)` as a no-op (see Dengue, which declares its own aggregate totals).

@@ -96,21 +96,31 @@ def run_simulation(
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
-    # Resolve model_class from the artifact's disease_type (e.g. COVID_SIHR)
-    # so variant selection routes to the correct subclass. ModelArtifact is
-    # preferred over Disease because it carries the specific variant type;
-    # Disease.disease_type is the base type (e.g. COVID_SEIHDR).
+    # Resolve model_class from the artifact's unique model_key. Older artifacts
+    # fall back to disease_type when that identifier is unambiguous.
     # The caller-supplied model_class is kept as a final fallback.
     from compartment.registry import resolve as _resolve
 
     job = config["data"]["getSimulationJob"]
-    config_disease_type = (job.get("ModelArtifact") or {}).get("disease_type") or (
-        job.get("Disease") or {}
-    ).get("disease_type")
-    if config_disease_type:
-        resolved = _resolve(config_disease_type)
-        if resolved is not None:
-            model_class = resolved
+    model_artifact = job.get("ModelArtifact") or {}
+    model_key = model_artifact.get("model_key")
+    if model_key:
+        resolved = _resolve(model_key)
+        if resolved is None:
+            raise ValueError(f"Unknown model_key: {model_key}")
+        model_class = resolved
+    else:
+        # Backward compatibility for artifacts created before model_key existed.
+        for disease_identifier in (
+            model_artifact.get("disease_type"),
+            (job.get("Disease") or {}).get("disease_type"),
+        ):
+            if not disease_identifier:
+                continue
+            resolved = _resolve(disease_identifier)
+            if resolved is not None:
+                model_class = resolved
+                break
 
     disease_type = model_class.DISEASE_TYPE
     config["data"]["getSimulationJob"]["Disease"]["disease_type"] = disease_type
@@ -118,7 +128,7 @@ def run_simulation(
     validation_success, cleaned_config = record_and_upload_validation(
         simulation_job_id,
         config,
-        disease_type,
+        model_class.MODEL_KEY,
         environment=simulation_params.get("ENVIRONMENT", "dev")
         if simulation_params
         else None,

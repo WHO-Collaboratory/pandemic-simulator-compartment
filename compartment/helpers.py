@@ -314,8 +314,8 @@ def create_jax_intervention_results(
 
         # Use schema-declared infective compartments when available;
         # fall back to "I" for legacy models.
-        from compartment.registry import MODEL_REGISTRY
-        model_class = MODEL_REGISTRY.get(disease_type)
+        from compartment.registry import resolve
+        model_class = resolve(disease_type)
         if model_class and hasattr(model_class, "COMPARTMENTS") and hasattr(model_class.COMPARTMENTS, "infective_ids"):
             infective_comps = list(model_class.COMPARTMENTS.infective_ids)
             infective_idx = [

@@ -104,7 +104,7 @@ def _python_type_for(vtype: ValueType) -> type:
 # Public API
 # ---------------------------------------------------------------------------
 
-# Cache: disease_type -> generated Pydantic class
+# Cache: unique model_key -> generated Pydantic class
 _generated_cache: dict[str, type] = {}
 
 
@@ -118,10 +118,12 @@ def generate_disease_config(schema: ModelParameterSchema) -> type:
     - Has any extra disease-specific parameters from ``schema.disease_parameters``
     - Is fully compatible with ``SimulationConfig[T]``
 
-    Results are cached per ``disease_type`` so repeated calls are cheap.
+    Results are cached per ``model_key`` so models sharing a disease_type do
+    not reuse one another's validation class.
     """
-    if schema.disease_type in _generated_cache:
-        return _generated_cache[schema.disease_type]
+    cache_key = schema.model_key or schema.disease_type
+    if cache_key in _generated_cache:
+        return _generated_cache[cache_key]
 
     from compartment.validation.disease_config import BaseDiseaseConfig
 
@@ -178,7 +180,7 @@ def generate_disease_config(schema: ModelParameterSchema) -> type:
         **fields,
     )
 
-    _generated_cache[schema.disease_type] = config_cls
+    _generated_cache[cache_key] = config_cls
     logger.info("Generated Pydantic config class: %s", class_name)
     return config_cls
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import uuid
 from abc import ABC
 from pathlib import Path
 from typing import Any, ClassVar
@@ -27,6 +28,16 @@ from compartment.runtime import Intervention, TransmissionEdge
 #   from compartment.model import Model, ValueType
 # without needing to import from compartment.parameters directly.
 __all__ = ["Model", "ParameterSchemaBuilder", "ValueType"]
+
+
+_MODEL_KEY_NAMESPACE = uuid.UUID("477c1cb2-2e9d-4cad-a209-830d1016dbef")
+
+
+def model_key_for_class(model_class: type, disease_type: str) -> str:
+    """Return a stable, globally unique routing key for a model class."""
+    class_path = f"{model_class.__module__}.{model_class.__qualname__}"
+    suffix = uuid.uuid5(_MODEL_KEY_NAMESPACE, class_path)
+    return f"{disease_type}_{suffix}"
 
 
 class Model(ABC):
@@ -112,6 +123,7 @@ class Model(ABC):
             # only declare disease_type once (in set_model_info).
             if "DISEASE_TYPE" not in cls.__dict__ and schema.disease_type:
                 cls.DISEASE_TYPE = schema.disease_type
+            cls.MODEL_KEY = schema.model_key
 
             # Custom field registries: attribute-style access to
             # disease parameter and admin zone field names.
@@ -323,6 +335,7 @@ class Model(ABC):
         cls.define_parameters(schema)
 
         built = schema.build()
+        built.model_key = model_key_for_class(cls, built.disease_type)
 
         # Expose the UI compartment display order. When the model groups raw
         # compartments (COMPARTMENT_DELTA_GROUPING), the grouped keys are what
