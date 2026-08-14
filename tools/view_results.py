@@ -11,8 +11,8 @@ Features
 --------
 * Auto-detects the per-compartment record format:
     - deterministic  ->  {"age_0_17": .., "age_all": ..}   (plots age_all)
-    - uncertainty    ->  {"mean": .., "lower": .., "upper": ..}
-      (plots the mean as a line and shades the lower..upper band)
+    - uncertainty    ->  {"median": .., "lower": .., "upper": ..}
+      (plots the median as a line and shades the lower..upper band)
 * Draws vertical marker lines at each intervention start/stop date, when the
   run actually used interventions. Threshold-triggered interventions (no fixed
   date) are listed in the panel note instead of drawn as a line.
@@ -164,11 +164,12 @@ def extract_value(entry):
     ``lower``/``upper`` are None for deterministic (non-band) output.
     """
     if isinstance(entry, dict):
-        if "mean" in entry:
-            mean = float(entry["mean"])
-            lower = float(entry.get("lower", mean))
-            upper = float(entry.get("upper", mean))
-            return mean, lower, upper
+        central = entry.get("median", entry.get("mean"))
+        if central is not None:
+            median = float(central)
+            lower = float(entry.get("lower", median))
+            upper = float(entry.get("upper", median))
+            return median, lower, upper
         if "age_all" in entry:
             return float(entry["age_all"]), None, None
         # Unknown dict shape: fall back to the first numeric leaf.
@@ -187,7 +188,7 @@ def parse_parent_admin_total(run):
     """Extract dates + per-compartment series from a run's parent_admin_total.
 
     Returns (dates, series, has_bands) where ``series`` maps
-    compartment -> {"mean": [...], "lower": [...] or None, "upper": [...] or None}.
+    compartment -> {"median": [...], "lower": [...] or None, "upper": [...] or None}.
     """
     pat = run.get("parent_admin_total") or {}
     ts = pat.get("time_series") or []
@@ -200,17 +201,17 @@ def parse_parent_admin_total(run):
     series = {}
     has_bands = False
     for comp in comp_keys:
-        means, lowers, uppers = [], [], []
+        medians, lowers, uppers = [], [], []
         comp_has_band = False
         for rec in ts:
-            mean, lower, upper = extract_value(rec.get(comp, {}))
-            means.append(mean)
+            median, lower, upper = extract_value(rec.get(comp, {}))
+            medians.append(median)
             if lower is not None:
                 comp_has_band = True
             lowers.append(lower)
             uppers.append(upper)
         series[comp] = {
-            "mean": means,
+            "median": medians,
             "lower": lowers if comp_has_band else None,
             "upper": uppers if comp_has_band else None,
         }
@@ -250,8 +251,8 @@ def parse_compartment_deltas(run):
 
     These are per-compartment cumulative totals over the whole run (the final
     ``*_total`` value). Multi-run results may store
-    ``{mean, lower, upper}`` per compartment — use the central ``mean``
-    (average). Returns {} when the run has none.
+    ``{median, lower, upper}`` per compartment — use the central median
+    value. Returns {} when the run has none.
     """
     cd = run.get("compartment_deltas") or {}
     out = {}
@@ -259,8 +260,8 @@ def parse_compartment_deltas(run):
         if comp == "__typename":
             continue
         try:
-            if isinstance(val, dict) and "mean" in val:
-                out[comp] = float(val["mean"])
+            if isinstance(val, dict) and ("median" in val or "mean" in val):
+                out[comp] = float(val.get("median", val.get("mean")))
             else:
                 out[comp] = float(val)
         except (TypeError, ValueError):
@@ -335,7 +336,7 @@ def plot_panel(ax, run, colors, selected, log_scale, draw_markers):
         if data is None:
             continue
         color = colors[comp]
-        ax.plot(dates, data["mean"], label=comp, color=color, linewidth=1.6)
+        ax.plot(dates, data["median"], label=comp, color=color, linewidth=1.6)
         if data["lower"] is not None and data["upper"] is not None:
             ax.fill_between(dates, data["lower"], data["upper"],
                             color=color, alpha=0.18, linewidth=0)

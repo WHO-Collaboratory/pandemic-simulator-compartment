@@ -118,35 +118,38 @@ class SimulationPostProcessor:
             for sim in self.population_matrix
         ]
         all_sims = np.stack(grouped_sims, axis=0)
-        means_child, lower_child, upper_child = self._calculate_simulation_based_interval(all_sims, ci)
+        medians_child, lower_child, upper_child = (
+            self._calculate_simulation_based_interval(all_sims, ci)
+        )
 
         # Total population: sum across regions (last axis is region)
         logger.info(f"Calculating confidence intervals for parent")
         all_sims_total = all_sims.sum(axis=-1)  # shape: (n_runs, T, C)
-        means_parent, lower_parent, upper_parent = self._calculate_simulation_based_interval(all_sims_total, ci)
+        medians_parent, lower_parent, upper_parent = (
+            self._calculate_simulation_based_interval(all_sims_total, ci)
+        )
 
         # Calculate multi run compartment deltas
-        logger.info(f"Averaging compartment deltas")
-        avg_compartment_deltas = compute_multi_run_compartment_deltas(
-            self.population_matrix, 
-            self.disease_type, 
-            len(self.admin_units), 
+        logger.info(f"Calculating median compartment deltas")
+        compartment_deltas = compute_multi_run_compartment_deltas(
+            self.population_matrix,
+            self.disease_type,
+            len(self.admin_units),
             self.compartment_list,
-            self.model.__class__
+            self.model.__class__,
         )
-        
+
         # Format output
         logger.info(f"Handing payload to multi run formatter")
         return format_uncertainty_output(
-            means_child, lower_child, upper_child,
-            means_parent, lower_parent, upper_parent,
+            medians_child, lower_child, upper_child,
+            medians_parent, lower_parent, upper_parent,
             self.payload,
             grouped_compartment_list,
             self.admin_units,
             str(self.start_date),
             self.n_timesteps,
             self.step,
-            avg_compartment_deltas,
+            compartment_deltas,
             intervention_dict=self.intervention_dict,
         )
-        

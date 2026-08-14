@@ -91,12 +91,12 @@ def _run(cfg: dict) -> list[dict]:
 
 
 def _is_uncertainty_format(time_series: list) -> bool:
-    """True when compartment values are CI dicts {mean, lower, upper}."""
+    """True when compartment values are CI dicts {median, lower, upper}."""
     if not time_series:
         return False
     first = time_series[0]
     values = [v for k, v in first.items() if k != "date"]
-    return bool(values) and all(isinstance(v, dict) and "mean" in v for v in values)
+    return bool(values) and all(isinstance(v, dict) and "median" in v for v in values)
 
 
 def _has_spread(time_series: list) -> bool:
@@ -170,7 +170,7 @@ class TestStochasticOutputFormat:
         with_run = next(r for r in results if not r["control_run"])
         ts = with_run["parent_admin_total"]["time_series"]
         assert _is_uncertainty_format(ts), (
-            "STOCHASTIC model should produce {mean, lower, upper} CI output, "
+            "STOCHASTIC model should produce {median, lower, upper} CI output, "
             "not bare scalar values."
         )
 
