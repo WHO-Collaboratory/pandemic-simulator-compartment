@@ -11,11 +11,6 @@ results/
 compartment/models/*/artifacts/*
 compartment/.DS_Store
 compartment/models/*/data/
-# Keep the small, canonical BYOD example available on a fresh clone. Modeler
-# datasets remain ignored by default.
-!compartment/models/mpox_jax_model/data/
-compartment/models/mpox_jax_model/data/*
-!compartment/models/mpox_jax_model/data/transition-rate-multipliers.csv
 
 .tmp/
 TODO.md
