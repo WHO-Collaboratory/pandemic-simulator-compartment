@@ -23,6 +23,7 @@ env:
 jobs:
   smoke-tests:
     uses: ./.github/workflows/smoke-tests.yml
+    secrets: inherit
 
   # Auto-discover every model under compartment/models/ that ships a runnable
   # example-config.json.  Both the image-build and artifact-generation matrices

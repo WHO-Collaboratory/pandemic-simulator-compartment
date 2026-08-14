@@ -6,7 +6,16 @@ on:
   pull_request:
     branches: [main]
   workflow_call:
+    secrets:
+      AWS_ACCOUNT_ID:
+        required: true
+      AWS_ROLE_NAME:
+        required: true
   workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   discover:
@@ -42,6 +51,21 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
+      - name: Configure AWS credentials
+        if: hashFiles(format('compartment/models/{0}/datasets.yaml', matrix.model)) != ''
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
+          aws-region: us-east-1
+
+      # This is a no-op for models without datasets.yaml. For dataset-backed
+      # models it downloads every declared version to its manifest file path.
+      - name: Stage datasets for ${{ matrix.model }}
+        if: hashFiles(format('compartment/models/{0}/datasets.yaml', matrix.model)) != ''
+        run: |
+          uv run python -m compartment.datasets stage \
+            --model-dir compartment/models/${{ matrix.model }}
+
       - name: Smoke test ${{ matrix.model }}
         run: uv run python -m pytest tests/test_smoke.py -v -m integration -k "${{ matrix.model }}"
 
@@ -70,6 +94,20 @@ jobs:
 
       - name: Install dependencies
         run: uv sync
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
+          aws-region: us-east-1
+
+      - name: Stage all declared datasets
+        run: |
+          find compartment/models -name datasets.yaml -print0 \
+            | while IFS= read -r -d '' manifest; do
+                uv run python -m compartment.datasets stage \
+                  --model-dir "$(dirname "$manifest")"
+              done
 
       - name: Unit tests
         run: uv run python -m pytest tests/ -m "not integration" -q
