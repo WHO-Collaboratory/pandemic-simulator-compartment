@@ -14,12 +14,18 @@ This document explains how to quantify and communicate uncertainty in compartmen
 - [Declaring Variance](#declaring-variance)
   - [On Transmission Edges](#on-transmission-edges)
   - [On Interventions](#on-interventions)
-  - [On Disease Parameters](#on-disease-parameters)
+  - [On Custom Parameters](#on-custom-parameters)
   - [Enabling a Stochastic Model](#enabling-a-stochastic-model)
 - [Number of Runs](#number-of-runs)
 - [Understanding Output](#understanding-output)
+  - [Overall File Structure](#overall-file-structure)
+  - [Deterministic Output](#deterministic-output)
+  - [Multi-Run Output (Parameter Uncertainty or Stochastic)](#multi-run-output-parameter-uncertainty-or-stochastic)
 - [Related Documentation](#related-documentation)
 - [References](#references)
+  - [Latin Hypercube Sampling](#latin-hypercube-sampling)
+  - [Stochastic Epidemic Models](#stochastic-epidemic-models)
+  - [Uncertainty Quantification in Epidemiology](#uncertainty-quantification-in-epidemiology)
 
 
 
@@ -69,18 +75,18 @@ A stochastic model builds randomness directly into the disease dynamics: instead
 
 You do **not** need to select a run mode manually — the simulator detects it automatically from the model and its parameters.
 
-Variance can be added in **three places**. Transmission edges and interventions support it out of the box (config only), while disease parameters must opt in from the model code:
+Variance can be added in **three places**. Transmission edges and interventions support it out of the box (config only), while additional parameters must opt in from the model code:
 
 
 | Place             | Example                                                                                      | How parameter uncertainty is enabled                                                      |
 | ----------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | Transmission edge | The `beta` transmission rate (S→I) in `example_parameter_uncertainty_declarative_model`      | Built-in, no code changes                                                                 |
 | Intervention      | `my_intervention`'s reduction of `beta` in `example_parameter_uncertainty_declarative_model` | Built-in, no code changes                                                                 |
-| Disease parameter | The `asymptomatic_fraction` parameter in `example_stochastic_model`                          | Requires code — set `enable_variance=True` in the model schema. Built-in, no code changes |
+| Additional parameter | The `asymptomatic_fraction` parameter in `example_stochastic_model`                          | Requires code — set `enable_variance=True` in the model schema. Built-in, no code changes |
 
 
 1. If the model class declares `STOCHASTIC = True` → **stochastic** (always runs the model's configured number of trajectories; any variance parameters are spread across those same runs rather than adding more).
-2. Otherwise, if **any** variance parameter is declared (on an edge, intervention, or disease parameter) → **parameter uncertainty**.
+2. Otherwise, if **any** variance parameter is declared (on an edge, intervention, or additional parameter) → **parameter uncertainty**.
 3. Otherwise → **deterministic**.
 
 
@@ -262,7 +268,7 @@ Both parameter uncertainty and stochastic run modes default to **30** runs. You 
 - **Stochastic models:** change the default baked into the model by adjusting the `num_runs` parameter's `default` in `define_parameters()` — the same `add_parameter()` call shown in [Enabling a Stochastic Model](#enabling-a-stochastic-model) above (e.g. set `default=50`).
 - **Any run (local only):** set `n_simulations` in your local config file to explore how the model behaves with a different number of runs. This override only applies when running locally — in the hosted Pandemic Simulator you **cannot** change the number of runs for parameter uncertainty; it is fixed at 30.
 
-For example, add `n_simulations` at the top level of `example_parameter_uncertainty_declarative_model/example-config.json`:
+For example, [`example_parameter_uncertainty_declarative_model/example-config.json`](../../compartment/models/example_parameter_uncertainty_declarative_model/example-config.json) already sets `n_simulations` at the top level, so it runs 20 simulations instead of the default 30:
 
 ```json
 {
