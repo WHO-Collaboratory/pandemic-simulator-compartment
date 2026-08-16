@@ -23,35 +23,19 @@ This document explains how to quantify and communicate uncertainty in compartmen
 
 ## Why Uncertainty Matters
 
-Epidemiologists usually want more than a single "best guess" trajectory, because disease dynamics are inherently variable and model parameters are rarely known exactly. Reporting a median together with a plausible range communicates that uncertainty honestly.
+Epidemiologists usually want more than a single "best guess" trajectory, because disease dynamics are inherently variable and model parameters are rarely known exactly. Reporting a measure of central tendency together with a range communicates the level of uncertainty.
+
+
+## Run Modes
 
 The Pandemic Simulator offers **three run modes**:
 
 - **Deterministic** — runs the model **once** and returns a single trajectory per compartment.
-- **Parameter uncertainty** — runs the model **multiple times** (30 by default), each time drawing parameter values via Latin Hypercube Sampling, and reports a median with a 95% interval.
-- **Stochastic** — runs a **stochastic model multiple times** (30 by default) and reports a median with a 95% interval.
+- **Parameter uncertainty** — runs the model **multiple times** (30 by default), each time drawing parameter values via Latin Hypercube Sampling, and reports a median with a 95% simulation-based interval.
+- **Stochastic** — runs a **stochastic model multiple times** (30 by default) and reports a median with a 95% simulation-based interval.
 
-## Run Modes
-
-<table>
-  <thead>
-    <tr><th>Mode</th><th>Runs</th><th>Returns</th><th>Speed</th></tr>
-  </thead>
-  <tbody>
-    <tr><td><strong>Deterministic</strong></td><td>1</td><td>A single value per compartment per timestep</td><td>Fast (seconds to minutes)</td></tr>
-    <tr><td><strong>Parameter uncertainty</strong></td><td>30 (default)</td><td>Median + 95% interval per compartment per timestep</td><td>Slower (minutes to hours)</td></tr>
-    <tr><td><strong>Stochastic</strong></td><td>30 (default)</td><td>Median + 95% interval per compartment per timestep</td><td>Slower (minutes to hours)</td></tr>
-  </tbody>
-</table>
-
-**Note:** The multi-run modes still run **with and without interventions** in parallel (a control run), so you get uncertainty bands for both scenarios.
 
 ## Two Ways to Estimate Uncertainty
-
-There are two ways to estimate uncertainty in the Pandemic Simulator:
-
-1. Use the built-in, efficient functionality that applies **Latin Hypercube Sampling (LHS)** to model parameters to produce a 95% simulation-based interval.
-2. Use a **stochastic model**.
 
 ### 1. Parameter Uncertainty via Latin Hypercube Sampling (LHS)
 
@@ -71,11 +55,19 @@ A stochastic model builds randomness directly into the disease dynamics: instead
 
 - **Option 1 — Parameter uncertainty (LHS).** LHS is applied to input parameters for both the model and its interventions. **Only a uniform distribution is currently supported.**
 - **Option 2 — Stochastic model.** The modeler can supply a stochastic model.
-- **Option 3 — Combined approach.** Both a stochastic model *and* LHS parameter uncertainty can be used together. This may be overkill and can take a long time to run, but it is an available option.
+- **Option 3 — Combined approach.** A stochastic model and LHS parameter uncertainty can be combined. This is supported, but combining the two sources of variability tends to widen the simulation-based interval.
 
 ## How the Simulator Chooses a Run Mode
 
-You do **not** need to select a run mode manually — the simulator detects it automatically from the model and its parameters (any `run_mode` value in the frontend config is intentionally ignored). The logic is:
+You do **not** need to select a run mode manually — the simulator detects it automatically from the model and its parameters.
+
+Variance can be added in **three places**. Transmission edges and interventions support it out of the box (config only), while disease parameters must opt in from the model code:
+
+| Place | Example | How parameter uncertainty is enabled |
+| --- | --- | --- |
+| Transmission edge |  | Built-in — add `variance_params` in the config, no code changes |
+| Intervention |  | Built-in — add `variance_params` in the config, no code changes |
+| Disease parameter |  | Requires code — set `enable_variance=True` in the model schema, then add `variance_params` in the config |
 
 1. If the model class declares `STOCHASTIC = True` → **stochastic** (always runs the model's configured number of trajectories; any variance parameters are spread across those same runs rather than adding more).
 2. Otherwise, if **any** variance parameter is declared (on an edge, intervention, or disease parameter) → **parameter uncertainty**.
