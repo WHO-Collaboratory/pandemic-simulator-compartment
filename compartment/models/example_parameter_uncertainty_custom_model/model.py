@@ -75,7 +75,7 @@ class ExampleParameterUncertaintyCustomModel(Model):
             max_value=180.0,
             unit="days",
             required=False,
-            enable_variance=False,
+            enable_variance=True,
         )
         schema.add_parameter(
             name="ramp_down_days",
@@ -87,7 +87,7 @@ class ExampleParameterUncertaintyCustomModel(Model):
             max_value=180.0,
             unit="days",
             required=False,
-            enable_variance=False,
+            enable_variance=True,
         )
 
         # --- Optional: spatial travel support ---
