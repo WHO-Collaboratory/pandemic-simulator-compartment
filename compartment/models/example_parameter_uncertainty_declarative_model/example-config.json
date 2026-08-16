@@ -1,4 +1,5 @@
 {
+    "n_simulations": 20,
     "Disease": {
         "disease_type": "example_parameter_uncertainty_declarative"
     },
