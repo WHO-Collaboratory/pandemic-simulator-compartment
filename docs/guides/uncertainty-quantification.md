@@ -65,120 +65,143 @@ Variance can be added in **three places**. Transmission edges and interventions 
 
 | Place | Example | How parameter uncertainty is enabled |
 | --- | --- | --- |
-| Transmission edge |  | Built-in — add `variance_params` in the config, no code changes |
-| Intervention |  | Built-in — add `variance_params` in the config, no code changes |
-| Disease parameter |  | Requires code — set `enable_variance=True` in the model schema, then add `variance_params` in the config |
+| Transmission edge | The `beta` transmission rate (S→I) in `example_parameter_uncertainty_declarative_model` | Built-in, no code changes|
+| Intervention | `my_intervention`'s reduction of `beta` in `example_parameter_uncertainty_declarative_model` | Built-in, no code changes |
+| Disease parameter | The `asymptomatic_fraction` parameter in `example_stochastic_model` | Requires code — set `enable_variance=True` in the model schema. Built-in, no code changes|
+
+
 
 1. If the model class declares `STOCHASTIC = True` → **stochastic** (always runs the model's configured number of trajectories; any variance parameters are spread across those same runs rather than adding more).
 2. Otherwise, if **any** variance parameter is declared (on an edge, intervention, or disease parameter) → **parameter uncertainty**.
 3. Otherwise → **deterministic**.
 
+
+
 ## Declaring Variance
 
-Variance can be added in **three places**: on a transmission edge, as part of an intervention, or as part of a disease parameter. For transmission edges and interventions, the ability to vary parameters is built into the framework — **no extra code is required**, you just add `variance_params` in the config. For disease parameters, variance is controlled by the `enable_variance` option in the model schema.
+To test parameter uncertainty locally, declare the variance in the config file you run the simulation with. There are three places to declare it, and each uses a different shape. Every example below is taken from a model in this repository.
 
 ### On Transmission Edges
 
-Add `variance_params` to any transmission edge:
+Set `has_variance` to `true`. From [`example_parameter_uncertainty_declarative_model/example-config.json`](../../compartment/models/example_parameter_uncertainty_declarative_model/example-config.json), where the transmission rate varies but the recovery period does not:
 
 ```json
-{
-  "Disease": {
-    "transmission_edges": [
-      {
-        "source": "susceptible",
-        "target": "exposed",
-        "data": {
-          "transmission_rate": 0.3,
-          "variance_params": {
-            "has_variance": true,
-            "distribution_type": "UNIFORM",
-            "min": 0.25,
-            "max": 0.35
-          }
-        }
-      },
-      {
-        "source": "exposed",
-        "target": "infected",
-        "data": {
-          "transmission_rate": 0.2,
-          "variance_params": {
-            "has_variance": true,
-            "distribution_type": "UNIFORM",
-            "min": 0.17,
-            "max": 0.23
-          }
-        }
-      }
-    ]
-  }
-}
-```
-
-**Effect:** Each simulation run draws new values for these rates from the specified (uniform) range.
-
-### On Interventions
-
-Add `variance_params` to intervention parameters:
-
-```json
-{
-  "interventions": [
+"TransmissionEdges": {
+  "items": [
     {
-      "id": "mask_wearing",
-      "adherence_min": 60.0,
-      "transmission_percentage": 35.0,
-      "start_date": "2025-11-18",
-      "end_date": "2025-12-31",
-      "variance_params": [
-        {
-          "has_variance": true,
-          "distribution_type": "UNIFORM",
-          "field_name": "adherence_min",
-          "min": 40.0,
-          "max": 80.0
-        },
-        {
-          "has_variance": true,
-          "distribution_type": "UNIFORM",
-          "field_name": "transmission_percentage",
-          "min": 20.0,
-          "max": 50.0
-        }
-      ]
+      "transmission_edge": {
+        "source": "susceptible",
+        "target": "infected",
+        "value_type": "RATE"
+      },
+      "value": 0.3,
+      "FieldConfigs": {
+        "items": [
+          {
+            "field_key": "value",
+            "has_variance": true,
+            "distribution_type": "UNIFORM",
+            "disease_param": "BETA",
+            "min": 0.2,
+            "max": 0.4
+          }
+        ]
+      }
+    },
+    {
+      "transmission_edge": {
+        "source": "infected",
+        "target": "recovered",
+        "value_type": "DAYS"
+      },
+      "value": 10.0,
+      "FieldConfigs": {
+        "items": [
+          {
+            "field_key": "value",
+            "has_variance": false,
+            "distribution_type": "UNIFORM",
+            "disease_param": "GAMMA"
+          }
+        ]
+      }
     }
   ]
 }
 ```
 
-**Effect:** Each run draws new `adherence_min` and `transmission_percentage` values.
+`disease_param` names the schema variable the edge maps to — `BETA` resolves to the `beta` declared via `variable_name` in `add_transmission_edge()`.
 
-**Important:** For interventions, you must specify `field_name` to indicate which parameter varies.
+**Effect:** Each run draws a new `beta` from a uniform distribution over 0.2–0.4. `gamma` stays fixed at 10 days.
+
+### On Interventions
+
+Interventions use `field_key` to name which intervention field varies. From the same config file:
+
+```json
+"Interventions": {
+  "items": [
+    {
+      "Intervention": { "name": "MY_INTERVENTION", "display_name": "My intervention" },
+      "adherence_min": 50.0,
+      "transmission_percentage": 50.0,
+      "start_date": "2026-03-01",
+      "end_date": "2026-06-01",
+      "FieldConfigs": {
+        "items": [
+          {
+            "field_key": "adherence_min",
+            "has_variance": true,
+            "distribution_type": "UNIFORM",
+            "min": 40.0,
+            "max": 60.0
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+**Effect:** Each run draws a new adherence between 40% and 60% for `my_intervention`. Percentages are converted to fractions internally.
+
+**Important:** `field_key` is required — it identifies which field varies. Add another entry to `items[]` to vary `transmission_percentage` as well.
 
 ### On Disease Parameters
 
-When you declare a disease parameter in your model schema, it exposes an `enable_variance` option. It defaults to `True`, which lets a user vary that parameter in the UI. Set it to `False` when you do **not** want the parameter to be varied (for example, an integer count field):
+Disease parameters take two steps: the model must allow variance, and the config must request it.
+
+**1. Allow it in the schema.** `add_parameter()` accepts `enable_variance`, which defaults to `True`. Set it to `False` for parameters that should never be varied — such as an integer count. From [`example_stochastic_model/model.py`](../../compartment/models/example_stochastic_model/model.py):
 
 ```python
-@classmethod
-def define_parameters(cls, schema):
-    # Variance allowed (default) — users can vary this parameter
-    schema.add_disease_parameter(
-        name="incubation_period",
-        default=5.0,
-        min_value=2.0,
-        max_value=10.0,
-        enable_variance=True,
-    )
-
-    # Variance disabled — hides the variance option for this parameter
-    schema.add_disease_parameter(
-        name="num_runs",
-        default=30,
-        enable_variance=False,
-    )
+schema.add_parameter(
+    name="num_runs",
+    label="Number of Runs",
+    description="Number of stochastic trajectories to simulate.",
+    value_type=ValueType.INTEGER,
+    default=30,
+    min_value=5,
+    max_value=50,
+    enable_variance=False,   # a trajectory count should not be sampled
+)
 ```
+
+**2. Request it in the config.** Unlike edges and interventions, disease parameters declare variance as a `variance_params` list inside the `Disease` block, keyed by `param`. Using `ramp_up_days` from [`example_parameter_uncertainty_custom_model`](../../compartment/models/example_parameter_uncertainty_custom_model/model.py):
+
+```json
+"Disease": {
+  "disease_type": "example_parameter_uncertainty_custom",
+  "ramp_up_days": 14,
+  "ramp_down_days": 21,
+  "variance_params": [
+    { "param": "ramp_up_days", "dist": "uniform", "min": 7, "max": 21 }
+  ]
+}
+```
+
+**Effect:** Each run draws a new `ramp_up_days` between 7 and 21.
+
+> Note: `ramp_up_days` currently ships with `enable_variance=False`, so remove that argument (or set it to `True`) before the config above will take effect.
 
 ### Enabling a Stochastic Model
 
