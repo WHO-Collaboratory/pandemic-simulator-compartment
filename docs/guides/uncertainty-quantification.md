@@ -153,8 +153,17 @@ Interventions use `field_key` to name which intervention field varies. From the 
             "field_key": "adherence_min",
             "has_variance": true,
             "distribution_type": "UNIFORM",
+            "default": 50.0,
             "min": 40.0,
             "max": 60.0
+          },
+          {
+            "field_key": "transmission_percentage",
+            "has_variance": true,
+            "distribution_type": "UNIFORM",
+            "default": 50.0,
+            "min": 45.0,
+            "max": 55.0
           }
         ]
       }
@@ -163,15 +172,15 @@ Interventions use `field_key` to name which intervention field varies. From the 
 }
 ```
 
-**Effect:** Each run draws a new adherence between 40% and 60% for `my_intervention`. Percentages are converted to fractions internally.
+**Effect:** Each run draws a new adherence between 40% and 60% *and* a new transmission reduction between 45% and 55% for `my_intervention`. Percentages are converted to fractions internally.
 
-**Important:** `field_key` is required — it identifies which field varies. Add another entry to `items[]` to vary `transmission_percentage` as well.
+**Important:** `field_key` is required — it identifies which field varies. Each field you want to vary needs its own entry in `items[]`, as shown here for both `adherence_min` and `transmission_percentage`.
 
-### On Disease Parameters
+### On Custom Parameters
 
-Disease parameters take two steps: the model must allow variance, and the config must request it.
+Custom parameters take two steps: the model must allow variance, and the config must request it.
 
-**1. Allow it in the schema.** `add_parameter()` accepts `enable_variance`, which defaults to `True`. Set it to `False` for parameters that should never be varied — such as an integer count. From [`example_stochastic_model/model.py`](../../compartment/models/example_stochastic_model/model.py):
+**1. Allow it in the schema.** `add_parameter()` accepts `enable_variance`, which defaults to `True`. Set it to `False` for parameters that should never be varied. From [`example_stochastic_model/model.py`](../../compartment/models/example_stochastic_model/model.py):
 
 ```python
 schema.add_parameter(
