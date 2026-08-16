@@ -180,18 +180,20 @@ Interventions use `field_key` to name which intervention field varies. From the 
 
 Custom parameters take two steps: the model must allow variance, and the config must request it.
 
-**1. Allow it in the schema.** `add_parameter()` accepts `enable_variance`, which defaults to `True`. Set it to `False` for parameters that should never be varied. From [`example_stochastic_model/model.py`](../../compartment/models/example_stochastic_model/model.py):
+**1. Allow it in the schema.** `add_parameter()` accepts `enable_variance`, which defaults to `True`. Leave it `True` to allow the parameter to be varied; set it to `False` for parameters that should never be sampled. From [`example_parameter_uncertainty_custom_model/model.py`](../../compartment/models/example_parameter_uncertainty_custom_model/model.py):
 
 ```python
 schema.add_parameter(
-    name="num_runs",
-    label="Number of Runs",
-    description="Number of stochastic trajectories to simulate.",
-    value_type=ValueType.INTEGER,
-    default=30,
-    min_value=5,
-    max_value=50,
-    enable_variance=False,   # a trajectory count should not be sampled
+    name="ramp_up_days",
+    label="Intervention Ramp-Up (days)",
+    description="Days for the intervention to climb from baseline to full adherence.",
+    value_type=ValueType.DAYS,
+    default=14.0,
+    min_value=1.0,
+    max_value=180.0,
+    unit="days",
+    required=False,
+    enable_variance=True,   # allow this parameter to be sampled
 )
 ```
 
@@ -210,7 +212,7 @@ schema.add_parameter(
 
 **Effect:** Each run draws a new `ramp_up_days` between 7 and 21.
 
-> Note: `ramp_up_days` currently ships with `enable_variance=False`, so remove that argument (or set it to `True`) before the config above will take effect.
+> Note: `ramp_up_days` already ships with `enable_variance=True` (step 1), so the config above takes effect as-is. If a parameter has `enable_variance=False`, flip it to `True` first.
 
 ### Enabling a Stochastic Model
 
