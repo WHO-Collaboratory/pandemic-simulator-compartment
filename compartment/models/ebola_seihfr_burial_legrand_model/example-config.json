@@ -19,7 +19,14 @@
                 "value": 7.0,
                 "FieldConfigs": {
                     "items": [
-                        { "field_key": "value", "has_variance": false, "disease_param": "ALPHA" }
+                        {
+                            "field_key": "value",
+                            "has_variance": true,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "ALPHA",
+                            "min": 4.0,
+                            "max": 10.0
+                        }
                     ]
                 }
             },
