@@ -71,8 +71,8 @@
             "name": "Kikwit, DRC (1995)",
             "center_lat": -5.039,
             "center_lon": 18.815,
-            "population": 100000,
-            "infected_population": 0.001
+            "population": 200000,
+            "infected_population": 0.0015
         }
     ]
 }
