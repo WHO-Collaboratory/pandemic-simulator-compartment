@@ -863,7 +863,7 @@ class ModelParameterSchema:
             ),
             # num_runs is surfaced solely as a "disease_parameter" custom field
             # (with default_value/min/max in its metadata) — declare it via
-            # schema.add_disease_parameter(name="num_runs", ...). It is
+            # schema.add_parameter(name="num_runs", ...). It is
             # intentionally NOT emitted at the artifact root; the runtime falls
             # back to the model-class NUM_RUNS default when no value is provided.
             # Compartment graph
@@ -1337,30 +1337,6 @@ class ParameterSchemaBuilder:
             )
         )
 
-    # ----- Number of runs (stochastic models only) -------------------------
-
-    def set_num_runs(
-        self,
-        default: int,
-        min_value: int = 1,
-        max_value: int = 100,
-    ) -> None:
-        """
-        Set the number of stochastic trajectories for this model.
-
-        Only meaningful for models with ``STOCHASTIC = True``.  Omit this
-        call on deterministic models — they always run once.
-
-        Args:
-            default: Default trajectory count used when no per-run override is
-                provided (e.g. ``10`` for a large model, ``30`` for a small one).
-            min_value: Hard lower bound enforced by the UI.
-            max_value: Hard upper bound enforced by the UI.
-        """
-        self._num_runs = default
-        self._num_runs_min = min_value
-        self._num_runs_max = max_value
-
     # ----- Custom fields (enforced contract) --------------------------------
 
     def add_admin_zone_field(
@@ -1414,7 +1390,7 @@ class ParameterSchemaBuilder:
             )
         )
 
-    def add_disease_parameter(
+    def add_parameter(
         self,
         name: str,
         label: str,
@@ -1469,6 +1445,9 @@ class ParameterSchemaBuilder:
                 enable_variance=enable_variance,
             )
         )
+
+    # Deprecated alias kept so models written against the old name keep working.
+    add_disease_parameter = add_parameter
 
     # ----- Demographics ----------------------------------------------------
 
@@ -1599,7 +1578,7 @@ class ParameterSchemaBuilder:
                     )
 
         # If a disease parameter named "num_runs" was declared via
-        # add_disease_parameter(), use its default/min/max to populate the
+        # add_parameter(), use its default/min/max to populate the
         # artifact-level fields so ModelArtifact.num_runs stays accurate.
         num_runs_param = next(
             (p for p in self._disease_parameters if p.name == "num_runs"), None

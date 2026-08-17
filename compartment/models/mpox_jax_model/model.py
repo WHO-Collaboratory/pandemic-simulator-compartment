@@ -115,7 +115,7 @@ class MpoxJaxModel(Model):
         # This model uses exponential distance decay rather than a gravity
         # power law, so it declares its own decay length alongside sigma.
         # Both are consumed by build_travel_matrix() -> mobility() below.
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="travel_sigma",
             label="Travel Rate (σ)",
             description=(
@@ -128,7 +128,7 @@ class MpoxJaxModel(Model):
             max_value=100.0,
             unit="%",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="travel_scale_km",
             label="Travel Decay Length",
             description=(

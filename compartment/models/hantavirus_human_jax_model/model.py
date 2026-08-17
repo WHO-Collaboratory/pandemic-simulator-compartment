@@ -184,7 +184,7 @@ class HantavirusHumanJaxModel(Model):
         # humans) so a single schema edge cannot represent S_h -> E_h. The
         # rodent FOI is also applied manually for symmetry and because P
         # only modulates the human-side betas.
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="beta_star",
             label="Avg Rodent-to-Human Transmission (beta*)",
             description=(
@@ -198,7 +198,7 @@ class HantavirusHumanJaxModel(Model):
             min_value=0.0, max_value=10.0,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="beta_h_star",
             label="Avg Human-to-Human Transmission (beta_h*)",
             description=(
@@ -213,7 +213,7 @@ class HantavirusHumanJaxModel(Model):
             min_value=0.0, max_value=10.0,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="beta_m",
             label="Rodent-to-Rodent Transmission (beta_m)",
             description=(
@@ -233,7 +233,7 @@ class HantavirusHumanJaxModel(Model):
         # total rate gamma_h, split by cfr_eff. cfr_eff rises from cfr
         # toward cfr_max as concurrent cases exceed hospital_capacity,
         # modelling the real increase in fatality when ICUs are overwhelmed.
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="cfr",
             label="Baseline Case Fatality Rate (%)",
             description=(
@@ -247,7 +247,7 @@ class HantavirusHumanJaxModel(Model):
             min_value=0.0, max_value=100.0,
             unit="%",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="cfr_max",
             label="Saturated Case Fatality Rate (%)",
             description=(
@@ -261,7 +261,7 @@ class HantavirusHumanJaxModel(Model):
             min_value=0.0, max_value=100.0,
             unit="%",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="hospital_capacity",
             label="Hospital Capacity (fraction of population)",
             description=(
@@ -277,7 +277,7 @@ class HantavirusHumanJaxModel(Model):
         )
 
         # Seasonality of rodent-to-human spillover.
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="seasonal_amplitude",
             label="Seasonal Spillover Amplitude",
             description=(
@@ -291,7 +291,7 @@ class HantavirusHumanJaxModel(Model):
             default_min=0.0, default_max=1.0,
             min_value=0.0, max_value=1.0,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="seasonal_peak_day",
             label="Seasonal Peak Day of Year",
             description=(
@@ -306,7 +306,7 @@ class HantavirusHumanJaxModel(Model):
         )
 
         # Demographics (births and natural mortality).
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="b_h",
             label="Human Birth Rate",
             description="Per-capita human birth rate (per day).",
@@ -316,7 +316,7 @@ class HantavirusHumanJaxModel(Model):
             min_value=0.0, max_value=1.0,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="d_h",
             label="Human Natural Mortality",
             description="Per-capita non-disease human mortality rate (per day).",
@@ -326,7 +326,7 @@ class HantavirusHumanJaxModel(Model):
             min_value=0.0, max_value=1.0,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="b_m",
             label="Rodent Birth Rate",
             description="Per-capita rodent birth rate (per day).",
@@ -336,7 +336,7 @@ class HantavirusHumanJaxModel(Model):
             min_value=0.0, max_value=1.0,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="d_m",
             label="Rodent Natural Mortality",
             description="Per-capita rodent mortality rate (per day).",
@@ -348,7 +348,7 @@ class HantavirusHumanJaxModel(Model):
         )
 
         # Risk perception parameters.
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="P_star",
             label="Average Risk Perception (P*)",
             description=(
@@ -361,7 +361,7 @@ class HantavirusHumanJaxModel(Model):
             default_min=0.1, default_max=0.9,
             min_value=0.01, max_value=1.0,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="lambda_1",
             label="Resistance to Change (lambda_1)",
             description=(
@@ -376,7 +376,7 @@ class HantavirusHumanJaxModel(Model):
             min_value=0.0, max_value=1.0,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="lambda_2",
             label="Reaction Speed (lambda_2)",
             description=(
@@ -450,7 +450,7 @@ class HantavirusHumanJaxModel(Model):
         # declares its own exponent alongside sigma. Both are consumed by
         # build_travel_matrix() -> gravity() below. When sigma is 0 the matrix
         # collapses to the identity (no person-to-person spatial coupling).
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="travel_sigma",
             label="Travel Rate (σ)",
             description=(
@@ -464,7 +464,7 @@ class HantavirusHumanJaxModel(Model):
             max_value=100.0,
             unit="%",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="travel_alpha",
             label="Distance Decay Exponent",
             description=(

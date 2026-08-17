@@ -1,7 +1,7 @@
 """Travel matrix tests.
 
 Mobility is model-owned: a model that travels declares ``travel_sigma`` (plus
-any kernel-specific extras) via ``schema.add_disease_parameter()`` and defines
+any kernel-specific extras) via ``schema.add_parameter()`` and defines
 how those become a matrix in ``build_travel_matrix()``. The framework calls
 that hook via ``Model._ensure_travel_matrix()`` before ``prepare_initial_state()``.
 

@@ -175,7 +175,7 @@ class EbolaJaxModel(Model):
             value_type=ValueType.DAYS,
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="prop_community",
             label="Proportion in Community",
             description=(
@@ -188,7 +188,7 @@ class EbolaJaxModel(Model):
             min_value=0.0, max_value=100.0,
             unit="%",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="etu_risk",
             label="ETU Transmission Risk",
             description=(
@@ -201,7 +201,7 @@ class EbolaJaxModel(Model):
             min_value=0.0, max_value=100.0,
             unit="%",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="funeral_risk",
             label="Funeral Transmission Risk",
             description=(
@@ -230,7 +230,7 @@ class EbolaJaxModel(Model):
         # ---- Mobility ----
         # NOTE: deliberately named travel_sigma, not sigma — sigma is already
         # this model's E1->I1 incubation edge (see add_transmission_edge above).
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="travel_sigma",
             label="Travel Rate (σ)",
             description=(
@@ -246,7 +246,7 @@ class EbolaJaxModel(Model):
             unit="%",
         )
 
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="num_runs",
             label="Number of Runs",
             description="Number of stochastic trajectories to simulate.",
