@@ -1,0 +1,71 @@
+{
+    "start_date": "1995-01-06",
+    "end_date": "1996-01-06",
+    "Disease": {
+        "disease_type": "ebola-seihfr-burial-legrand",
+        "betaI": 0.084,
+        "betaH": 0.113,
+        "betaF": 1.093,
+        "gamma_h": 5.0,
+        "gamma_i": 10.0,
+        "gamma_d": 9.6,
+        "theta_target": 80.0,
+        "delta_target": 81.0
+    },
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": { "source": "E", "target": "I", "value_type": "DAYS" },
+                "value": 7.0,
+                "FieldConfigs": {
+                    "items": [
+                        { "field_key": "value", "has_variance": false, "disease_param": "ALPHA" }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": { "source": "F", "target": "R", "value_type": "DAYS" },
+                "value": 2.0,
+                "FieldConfigs": {
+                    "items": [
+                        { "field_key": "value", "has_variance": false, "disease_param": "GAMMA_F" }
+                    ]
+                }
+            }
+        ]
+    },
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": { "name": "COMMUNITY_INTERVENTION", "display_name": "Community Transmission Control" },
+                "adherence_min": 100.0,
+                "transmission_percentage": 12.0,
+                "start_date": "1995-05-04",
+                "end_date": null
+            },
+            {
+                "Intervention": { "name": "HOSPITAL_INTERVENTION", "display_name": "Hospital Isolation / Barrier Nursing" },
+                "adherence_min": 100.0,
+                "transmission_percentage": 100.0,
+                "start_date": "1995-05-04",
+                "end_date": null
+            },
+            {
+                "Intervention": { "name": "FUNERAL_INTERVENTION", "display_name": "Safe Burial Practices" },
+                "adherence_min": 100.0,
+                "transmission_percentage": 100.0,
+                "start_date": "1995-05-04",
+                "end_date": null
+            }
+        ]
+    },
+    "admin_zones": [
+        {
+            "name": "Kikwit, DRC (1995)",
+            "center_lat": -5.039,
+            "center_lon": 18.815,
+            "population": 100000,
+            "infected_population": 0.001
+        }
+    ]
+}
