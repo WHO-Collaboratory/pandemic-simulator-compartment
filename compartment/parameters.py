@@ -729,6 +729,10 @@ class ModelParameterSchema:
     compartments: list[CompartmentDef]
     transmission_edges: list[TransmissionEdgeDef]
 
+    # Stable internal routing key. Assigned automatically from the model's
+    # fully-qualified class name; model authors continue to set disease_type.
+    model_key: str | None = None
+
     interventions: list[InterventionDef] = field(default_factory=list)
 
     # Fields that appear on each admin zone (beyond the shared defaults)
@@ -849,6 +853,7 @@ class ModelParameterSchema:
         result: dict[str, Any] = {
             # ModelArtifact identity
             "disease_type": self.disease_type,
+            **({"model_key": self.model_key} if self.model_key else {}),
             "name": self.disease_label,
             "definition": self.description,
             "run_mode": self.run_mode,
@@ -1033,7 +1038,9 @@ class ParameterSchemaBuilder:
         Set the disease model identity.  Must be called exactly once.
 
         Args:
-            disease_type: Machine identifier (e.g. ``"MPOX"``).
+            disease_type: Disease-family identifier (e.g. ``"MPOX"``). Multiple
+                model classes may share it; the framework generates a unique,
+                stable ``model_key`` for internal routing.
             label: Human-readable name (e.g. ``"MPOX"``).
             description: Short description shown in the UI.
         """

@@ -29,7 +29,7 @@ What it does automatically:
   intervention id(s). Threshold-triggered interventions (no fixed date) are noted
   in the panel instead.
 - **Uncertainty / stochastic bounds** — for `UNCERTAINTY` (or multi-run) output,
-  where each compartment record is `{mean, lower, upper}`, the mean is drawn as a
+  where each compartment record is `{median, lower, upper}`, the median is drawn as a
   line and the `lower..upper` range is shaded.
 - **Compartment deltas metric** — a table beneath the chart lists each run's
   `compartment_deltas` (the per-compartment cumulative totals: total ever-infected,

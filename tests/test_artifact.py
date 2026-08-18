@@ -61,7 +61,7 @@ class TestArtifactDiscovery:
         from compartment.registry import MODEL_REGISTRY
 
         models_dir = Path("compartment/models")
-        discovered: set[str] = set()
+        discovered: set[type] = set()
         for model_dir in models_dir.iterdir():
             if not model_dir.is_dir() or model_dir.name.startswith("_"):
                 continue
@@ -78,11 +78,72 @@ class TestArtifactDiscovery:
                         and cls.__module__ == module_name
                         and hasattr(cls, "DISEASE_TYPE")
                     ):
-                        discovered.add(cls.DISEASE_TYPE)
+                        discovered.add(cls)
 
-        missing = discovered - set(MODEL_REGISTRY.keys())
-        assert not missing, f"Classes with DISEASE_TYPE not in MODEL_REGISTRY: {missing}"
+        missing = discovered - set(MODEL_REGISTRY.values())
+        assert not missing, f"Model classes missing from MODEL_REGISTRY: {missing}"
         assert len(MODEL_REGISTRY) == len(discovered), (
             f"Registry has {len(MODEL_REGISTRY)} entries but {len(discovered)} "
             f"model classes with DISEASE_TYPE were found"
         )
+
+    def test_duplicate_disease_types_get_distinct_internal_routes(self):
+        from compartment.registry import _build_registries
+
+        class FirstModel:
+            DISEASE_TYPE = "SHARED_DISEASE"
+            MODEL_KEY = "SHARED_DISEASE_11111111-1111-5111-8111-111111111111"
+
+        class SecondModel:
+            DISEASE_TYPE = "SHARED_DISEASE"
+            MODEL_KEY = "SHARED_DISEASE_22222222-2222-5222-8222-222222222222"
+
+        models, disease_types = _build_registries([FirstModel, SecondModel])
+
+        assert models[FirstModel.MODEL_KEY] is FirstModel
+        assert models[SecondModel.MODEL_KEY] is SecondModel
+        assert "SHARED_DISEASE" not in disease_types
+
+    def test_model_key_is_stable_and_included_in_artifact(self):
+        from compartment.models.mpox_jax_model.model import MpoxJaxModel
+        from compartment.registry import resolve
+
+        first = MpoxJaxModel._build_parameter_schema()
+        second = MpoxJaxModel._build_parameter_schema()
+
+        assert first.model_key == second.model_key == MpoxJaxModel.MODEL_KEY
+        assert first.model_key.startswith(f"{first.disease_type}_")
+        assert first.to_artifact_dict()["model_key"] == first.model_key
+        assert resolve(first.model_key) is MpoxJaxModel
+        assert resolve(first.disease_type) is MpoxJaxModel
+
+    def test_validation_cache_isolated_for_duplicate_disease_types(self):
+        from compartment.model import Model
+        from compartment.parameters import ValueType
+        from compartment.schema_generator import clear_cache, generate_disease_config
+
+        class FirstModel(Model):
+            @classmethod
+            def define_parameters(cls, schema):
+                schema.set_model_info("SHARED", "First", "First model")
+                schema.add_compartment("S", "Susceptible", "Susceptible")
+                schema.add_disease_parameter(
+                    "first_only", "First only", "First parameter", ValueType.FLOAT, 1.0
+                )
+
+        class SecondModel(Model):
+            @classmethod
+            def define_parameters(cls, schema):
+                schema.set_model_info("SHARED", "Second", "Second model")
+                schema.add_compartment("S", "Susceptible", "Susceptible")
+                schema.add_disease_parameter(
+                    "second_only", "Second only", "Second parameter", ValueType.FLOAT, 1.0
+                )
+
+        clear_cache()
+        first_config = generate_disease_config(FirstModel._build_parameter_schema())
+        second_config = generate_disease_config(SecondModel._build_parameter_schema())
+
+        assert first_config is not second_config
+        assert "first_only" in first_config.model_fields
+        assert "second_only" in second_config.model_fields

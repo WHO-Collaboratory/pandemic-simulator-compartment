@@ -188,7 +188,26 @@ Interventions use `field_key` to name which intervention field varies. From the 
 }
 ```
 
-**Effect:** Each run draws a new adherence between 40% and 60% *and* a new transmission reduction between 45% and 55% for `my_intervention`. Percentages are converted to fractions internally.
+Three values per compartment per timestep:
+
+- **median:** Median across all simulation runs (50th percentile)
+- **lower:** Lower bound of 95% CI (2.5th percentile)
+- **upper:** Upper bound of 95% CI (97.5th percentile)
+
+**Interpretation:**
+
+- "On day 19, we expect **550 infections** (median)"
+- "We're 95% confident the true value is between **450 and 680**"
+
+> **Visualizing bands:** `python tools/view_results.py results/<output>.json` plots the `median` line and shades the `lower`–`upper` band for each compartment, with the intervention and control runs side by side. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md).
+
+### Confidence Interval (CI)
+
+The framework uses a **95% confidence interval** by default:
+- **lower:** 2.5th percentile of simulation results
+- **upper:** 97.5th percentile of simulation results
+
+This means:
 
 **Important:** `field_key` is required — it identifies which field varies. Each field you want to vary needs its own entry in `items[]`, as shown here for both `adherence_min` and `transmission_percentage`.
 
@@ -378,7 +397,12 @@ The framework uses a **95% simulation-based interval** by default: the `lower` a
 
 
 
-### Stochastic Epidemic Models
+- **[INTERVENTIONS.md](./interventions.md)** — Varying intervention effectiveness
+- **[DEVELOPING_MODELS.md](./developing-models.md)** — Model development guide
+- **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; shades the median/lower/upper parameter uncertainty bands from UNCERTAINTY output
+- **[compartment/run_simulation.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/run_simulation.py)** — UQ orchestration code
+- **[compartment/helpers.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/helpers.py)** — LHS implementation (`generate_LHS_samples`)
+- **[compartment/batch_simulation_manager.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/batch_simulation_manager.py)** — Parallel simulation runner
 
 - **Allen (2017).** ["A primer on stochastic epidemic models: Formulation, numerical simulation, and analysis."](https://doi.org/10.1016/j.idm.2017.03.001) *Infectious Disease Modelling* 2(2): 128-142.
   - Introduction to formulating and simulating stochastic epidemic models

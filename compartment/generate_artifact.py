@@ -90,8 +90,8 @@ def _discover_models_from_dir(model_dir: str) -> list:
 
 def _get_model_class(disease_type: str):
     """Return the model class for a disease type via the central registry."""
-    from compartment.registry import MODEL_REGISTRY
-    model_class = MODEL_REGISTRY.get(disease_type)
+    from compartment.registry import MODEL_REGISTRY, resolve
+    model_class = resolve(disease_type)
     if model_class is None:
         available = sorted(MODEL_REGISTRY.keys())
         print(f"Error: Unknown disease type '{disease_type}'", file=sys.stderr)
@@ -102,14 +102,19 @@ def _get_model_class(disease_type: str):
 
 def _list_available() -> list[str]:
     """Return disease types that have implemented define_parameters()."""
-    from compartment.registry import MODEL_REGISTRY
+    from compartment.registry import DISEASE_TYPE_REGISTRY, MODEL_REGISTRY
     from compartment.schema_generator import has_parameter_schema
 
     available = []
-    for dt, model_class in MODEL_REGISTRY.items():
+    for model_key, model_class in MODEL_REGISTRY.items():
         try:
             if has_parameter_schema(model_class):
-                available.append(dt)
+                disease_type = model_class.DISEASE_TYPE
+                available.append(
+                    disease_type
+                    if DISEASE_TYPE_REGISTRY.get(disease_type) is model_class
+                    else model_key
+                )
         except Exception:
             pass
     return available
@@ -122,7 +127,10 @@ def main():
     parser.add_argument(
         "disease_type",
         nargs="?",
-        help="Disease type identifier (e.g. MPOX). Omit to list available types.",
+        help=(
+            "Disease type identifier (e.g. MPOX), or the generated model_key "
+            "when multiple models share a disease type. Omit to list available types."
+        ),
     )
     parser.add_argument(
         "--output",
@@ -176,6 +184,12 @@ def main():
     # --model-dir + --output-dir: generate one artifact per discovered class
     if args.model_dir and args.output_dir:
         model_classes = _discover_models_from_dir(args.model_dir)
+        disease_type_counts: dict[str, int] = {}
+        for model_class in model_classes:
+            disease_type = model_class.DISEASE_TYPE
+            disease_type_counts[disease_type] = (
+                disease_type_counts.get(disease_type, 0) + 1
+            )
         output_dir = Path(args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         # Every variant in a model dir shares that dir's datasets.yaml.
@@ -186,7 +200,12 @@ def main():
             except NotImplementedError:
                 print(f"Skipping {model_class.__name__}: define_parameters() not implemented.", file=sys.stderr)
                 continue
-            output_path = output_dir / f"{schema.disease_type}.json"
+            artifact_name = (
+                schema.model_key
+                if disease_type_counts[schema.disease_type] > 1
+                else schema.disease_type
+            )
+            output_path = output_dir / f"{artifact_name}.json"
             artifact = _attach_datasets(schema.to_artifact_dict(), source_dir)
             with open(output_path, "w") as f:
                 f.write(json.dumps(artifact, indent=2) + "\n")

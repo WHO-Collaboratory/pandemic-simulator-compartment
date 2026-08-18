@@ -685,14 +685,14 @@ class TestCovidUncertainty:
             for comp in ["S", "I", "R"]:
                 assert comp in mid_point
                 val = mid_point[comp]
-                assert "mean" in val, f"Expected parameter uncertainty format (mean/lower/upper) for {comp}"
+                assert "median" in val, f"Expected parameter uncertainty format (median/lower/upper) for {comp}"
                 assert "lower" in val
                 assert "upper" in val
 
             for entry in ts:
                 for comp in ["S", "I", "R"]:
                     val = entry[comp]
-                    for stat in ["mean", "lower", "upper"]:
+                    for stat in ["median", "lower", "upper"]:
                         assert not math.isnan(val[stat]), (
                             f"NaN in {comp}.{stat} on {entry['date']}"
                         )
@@ -744,17 +744,17 @@ class TestCovidUncertainty:
                     if key == "date":
                         continue
                     if isinstance(val, dict):
-                        assert "mean" in val and "lower" in val and "upper" in val, (
+                        assert "median" in val and "lower" in val and "upper" in val, (
                             f"Expected parameter uncertainty format for {key}, got keys: {val.keys()}"
                         )
-                        for stat in ["mean", "lower", "upper"]:
+                        for stat in ["median", "lower", "upper"]:
                             assert not math.isnan(val[stat]), (
                                 f"NaN in {key}.{stat} on {entry['date']}"
                             )
 
     @pytest.mark.integration
-    def test_uncertainty_lower_le_mean_le_upper(self):
-        """In parameter uncertainty output, lower <= mean <= upper should hold."""
+    def test_uncertainty_lower_le_median_le_upper(self):
+        """In parameter uncertainty output, lower <= median <= upper should hold."""
         from compartment.models.covid_jax_model.model import CovidJaxModel
 
         config = {
@@ -798,12 +798,12 @@ class TestCovidUncertainty:
                 for key, val in entry.items():
                     if key == "date":
                         continue
-                    if isinstance(val, dict) and "mean" in val:
-                        assert val["lower"] <= val["mean"] + 0.01, (
-                            f"lower ({val['lower']}) > mean ({val['mean']}) "
+                    if isinstance(val, dict) and "median" in val:
+                        assert val["lower"] <= val["median"] + 0.01, (
+                            f"lower ({val['lower']}) > median ({val['median']}) "
                             f"for {key} on {entry['date']}"
                         )
-                        assert val["mean"] <= val["upper"] + 0.01, (
-                            f"mean ({val['mean']}) > upper ({val['upper']}) "
+                        assert val["median"] <= val["upper"] + 0.01, (
+                            f"median ({val['median']}) > upper ({val['upper']}) "
                             f"for {key} on {entry['date']}"
                         )

@@ -255,6 +255,9 @@ def _sanitize_legacy_time_series(time_series):
 
 def _legacy_delta_value(value):
     """Coerce nested multi-run delta stats to the Float the closed schema accepts."""
+    if isinstance(value, dict) and "median" in value:
+        return value["median"]
+    # Support results written before the central statistic was named accurately.
     if isinstance(value, dict) and "mean" in value:
         return value["mean"]
     return value
@@ -279,8 +282,8 @@ def _add_v2_payloads(results):
     3D/4D + parameter uncertainty), which all converge on the same ``results`` shape here.
 
     For multi-run (parameter uncertainty/stochastic) output, ``compartment_deltas`` may be
-    ``{comp: {mean, lower, upper}}``; v2 preserves that shape while the legacy
-    Float fields receive only the central ``mean`` (average) value.
+    ``{comp: {median, lower, upper}}``; v2 preserves that shape while the legacy
+    Float fields receive only the central median value.
     """
     for zone in results.get("admin_zones", []) or []:
         if isinstance(zone, dict) and "time_series" in zone:

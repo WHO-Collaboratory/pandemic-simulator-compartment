@@ -48,7 +48,7 @@ def _has_uncertainty_format(time_series: list) -> bool:
         return False
     first = time_series[0]
     values = [v for k, v in first.items() if k != "date"]
-    return values and all(isinstance(v, dict) and "mean" in v for v in values)
+    return values and all(isinstance(v, dict) and "median" in v for v in values)
 
 
 def _run_config(config: dict) -> list:

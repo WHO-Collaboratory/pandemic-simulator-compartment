@@ -65,16 +65,28 @@ __all__ = [
 logger = logging.getLogger("compartment.validation")
 
 # ---------------------------------------------------------------------------
-# Model registry: disease_type -> model class
+# Model registry: model_key plus unambiguous disease_type aliases -> model class
 # Lazy import to avoid circular dependencies at module level.
 # ---------------------------------------------------------------------------
 
 
 def _get_model_registry() -> dict:
-    from compartment.registry import MODEL_REGISTRY, DISEASE_TYPE_ALIASES
-    return {**MODEL_REGISTRY, **{alias: MODEL_REGISTRY[canonical]
-                                  for alias, canonical in DISEASE_TYPE_ALIASES.items()
-                                  if canonical in MODEL_REGISTRY}}
+    from compartment.registry import (
+        DISEASE_TYPE_ALIASES,
+        DISEASE_TYPE_REGISTRY,
+        MODEL_KEY_REGISTRY,
+        MODEL_REGISTRY,
+    )
+    return {
+        **MODEL_REGISTRY,
+        **MODEL_KEY_REGISTRY,
+        **DISEASE_TYPE_REGISTRY,
+        **{
+            alias: DISEASE_TYPE_REGISTRY[canonical]
+            for alias, canonical in DISEASE_TYPE_ALIASES.items()
+            if canonical in DISEASE_TYPE_REGISTRY
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +150,7 @@ def load_simulation_config(config: dict, disease_type: str):
 
     Args:
         config: Configuration dict (usually from GraphQL/JSON)
-        disease_type: Type of disease ("RESPIRATORY", "VECTOR_BORNE", "MPOX")
+        disease_type: Unique model_key, or an unambiguous disease type.
 
     Returns:
         ProcessedSimulation with all computed fields ready for use by Model classes.

@@ -231,10 +231,10 @@ def compute_jax_compartment_deltas(
 
 
 def compute_multi_run_compartment_deltas(
-    population_matrix, disease_type, n_regions, compartment_list, model_class=None, ci=0.95
+    population_matrix, disease_type, n_regions, compartment_list, model_class=None
 ):
     """
-    Calculate the average compartment deltas over all simulations, plus
+    Calculate the median compartment deltas over all simulations, plus
     lower/upper simulation-based interval bounds on the same per-run deltas.
     """
     all_deltas = []
@@ -245,12 +245,13 @@ def compute_multi_run_compartment_deltas(
         all_deltas.append(deltas)
     # Get unique compartments
     compartments = all_deltas[0].keys()
-    lower_q = ((1 - ci) / 2) * 100
-    upper_q = (1 - ((1 - ci) / 2)) * 100
-    # average + CI bounds for each compartment
+    lower_q = 2.5
+    upper_q = 97.5
+    # Median + CI bounds for each compartment, matching the multi-run time-series
+    # result shape.
     return {
         comp: {
-            "mean": float(np.mean([d[comp] for d in all_deltas])),
+            "median": float(np.median([d[comp] for d in all_deltas])),
             "lower": float(np.percentile([d[comp] for d in all_deltas], lower_q)),
             "upper": float(np.percentile([d[comp] for d in all_deltas], upper_q)),
         }
@@ -313,8 +314,8 @@ def create_jax_intervention_results(
 
         # Use schema-declared infective compartments when available;
         # fall back to "I" for legacy models.
-        from compartment.registry import MODEL_REGISTRY
-        model_class = MODEL_REGISTRY.get(disease_type)
+        from compartment.registry import resolve
+        model_class = resolve(disease_type)
         if model_class and hasattr(model_class, "COMPARTMENTS") and hasattr(model_class.COMPARTMENTS, "infective_ids"):
             infective_comps = list(model_class.COMPARTMENTS.infective_ids)
             infective_idx = [
@@ -596,10 +597,10 @@ def fast_format_jax_output_demographic(
 
 
 def format_uncertainty_output(
-    means_child,
+    medians_child,
     lower_child,
     upper_child,
-    means_parent,
+    medians_parent,
     lower_parent,
     upper_parent,
     payload,
@@ -608,7 +609,7 @@ def format_uncertainty_output(
     start_date,
     n_timesteps,
     step,
-    avg_compartment_deltas,
+    compartment_deltas,
     intervention_dict=None,
 ):
 
@@ -626,7 +627,7 @@ def format_uncertainty_output(
         "time_steps": payload["time_steps"],
         "interventions": transform_interventions(intervention_dict or {}),
         "admin_zones": [],
-        "compartment_deltas": avg_compartment_deltas,
+        "compartment_deltas": compartment_deltas,
         "parent_admin_total": [],
     }
 
@@ -641,8 +642,8 @@ def format_uncertainty_output(
     ]
 
     # number of timesteps in the output
-    n_outputs_child = means_child.shape[0]
-    n_outputs_parent = means_parent.shape[0]
+    n_outputs_child = medians_child.shape[0]
+    n_outputs_parent = medians_parent.shape[0]
 
     # Format child admin zones
     for zone_idx, zone in enumerate(admin_units):
@@ -661,7 +662,7 @@ def format_uncertainty_output(
             # embed each compartment name as its own key (exclude cumulative columns)
             for c_idx, comp_name in display_compartments:
                 record[comp_name] = {
-                    "mean": float(means_child[t, c_idx, zone_idx]),
+                    "median": float(medians_child[t, c_idx, zone_idx]),
                     "lower": float(lower_child[t, c_idx, zone_idx]),
                     "upper": float(upper_child[t, c_idx, zone_idx]),
                 }
@@ -677,7 +678,7 @@ def format_uncertainty_output(
         record = {"date": date.isoformat()}
         for c_idx, comp_name in display_compartments:
             record[comp_name] = {
-                "mean": float(means_parent[t, c_idx]),
+                "median": float(medians_parent[t, c_idx]),
                 "lower": float(lower_parent[t, c_idx]),
                 "upper": float(upper_parent[t, c_idx]),
             }

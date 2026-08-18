@@ -39,7 +39,7 @@ def _has_spread(time_series):
 
 def _is_uncertainty(time_series):
     vals = _ci_dict_values(time_series[0]) if time_series else []
-    return bool(vals) and all("mean" in v for v in vals)
+    return bool(vals) and all("median" in v for v in vals)
 
 
 def _run(config):
@@ -172,12 +172,12 @@ class TestControlRunStaysInterventionless:
         with_run = next(r for r in results if not r["control_run"])
         ctrl_run = next(r for r in results if r["control_run"])
 
-        def _mean_R(run):
+        def _median_R(run):
             v = run["parent_admin_total"]["time_series"][-1]["R"]
-            return v["mean"] if isinstance(v, dict) else v
+            return v["median"] if isinstance(v, dict) else v
 
-        r_with = _mean_R(with_run)
-        r_ctrl = _mean_R(ctrl_run)
+        r_with = _median_R(with_run)
+        r_ctrl = _median_R(ctrl_run)
         assert r_ctrl >= r_with, (
             f"Control run ({r_ctrl:.0f} recovered) should have >= infections than "
             f"the intervention run ({r_with:.0f}). If they're ~equal, the control "

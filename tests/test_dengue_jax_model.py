@@ -18,7 +18,7 @@ def _get_dengue_val(entry, comp):
     """Extract the numeric value from a time series entry (handles both formats)."""
     val = entry[comp]
     if isinstance(val, dict):
-        return val.get("age_all", val.get("mean", 0))
+        return val.get("age_all", val.get("median", 0))
     return val
 
 
@@ -228,7 +228,7 @@ class TestDengueUncertainty:
         mid_point = ts[len(ts) // 2]
         sample_comp = [k for k in mid_point if k != "date"][0]
         val = mid_point[sample_comp]
-        assert "mean" in val, f"Expected parameter uncertainty format for {sample_comp}, got {val}"
+        assert "median" in val, f"Expected parameter uncertainty format for {sample_comp}, got {val}"
 
         ctrl_run = next(r for r in results if r["control_run"])
         ctrl_ts = ctrl_run["parent_admin_total"]["time_series"]
