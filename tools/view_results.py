@@ -20,11 +20,10 @@ Features
   the two runs are directly comparable. Compartment names and colours mirror the
   Pandemic Simulator frontend (getCompartmentLabelsByDiseaseType in
   src/data/constants.tsx).
-* A ``compartment_deltas`` metric table beneath the time series — one column per
-  compartment (headed by its frontend display name) and one row per run, showing
-  the cumulative total (total ever-infected, total deaths, etc.), formatted the
-  same way as the frontend (thousands-separated integers). Hide with
-  ``--no-deltas``.
+* A ``compartment_deltas`` metric table beneath the time series. For uncertainty
+  and stochastic multi-run results, each central value is followed by its grey
+  2.5th–97.5th percentile interval, matching the frontend result cards. Hide
+  with ``--no-deltas``.
 
 This reads only the *parent* admin total; it never drills into per-admin-zone
 series.
@@ -246,27 +245,75 @@ def intervention_markers(run):
     return starts, ends, threshold_only
 
 
-def parse_compartment_deltas(run):
-    """Return the run's compartment_deltas as {compartment: float}.
+def _delta_mapping(value):
+    """Deserialize an AWSJSON delta payload into a mapping, if possible."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+    return value if isinstance(value, dict) else None
 
-    These are per-compartment cumulative totals over the whole run (the final
-    ``*_total`` value). Multi-run results may store
-    ``{median, lower, upper}`` per compartment — use the central median
-    value. Returns {} when the run has none.
+
+def _has_delta_ranges(deltas):
+    """Whether a delta mapping contains at least one complete interval."""
+    return any(
+        isinstance(value, dict)
+        and ("median" in value or "mean" in value)
+        and value.get("lower") is not None
+        and value.get("upper") is not None
+        for value in deltas.values()
+    )
+
+
+def parse_compartment_delta_stats(run):
+    """Return central values and optional percentile bounds for a run.
+
+    The v2 AWSJSON field is preferred because current multi-run output keeps
+    ``{median, lower, upper}`` there while the legacy ``compartment_deltas``
+    field contains only the central value. Older output that stores the nested
+    statistics directly in the legacy field remains supported, as does the
+    historical ``mean`` central-value key.
+
+    The result is ``{compartment: {value, lower, upper}}``. ``lower`` and
+    ``upper`` are ``None`` for deterministic output or incomplete intervals.
     """
-    cd = run.get("compartment_deltas") or {}
+    candidates = [
+        _delta_mapping(run.get("compartment_deltas_v2")),
+        _delta_mapping(run.get("compartment_deltas")),
+    ]
+    candidates = [candidate for candidate in candidates if candidate is not None]
+    source = next((candidate for candidate in candidates if _has_delta_ranges(candidate)),
+                  candidates[0] if candidates else {})
+
     out = {}
-    for comp, val in cd.items():
+    for comp, raw in source.items():
         if comp == "__typename":
             continue
+        central = raw
+        lower = upper = None
+        if isinstance(raw, dict):
+            central = raw.get("median", raw.get("mean"))
+            if raw.get("lower") is not None and raw.get("upper") is not None:
+                try:
+                    lower = float(raw["lower"])
+                    upper = float(raw["upper"])
+                except (TypeError, ValueError):
+                    lower = upper = None
         try:
-            if isinstance(val, dict) and ("median" in val or "mean" in val):
-                out[comp] = float(val.get("median", val.get("mean")))
-            else:
-                out[comp] = float(val)
+            value = float(central)
         except (TypeError, ValueError):
             continue
+        out[comp] = {"value": value, "lower": lower, "upper": upper}
     return out
+
+
+def parse_compartment_deltas(run):
+    """Return central compartment-delta values as {compartment: float}."""
+    return {
+        comp: stats["value"]
+        for comp, stats in parse_compartment_delta_stats(run).items()
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -288,21 +335,51 @@ def plot_deltas_table(ax, panels, selected, labels):
     Compartments are rows (not columns) so long disease names stay readable and
     the table scales to any number of compartments. Returns True if drawn.
     """
-    panel_deltas = [(label.split(" (")[0], parse_compartment_deltas(run))
+    panel_deltas = [(label.split(" (")[0], parse_compartment_delta_stats(run))
                     for label, run in panels]
     comps = delta_compartments(panels, selected)
     if not comps:
         return False
 
     ax.axis("off")
-    header = ["Compartment"] + [lbl for lbl, _ in panel_deltas]
-    cell_text = [
-        [labels[c][0]] + [format_number(d.get(c)) for _, d in panel_deltas]
-        for c in comps
-    ]
+    show_ranges = any(
+        stats.get("lower") is not None and stats.get("upper") is not None
+        for _, deltas in panel_deltas
+        for stats in deltas.values()
+    )
+
+    header = ["Compartment"]
+    for label, _ in panel_deltas:
+        header.append(label)
+        if show_ranges:
+            header.append("2.5% → 97.5%")
+
+    cell_text = []
+    for comp in comps:
+        row = [labels[comp][0]]
+        for _, deltas in panel_deltas:
+            stats = deltas.get(comp)
+            row.append(format_number(stats["value"]) if stats else "-")
+            if show_ranges:
+                if (stats and stats["lower"] is not None
+                        and stats["upper"] is not None):
+                    row.append(
+                        f'{format_number(stats["lower"])} → '
+                        f'{format_number(stats["upper"])}'
+                    )
+                else:
+                    row.append("")
+        cell_text.append(row)
+
     n_val = len(panel_deltas)
-    name_w = 0.46
-    col_widths = [name_w] + [(1 - name_w) / n_val] * n_val
+    name_w = 0.34 if show_ranges and n_val > 1 else 0.42 if show_ranges else 0.46
+    if show_ranges:
+        group_w = (1 - name_w) / n_val
+        col_widths = [name_w]
+        for _ in panel_deltas:
+            col_widths.extend([group_w * 0.38, group_w * 0.62])
+    else:
+        col_widths = [name_w] + [(1 - name_w) / n_val] * n_val
 
     tbl = ax.table(cellText=cell_text, colLabels=header, colWidths=col_widths,
                    cellLoc="right", loc="center")
@@ -310,11 +387,19 @@ def plot_deltas_table(ax, panels, selected, labels):
     tbl.set_fontsize(9)
     tbl.scale(1, 1.4)
 
-    # Header row: bold; compartment-name column left-aligned.
+    # Header row: bold; compartment-name column left-aligned. Percentile-range
+    # headers and values are muted grey, matching the frontend result cards.
     for j in range(len(header)):
         cell = tbl[0, j]
         cell.get_text().set_fontweight("bold")
         cell.get_text().set_ha("left" if j == 0 else "right")
+        if show_ranges and j > 0 and j % 2 == 0:
+            cell.get_text().set_color("0.45")
+            cell.get_text().set_fontsize(8)
+    if show_ranges:
+        for i in range(1, len(comps) + 1):
+            for j in range(2, len(header), 2):
+                tbl[i, j].get_text().set_color("0.45")
     # Compartment-name column: left-aligned and coloured to match its line.
     for i, c in enumerate(comps):
         name_cell = tbl[i + 1, 0]
