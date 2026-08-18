@@ -35,7 +35,9 @@ What it does automatically:
   `compartment_deltas` (the per-compartment cumulative totals: total ever-infected,
   total deaths, etc.). Compartment names, colours, and number formatting mirror the
   Pandemic Simulator frontend (`getCompartmentLabelsByDiseaseType`), so `E` shows as
-  "Exposed", `D` as "Deceased", and so on. Hide it with `--no-deltas`.
+  "Exposed", `D` as "Deceased", and so on. For uncertainty and stochastic
+  multi-run output, each central delta is followed by its grey 2.5th–97.5th
+  percentile interval. Hide the table with `--no-deltas`.
 
 It reads only the *parent* admin total, never per-admin-zone series.
 
