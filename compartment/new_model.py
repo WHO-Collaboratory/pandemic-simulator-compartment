@@ -133,7 +133,7 @@ class CLASS_NAME(Model):
         # Declare your mobility parameters as custom fields, then define how
         # they build the matrix in build_travel_matrix() below. Without this,
         # the base class supplies an identity matrix (no inter-zone travel).
-        # schema.add_disease_parameter(
+        # schema.add_parameter(
         #     name="travel_sigma",
         #     label="Travel Rate (σ)",
         #     description="Percentage of each zone's population away from home per day.",

@@ -1,410 +1,188 @@
 # Uncertainty Quantification in the Pandemic Simulator
 
-This document explains how to quantify and communicate parameter uncertainty in compartmental disease models using the Pandemic Simulator's built-in parameter uncertainty quantification (UQ) system.
+This document explains how to quantify and communicate uncertainty in compartmental disease models using the Pandemic Simulator. It covers the available run modes, the two methods for estimating uncertainty, what the framework currently supports, how to declare variance, and how to read the output.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Run Modes](#run-modes)
+- [Two Ways to Estimate Uncertainty](#two-ways-to-estimate-uncertainty)
+  - [1. Parameter Uncertainty via Latin Hypercube Sampling (LHS)](#1-parameter-uncertainty-via-latin-hypercube-sampling-lhs)
+  - [2. Stochastic Models](#2-stochastic-models)
+- [What the Simulator Currently Supports](#what-the-simulator-currently-supports)
+- [How the Simulator Chooses a Run Mode](#how-the-simulator-chooses-a-run-mode)
+- [Declaring Variance](#declaring-variance)
+  - [On Transmission Edges](#on-transmission-edges)
+  - [On Interventions](#on-interventions)
+  - [On Custom Parameters](#on-custom-parameters)
+  - [Enabling a Stochastic Model](#enabling-a-stochastic-model)
+- [Number of Runs](#number-of-runs)
+- [Understanding Output](#understanding-output)
+  - [Overall File Structure](#overall-file-structure)
+  - [Deterministic Output](#deterministic-output)
+  - [Multi-Run Output (Parameter Uncertainty or Stochastic)](#multi-run-output-parameter-uncertainty-or-stochastic)
+- [Related Documentation](#related-documentation)
+- [References](#references)
+  - [Latin Hypercube Sampling](#latin-hypercube-sampling)
+  - [Stochastic Epidemic Models](#stochastic-epidemic-models)
+  - [Uncertainty Quantification in Epidemiology](#uncertainty-quantification-in-epidemiology)
+
+
 
 ## Overview
 
-**Uncertainty quantification** addresses a fundamental challenge in epidemic modeling: **we don't know the true values of model parameters**. Transmission rates, recovery periods, intervention effectiveness, and initial conditions all have inherent parameter uncertainty.
+Epidemiologists usually want more than a single "best guess" trajectory, because disease dynamics are inherently variable and model parameters are rarely known exactly. Reporting a measure of central tendency together with a range communicates the level of uncertainty.
 
-Instead of running a single simulation with point estimates, UQ:
-1. **Defines parameter uncertainty ranges** for parameters (e.g., "beta is between 0.2 and 0.4")
-2. **Samples parameter combinations** using Latin Hypercube Sampling (LHS)
-3. **Runs multiple simulations** with different parameter sets
-4. **Aggregates results** to produce median trajectories and confidence intervals
+## Run Modes
 
-This provides **credible ranges** for model predictions rather than false precision from a single run.
+The Pandemic Simulator offers **three run modes**:
 
-## Why Uncertainty Quantification Matters
+- **Deterministic** — runs the model **once** and returns a single trajectory per compartment.
+- **Parameter uncertainty** — runs the model **multiple times** (30 by default), each time drawing parameter values via Latin Hypercube Sampling, and reports a median with a 95% simulation-based interval.
+- **Stochastic** — runs a **stochastic model multiple times** (30 by default) and reports a median with a 95% simulation-based interval.
 
-### The Problem with Point Estimates
+> Throughout this guide, the **95% simulation-based interval** refers to the band between the 2.5th and 97.5th percentiles of the simulated runs, with the median as the central line. See [Understanding Output](#understanding-output) for how these bounds appear in the results.
 
-A deterministic simulation with `beta = 0.3` produces a single trajectory:
-```
-Day 30: 1,234 infections
-Day 60: 8,567 infections
-```
 
-But what if `beta` is actually 0.25? Or 0.35? The difference can be enormous.
 
-### The UQ Solution
+## Two Ways to Estimate Uncertainty
 
-A parameter uncertainty run with `beta ~ Uniform(0.25, 0.35)` produces:
-```
-Day 30: 1,100 infections (95% CI: 850-1,450)
-Day 60: 7,800 infections (95% CI: 5,200-11,500)
-```
 
-**Key benefits:**
 
-- **Honest parameter uncertainty:** Reflects what we don't know
-- **Decision support:** "In the worst case, we'll have 11,500 infections"
-- **Sensitivity analysis:** Which parameters drive parameter uncertainty the most?
-- **Credibility:** Avoids overconfident predictions
+### 1. Parameter Uncertainty via Latin Hypercube Sampling (LHS)
 
-## Run Modes: DETERMINISTIC vs. UNCERTAINTY
+Latin Hypercube Sampling is an efficient, stratified sampling method for exploring how uncertain inputs affect a model's output. It divides each parameter's range into equally probable intervals, draws one sample from each interval, and then combines the samples across parameters. Compared with simple random sampling, this guarantees that the full range of every parameter is covered while using far fewer runs — which is why it is widely used for uncertainty and sensitivity analysis of epidemic models.
 
-The simulator supports two run modes:
+In practice, the simulator draws a set of parameter values for each run, simulates a trajectory for each set, and summarizes the resulting spread as a median and a 95% interval.
 
-### DETERMINISTIC Mode
+**References:** LHS was introduced by [McKay et al. 1979](https://doi.org/10.1080/00401706.1979.10489755). Its use for uncertainty and sensitivity analysis of epidemic and immunological models is described by [Marino et al. 2008](https://doi.org/10.1016/j.jtbi.2008.04.011), and it remains in common use — for example, [Majeed et al. 2022](https://doi.org/10.3389/fpubh.2022.1086849) apply LHS to analyze a co-circulating influenza/COVID-19 model.
 
-```json
-{
-  "run_mode": "DETERMINISTIC"
-}
-```
+### 2. Stochastic Models
 
-**Behavior:**
+A stochastic model builds randomness directly into the disease dynamics: instead of moving a fixed fraction of the population between compartments at each step, transitions occur as random events. Running the same model many times therefore produces a spread of trajectories, which captures the intrinsic variability of transmission — especially important for small populations and early-outbreak dynamics, where chance events can strongly influence the outcome.
 
-- Runs model **once** with parameter point estimates
-- Returns a single trajectory for each compartment
-- Fast (seconds to minutes)
-- Use for: initial exploration, testing, baseline scenarios
+**References:** For an introduction to formulating and simulating stochastic epidemic models, see [Allen 2017](https://doi.org/10.1016/j.idm.2017.03.001); for a broader survey, see [Britton 2010](https://doi.org/10.1016/j.mbs.2010.01.006).
 
-### UNCERTAINTY Mode
+## What the Simulator Currently Supports
 
-```json
-{
-  "run_mode": "UNCERTAINTY",
-  "n_simulations": 30
-}
-```
+- **Option 1 — Parameter uncertainty (LHS).** LHS is applied to input parameters for both the model and its interventions. **Only a uniform distribution is currently supported.**
+- **Option 2 — Stochastic model.** The modeler can supply a stochastic model.
+- **Option 3 — Combined approach.** A stochastic model and LHS parameter uncertainty can be combined. This is supported, but combining the two sources of variability tends to widen the simulation-based interval.
 
-**Behavior:**
 
-- Runs model **N times** with sampled parameters (default: 30)
-- Returns **median, lower bound (2.5%), upper bound (97.5%)** for each compartment
-- Slower (minutes to hours, depending on N and model complexity)
-- Use for: final results, communicating parameter uncertainty, policy analysis
 
-**Note:** Both modes still run **with and without interventions** in parallel (control run), so you get parameter uncertainty bands for both scenarios.
+## How the Simulator Chooses a Run Mode
 
-## Latin Hypercube Sampling (LHS)
+You do **not** need to select a run mode manually — the simulator detects it automatically from the model and its parameters.
 
-The framework uses **Latin Hypercube Sampling** to efficiently explore the parameter space.
+Variance can be added in **three places**. Transmission edges and interventions support it out of the box (config only), while additional parameters must opt in from the model code:
 
-### Why LHS?
 
-Compared to random sampling or grid search:
-- ✅ **Efficient:** Better coverage with fewer samples
-- ✅ **Stratified:** Ensures all parts of the range are represented
-- ✅ **Low discrepancy:** Avoids clustering of sample points
+| Place             | Example                                                                                      | How parameter uncertainty is enabled                                                      |
+| ----------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Transmission edge | The `beta` transmission rate (S→I) in `example_parameter_uncertainty_declarative_model`      | Built-in, no code changes                                                                 |
+| Intervention      | `my_intervention`'s reduction of `beta` in `example_parameter_uncertainty_declarative_model` | Built-in, no code changes                                                                 |
+| Additional parameter | The `asymptomatic_fraction` parameter in `example_stochastic_model`                          | Requires code — set `enable_variance=True` in the model schema. Built-in, no code changes |
 
-### How LHS Works
 
-For each parameter:
-1. **Divide the range into N equal-probability intervals**
-2. **Sample once from each interval**
-3. **Randomly permute** the samples to avoid correlation
+1. If the model class declares `STOCHASTIC = True` → **stochastic** (always runs the model's configured number of trajectories; any variance parameters are spread across those same runs rather than adding more).
+2. Otherwise, if **any** variance parameter is declared (on an edge, intervention, or additional parameter) → **parameter uncertainty**.
+3. Otherwise → **deterministic**.
 
-**Example:** Sampling beta ~ Uniform(0.2, 0.4) with N=5:
 
-```
-Intervals:  [0.20, 0.24] [0.24, 0.28] [0.28, 0.32] [0.32, 0.36] [0.36, 0.40]
-Samples:         0.22          0.26          0.30          0.34          0.38
-Permuted:        0.34          0.22          0.38          0.26          0.30
-```
 
-This guarantees good coverage even with few samples.
+## Declaring Variance
 
-## Supported Distributions
+To test parameter uncertainty locally, declare the variance in the config file you run the simulation with. There are three places to declare it, and each uses a different shape. Every example below is taken from a model in this repository.
 
-The framework supports **five probability distributions** for parameter uncertainty:
-
-### 1. Uniform Distribution
-
-**When to use:** No prior knowledge, all values equally likely within a range
-
-```json
-{
-  "variance_params": {
-    "has_variance": true,
-    "distribution_type": "UNIFORM",
-    "min": 0.2,
-    "max": 0.4
-  }
-}
-```
-
-**Characteristics:**
-
-- Flat probability density
-- Simple, interpretable
-- Conservative (gives equal weight to extremes)
-
-**Example:** "Beta could be anywhere between 0.2 and 0.4"
-
-### 2. Normal (Gaussian) Distribution
-
-**When to use:** Parameter is approximately bell-shaped around a mean
-
-```json
-{
-  "variance_params": {
-    "has_variance": true,
-    "distribution_type": "NORMAL",
-    "mean": 0.3,
-    "std": 0.05
-  }
-}
-```
-
-**Characteristics:**
-
-- Symmetric bell curve
-- Most values near the mean
-- Can produce negative values (clamp if needed)
-
-**Example:** "Beta is normally distributed with mean 0.3 and std 0.05"
-
-### 3. Triangular Distribution
-
-**When to use:** You have a best guess (mode) and min/max bounds
-
-```json
-{
-  "variance_params": {
-    "has_variance": true,
-    "distribution_type": "TRIANGULAR",
-    "min": 0.2,
-    "probability_mode": 0.5,
-    "max": 0.4
-  }
-}
-```
-
-**Characteristics:**
-
-- Asymmetric triangle
-- Mode at `min + (max - min) * probability_mode`
-- More realistic than uniform (acknowledges a "best guess")
-
-**Example:** "Beta is most likely 0.3, but could range from 0.2 to 0.4"
-
-**Note:** `probability_mode` must be in [0, 1]. It's the **position** of the peak, not the value.
-
-- `probability_mode=0.0` → peak at min
-- `probability_mode=0.5` → peak at midpoint
-- `probability_mode=1.0` → peak at max
-
-### 4. Beta Distribution
-
-**When to use:** Parameter is a proportion (0-1), with specific shape
-
-```json
-{
-  "variance_params": {
-    "has_variance": true,
-    "distribution_type": "BETA",
-    "alpha": 2.0,
-    "beta": 5.0
-  }
-}
-```
-
-**Characteristics:**
-
-- Bounded to [0, 1]
-- Flexible shapes (U-shaped, bell-shaped, uniform)
-- Used for probabilities and proportions
-
-**Example:** "Intervention adherence has a beta(2, 5) distribution"
-
-**Shape guide:**
-
-- `alpha = beta = 1` → Uniform(0, 1)
-- `alpha > beta` → Skewed right (most values near 1)
-- `alpha < beta` → Skewed left (most values near 0)
-- `alpha, beta > 1` → Bell-shaped
-
-### 5. Lognormal Distribution
-
-**When to use:** Parameter is always positive and right-skewed (e.g., incubation periods)
-
-```json
-{
-  "variance_params": {
-    "has_variance": true,
-    "distribution_type": "LOGNORMAL",
-    "mean": 1.0,
-    "sigma": 0.5
-  }
-}
-```
-
-**Characteristics:**
-
-- Always positive
-- Right-skewed (long tail)
-- Natural for duration and rate parameters
-
-**Example:** "Incubation period is lognormally distributed"
-
-**Note:** `mean` and `sigma` are parameters of the **underlying normal distribution**, not the lognormal itself. The median of the lognormal is `exp(mean)`.
-
-## Declaring Uncertainty in Config
+**LHS currently supports only the uniform distribution, so every variance declaration must supply a** `min` **and a** `max` **value.**
 
 ### On Transmission Edges
 
-Add `variance_params` to any transmission edge:
+Set `has_variance` to `true`. From `[example_parameter_uncertainty_declarative_model/example-config.json](../../compartment/models/example_parameter_uncertainty_declarative_model/example-config.json)`, where the transmission rate varies but the recovery period does not:
 
 ```json
-{
-  "Disease": {
-    "transmission_edges": [
-      {
+"TransmissionEdges": {
+  "items": [
+    {
+      "transmission_edge": {
         "source": "susceptible",
-        "target": "exposed",
-        "data": {
-          "transmission_rate": 0.3,
-          "variance_params": {
+        "target": "infected",
+        "value_type": "RATE"
+      },
+      "value": 0.3,
+      "FieldConfigs": {
+        "items": [
+          {
+            "field_key": "value",
             "has_variance": true,
             "distribution_type": "UNIFORM",
-            "min": 0.25,
-            "max": 0.35
+            "disease_param": "BETA",
+            "min": 0.2,
+            "max": 0.4
           }
-        }
-      },
-      {
-        "source": "exposed",
-        "target": "infected",
-        "data": {
-          "transmission_rate": 0.2,
-          "variance_params": {
-            "has_variance": true,
-            "distribution_type": "NORMAL",
-            "mean": 0.2,
-            "std": 0.03
-          }
-        }
+        ]
       }
-    ]
-  }
+    },
+    {
+      "transmission_edge": {
+        "source": "infected",
+        "target": "recovered",
+        "value_type": "DAYS"
+      },
+      "value": 10.0,
+      "FieldConfigs": {
+        "items": [
+          {
+            "field_key": "value",
+            "has_variance": false,
+            "distribution_type": "UNIFORM",
+            "disease_param": "GAMMA"
+          }
+        ]
+      }
+    }
+  ]
 }
 ```
 
-**Effect:** Each simulation run draws new values for these rates from the specified distributions.
+`disease_param` names the schema variable the edge maps to — `BETA` resolves to the `beta` declared via `variable_name` in `add_transmission_edge()`.
+
+**Effect:** Each run draws a new `beta` from a uniform distribution over 0.2–0.4. `gamma` stays fixed at 10 days.
 
 ### On Interventions
 
-Add `variance_params` to intervention parameters:
+Interventions use `field_key` to name which intervention field varies. From the same config file:
 
 ```json
-{
-  "interventions": [
+"Interventions": {
+  "items": [
     {
-      "id": "mask_wearing",
-      "adherence_min": 60.0,
-      "transmission_percentage": 35.0,
-      "start_date": "2025-11-18",
-      "end_date": "2025-12-31",
-      "variance_params": [
-        {
-          "has_variance": true,
-          "distribution_type": "UNIFORM",
-          "field_name": "adherence_min",
-          "min": 40.0,
-          "max": 80.0
-        },
-        {
-          "has_variance": true,
-          "distribution_type": "UNIFORM",
-          "field_name": "transmission_percentage",
-          "min": 20.0,
-          "max": 50.0
-        }
-      ]
-    }
-  ]
-}
-```
-
-**Effect:** Each run draws new adherence and transmission_percentage values.
-
-**Important:** For interventions, you must specify `field_name` to indicate which parameter varies.
-
-### Choosing Sample Size (n_simulations)
-
-```json
-{
-  "run_mode": "UNCERTAINTY",
-  "n_simulations": 30
-}
-```
-
-**Guidelines:**
-
-- **10-30:** Quick exploration, rough CI estimates
-- **30-100:** Standard for reporting (default: 30)
-- **100-500:** High-confidence CIs, sensitivity analysis
-- **500+:** Publication-quality, very tight CIs
-
-**Trade-off:** More samples = narrower CIs but longer runtime.
-
-**Rule of thumb:** 30 samples gives ~15% CI width, 100 samples gives ~10% CI width.
-
-## Understanding Output
-
-### DETERMINISTIC Output
-
-```json
-{
-  "admin_zones": [
-    {
-      "time_series": [
-        {
-          "date": "2025-11-18",
-          "S": 999500,
-          "I": 500,
-          "R": 0
-        },
-        {
-          "date": "2025-11-19",
-          "S": 998950,
-          "I": 550,
-          "R": 0
-        }
-      ]
-    }
-  ]
-}
-```
-
-Single value per compartment per timestep.
-
-### UNCERTAINTY Output
-
-```json
-{
-  "admin_zones": [
-    {
-      "time_series": [
-        {
-          "date": "2025-11-18",
-          "S": {
-            "mean": 999500,
-            "lower": 999400,
-            "upper": 999600
+      "Intervention": { "name": "MY_INTERVENTION", "display_name": "My intervention" },
+      "adherence_min": 50.0,
+      "transmission_percentage": 50.0,
+      "start_date": "2026-03-01",
+      "end_date": "2026-06-01",
+      "FieldConfigs": {
+        "items": [
+          {
+            "field_key": "adherence_min",
+            "has_variance": true,
+            "distribution_type": "UNIFORM",
+            "default": 50.0,
+            "min": 40.0,
+            "max": 60.0
           },
-          "I": {
-            "mean": 500,
-            "lower": 420,
-            "upper": 580
+          {
+            "field_key": "transmission_percentage",
+            "has_variance": true,
+            "distribution_type": "UNIFORM",
+            "default": 50.0,
+            "min": 45.0,
+            "max": 55.0
           }
-        },
-        {
-          "date": "2025-11-19",
-          "S": {
-            "mean": 998950,
-            "lower": 998200,
-            "upper": 999500
-          },
-          "I": {
-            "mean": 550,
-            "lower": 450,
-            "upper": 680
-          }
-        }
-      ]
+        ]
+      }
     }
   ]
 }
@@ -431,416 +209,193 @@ The framework uses a **95% confidence interval** by default:
 
 This means:
 
-- **95% of simulation runs** fall within [lower, upper]
-- **2.5% are below** lower bound
-- **2.5% are above** upper bound
+**Important:** `field_key` is required — it identifies which field varies. Each field you want to vary needs its own entry in `items[]`, as shown here for both `adherence_min` and `transmission_percentage`.
 
-**CI width** reflects uncertainty:
+### On Custom Parameters
 
-- **Narrow CI:** Parameters well-constrained
-- **Wide CI:** Large parameter uncertainty or high sensitivity
+Custom parameters take two steps: the model must allow variance, and the config must request it.
 
-## Workflow: From Deterministic to Uncertainty
-
-### Step 1: Deterministic Baseline
-
-Start with a deterministic run to validate your model:
-
-```json
-{
-  "run_mode": "DETERMINISTIC",
-  "Disease": {
-    "transmission_edges": [
-      {
-        "source": "susceptible",
-        "target": "infected",
-        "data": {"transmission_rate": 0.3}
-      }
-    ]
-  }
-}
-```
-
-**Check:**
-
-- Does the model run without errors?
-- Are trajectories reasonable?
-- Do interventions have the expected effect?
-
-### Step 2: Identify Uncertain Parameters
-
-Ask: **Which parameters am I most uncertain about?**
-
-**Good candidates:**
-
-- **Transmission rates (beta)** — varies by setting, behavior, season
-- **Initial infections** — often poorly known early in an outbreak
-- **Intervention effectiveness** — depends on adherence and implementation
-- **Recovery/removal rates** — clinical heterogeneity
-
-**Poor candidates:**
-
-- **Well-known biological constants** (e.g., human lifespan)
-- **Structural parameters** (e.g., number of regions)
-- **Fixed policy choices** (e.g., lockdown start date)
-
-### Step 3: Literature Review
-
-Find plausible ranges from literature:
-
-**Example sources:**
-
-- Meta-analyses (e.g., "R0 for COVID-19: 2.5-5.0" → beta ranges)
-- Clinical studies (e.g., "Incubation period: 5-7 days")
-- Empirical intervention effectiveness (e.g., "Masks reduce transmission by 20-50%")
-
-### Step 4: Add variance_params
-
-```json
-{
-  "run_mode": "UNCERTAINTY",
-  "n_simulations": 30,
-  "Disease": {
-    "transmission_edges": [
-      {
-        "source": "susceptible",
-        "target": "infected",
-        "data": {
-          "transmission_rate": 0.3,
-          "variance_params": {
-            "has_variance": true,
-            "distribution_type": "UNIFORM",
-            "min": 0.25,
-            "max": 0.35
-          }
-        }
-      }
-    ]
-  }
-}
-```
-
-### Step 5: Run and Interpret
-
-Run the parameter uncertainty mode:
-
-```bash
-python -m compartment.models.covid_jax_model.main \
-    --mode local \
-    --config_file my-uncertainty-config.json \
-    --output_file results/uncertainty-output.json
-```
-
-**Examine output:**
-
-- Is the median similar to your deterministic baseline?
-- Are CIs reasonable (not too wide or too narrow)?
-- Do CIs widen over time (typical — parameter uncertainty compounds)?
-
-### Step 6: Sensitivity Analysis
-
-Which parameters drive uncertainty the most?
-
-**Method:**
-
-1. Run parameter uncertainty with **only beta varying**
-2. Run parameter uncertainty with **only gamma varying**
-3. Compare CI widths
-
-**Result:** The parameter that produces wider CIs is the **high-sensitivity parameter** — prioritize getting better estimates for it.
-
-## Common Patterns
-
-### Pattern 1: Uniform Priors for All Transmission Rates
-
-**Use case:** Early in an outbreak, minimal data
-
-```json
-{
-  "transmission_edges": [
-    {
-      "source": "susceptible",
-      "target": "exposed",
-      "data": {
-        "transmission_rate": 0.3,
-        "variance_params": {
-          "has_variance": true,
-          "distribution_type": "UNIFORM",
-          "min": 0.2,
-          "max": 0.4
-        }
-      }
-    },
-    {
-      "source": "exposed",
-      "target": "infected",
-      "data": {
-        "transmission_rate": 0.2,
-        "variance_params": {
-          "has_variance": true,
-          "distribution_type": "UNIFORM",
-          "min": 0.15,
-          "max": 0.25
-        }
-      }
-    }
-  ]
-}
-```
-
-### Pattern 2: Intervention Adherence Uncertainty
-
-**Use case:** Modeling compliance with public health measures
-
-```json
-{
-  "interventions": [
-    {
-      "id": "social_isolation",
-      "adherence_min": 50.0,
-      "transmission_percentage": 50.0,
-      "start_date": "2025-11-01",
-      "variance_params": [
-        {
-          "has_variance": true,
-          "distribution_type": "BETA",
-          "field_name": "adherence_min",
-          "alpha": 3.0,
-          "beta": 3.0
-        }
-      ]
-    }
-  ]
-}
-```
-
-**Note:** Beta(3,3) produces a bell-shaped distribution on [0, 1], reflecting that adherence is usually moderate (not 0% or 100%).
-
-### Pattern 3: Mixed Distribution Types
-
-**Use case:** Different parameters have different parameter uncertainty profiles
-
-```json
-{
-  "transmission_edges": [
-    {
-      "source": "susceptible",
-      "target": "infected",
-      "data": {
-        "transmission_rate": 0.3,
-        "variance_params": {
-          "has_variance": true,
-          "distribution_type": "NORMAL",
-          "mean": 0.3,
-          "std": 0.05
-        }
-      }
-    },
-    {
-      "source": "infected",
-      "target": "recovered",
-      "data": {
-        "transmission_rate": 0.1,
-        "variance_params": {
-          "has_variance": true,
-          "distribution_type": "LOGNORMAL",
-          "mean": -2.3,
-          "sigma": 0.2
-        }
-      }
-    }
-  ]
-}
-```
-
-## Computational Performance
-
-### Runtime Scaling
-
-**Deterministic mode:** O(1) — single simulation run
-
-**Uncertainty mode:** O(N) — N parallel simulations
-
-**Typical runtimes (M1 Mac, 2 workers):**
-- 30 simulations: 2-5 minutes
-- 100 simulations: 10-20 minutes
-- 500 simulations: 1-2 hours
-
-**Factors affecting runtime:**
-
-- Number of simulations (n_simulations)
-- Model complexity (compartments, regions, age groups)
-- Simulation duration (time_steps)
-- Intervention complexity
-
-### Parallelization
-
-The framework runs simulations in **parallel** using multiprocessing:
+**1. Allow it in the schema.** `add_parameter()` accepts `enable_variance`, which defaults to `True`. Leave it `True` to allow the parameter to be varied; set it to `False` for parameters that should never be sampled. From `[example_parameter_uncertainty_custom_model/model.py](../../compartment/models/example_parameter_uncertainty_custom_model/model.py)`:
 
 ```python
-# From run_simulation.py
-top_level_workers = 2  # with vs. without interventions
-low_level_workers = 2  # parallel UQ runs within each
+schema.add_parameter(
+    name="ramp_up_days",
+    label="Intervention Ramp-Up (days)",
+    description="Days for the intervention to climb from baseline to full adherence.",
+    value_type=ValueType.DAYS,
+    default=14.0,
+    min_value=1.0,
+    max_value=180.0,
+    unit="days",
+    required=False,
+    enable_variance=True,   # allow this parameter to be sampled
+)
 ```
 
-**Total parallelism:** Up to `top_level_workers * low_level_workers` cores used.
+**2. Request it in the config.** To add parameter variance you must alter the `variance_params` list inside the `Disease` block. Using `ramp_up_days` from `[example_parameter_uncertainty_custom_model](../../compartment/models/example_parameter_uncertainty_custom_model/model.py)`:
 
-**Tuning:** On machines with many cores, increase `low_level_workers` in the code for faster UQ runs.
+```json
+"Disease": {
+  "disease_type": "example_parameter_uncertainty_custom",
+  "ramp_up_days": 14,
+  "ramp_down_days": 21,
+  "variance_params": [
+    { "param": "ramp_up_days", "dist": "uniform", "min": 7, "max": 21 }
+  ]
+}
+```
 
-## Best Practices
+**Effect:** Each run draws a new `ramp_up_days` between 7 and 21.
 
-### ✅ Do
+> Note: In the example, `ramp_up_days` already ships with `enable_variance=True` (step 1), so the config above takes effect as-is. If a parameter has `enable_variance=False`, you must change it in `schema.add_parameter()` to `True` first.
 
-- **Start with deterministic** to validate your model before adding parameter uncertainty
-- **Use uniform distributions** when you have minimal prior information
-- **Use normal/lognormal** when you have mean and variance estimates from data
-- **Vary transmission rates** — they're almost always uncertain
-- **Vary intervention adherence** — compliance is highly unpredictable
-- **Run 30+ simulations** for reportable results
-- **Report CIs alongside point estimates** — never give a single number without parameter uncertainty
-- **Document parameter sources** — where did your ranges come from?
-- **Check CI widths** — unreasonably wide or narrow suggests bad priors
 
-### ❌ Don't
 
-- **Don't vary everything** — prioritize parameters you're most uncertain about
-- **Don't use tiny ranges** (e.g., min=0.299, max=0.301) — be honest about parameter uncertainty
-- **Don't ignore literature** — use published estimates when available
-- **Don't report only the median** — CIs are the point of UQ
-- **Don't assume normality** without justification — many parameters are skewed
-- **Don't run <10 simulations** — CIs will be unreliable
-- **Don't vary structural parameters** (e.g., compartment list, number of regions)
+### Enabling a Stochastic Model
 
-## Troubleshooting
+For a stochastic model, the framework cannot infer intent from parameters alone, so the modeler must explicitly set the class-level flag `STOCHASTIC = True`. This tells the simulator the model must be run multiple times:
 
-### CIs Are Too Wide
+```python
+from compartment.model import Model, ValueType
 
-**Symptoms:**
 
-- Output ranges span orders of magnitude
-- CIs include implausible values (e.g., negative populations)
+class ExampleStochasticModel(Model):
+    STOCHASTIC = True  # run multiple trajectories
 
-**Possible causes:**
+    @classmethod
+    def define_parameters(cls, schema):
+        ...
+        # Optional: change the default trajectory count (see below)
+        schema.add_parameter(
+            name="num_runs",
+            label="Number of Runs",
+            description="Number of stochastic trajectories to simulate.",
+            value_type=ValueType.INTEGER,
+            default=30,
+            min_value=5,
+            max_value=50,
+            enable_variance=False,
+        )
+```
 
-1. **Parameter ranges too broad**
-   ```json
-   {"min": 0.01, "max": 10.0}  // 1000-fold range!
-   ```
-   **Fix:** Narrow ranges using literature
 
-2. **Too many varying parameters**
-   - Uncertainty compounds multiplicatively
-   **Fix:** Vary only high-sensitivity parameters
 
-3. **Long simulation horizon**
-   - Uncertainty grows exponentially with time
-   **Fix:** Accept this (it's reality) or shorten time horizon
+## Number of Runs
 
-### CIs Are Too Narrow
+Both parameter uncertainty and stochastic run modes default to **30** runs. You can change this:
 
-**Symptoms:**
+- **Stochastic models:** change the default baked into the model by adjusting the `num_runs` parameter's `default` in `define_parameters()` — the same `add_parameter()` call shown in [Enabling a Stochastic Model](#enabling-a-stochastic-model) above (e.g. set `default=50`).
+- **Any run (local only):** set `n_simulations` in your local config file to explore how the model behaves with a different number of runs. This override only applies when running locally — in the hosted Pandemic Simulator you **cannot** change the number of runs for parameter uncertainty; it is fixed at 30.
 
-- CIs barely wider than a deterministic run
-- Unrealistic confidence
+For example, [`example_parameter_uncertainty_declarative_model/example-config.json`](../../compartment/models/example_parameter_uncertainty_declarative_model/example-config.json) already sets `n_simulations` at the top level, so it runs 20 simulations instead of the default 30:
 
-**Possible causes:**
+```json
+{
+  "n_simulations": 20,
+  "Disease": {
+    "disease_type": "example_parameter_uncertainty_declarative"
+  },
+  "start_date": "2026-01-01",
+  "end_date": "2026-12-31"
+}
+```
 
-1. **Parameter ranges too tight**
-   ```json
-   {"min": 0.29, "max": 0.31}  // Only 7% variation
-   ```
-   **Fix:** Widen ranges to reflect true parameter uncertainty
 
-2. **Only varying low-sensitivity parameters**
-   - E.g., varying recovery rate but not transmission rate
-   **Fix:** Identify high-sensitivity parameters via sensitivity analysis
 
-### NaN or Inf in Output
+## Understanding Output
 
-**Symptoms:**
+To see how a model with parameter uncertainty runs locally, add a variance range into the `example-config.json` file (see [Declaring Variance](#declaring-variance) above). Visualizations for **parameter uncertainty** and **stochastic** models look the **same** in the Pandemic Simulator: both display the **median** and a **95% simulation-based interval**.
 
-- Output contains `NaN` or `inf` values
-- Some simulation runs crash
+### Overall File Structure
 
-**Possible causes:**
+Every results file is a **JSON array of two runs** — the run with interventions and the control run without them:
 
-1. **Distribution produces negative values**
-   ```json
-   {"distribution_type": "NORMAL", "mean": 0.1, "std": 0.2}
-   // Can sample negative rates!
-   ```
-   **Fix:** Use lognormal or clamp to positive values
+```json
+[
+  { "control_run": false, "admin_zones": [ ... ], "compartment_deltas": { ... } },
+  { "control_run": true,  "admin_zones": [ ... ], "compartment_deltas": { ... } }
+]
+```
 
-2. **Extreme parameter combinations**
-   - Very high beta + very low gamma → explosion
-   **Fix:** Ensure parameter ranges are biologically plausible
+Each run also carries `start_date`, `end_date`, `time_steps`, `interventions`, `parent_admin_total` (the whole-population series), and `compartment_deltas` (cumulative totals per compartment). The run mode changes only the shape of the values inside `time_series`.
 
-3. **Model instability**
-   - Some parameter combinations violate model assumptions
-   **Fix:** Add validation in `equation()` or narrow ranges
+### Deterministic Output
 
-### Slow Performance
+Each compartment holds an object of demographic keys. `age_all` carries the population-wide value; a model with declared age groups also lists one key per group:
 
-**Symptoms:**
+```json
+"time_series": [
+  {
+    "date": "2026-01-01",
+    "S": { "age_0_4": 0, "age_5_17": 0, "age_18_49": 0, "age_50_64": 0, "age_65_plus": 0, "age_all": 999900.0 },
+    "I": { "age_0_4": 0, "age_5_17": 0, "age_18_49": 0, "age_50_64": 0, "age_65_plus": 0, "age_all": 100.0 },
+    "R": { "age_0_4": 0, "age_5_17": 0, "age_18_49": 0, "age_50_64": 0, "age_65_plus": 0, "age_all": 0.0 }
+  }
+]
+```
 
-- UQ runs take hours
+A model with no age stratification produces `age_all` alone:
 
-**Possible causes:**
+```json
+{ "date": "2026-01-01", "S": { "age_all": 999900.0 }, "I": { "age_all": 100.0 } }
+```
 
-1. **Too many simulations**
-   **Fix:** Start with n_simulations=30, increase only if needed
+One value per compartment per timestep, always nested under a demographic key.
 
-2. **Complex model**
-   - Many regions, age groups, compartments
-   **Fix:** Simplify for exploratory UQ, then scale up
+### Multi-Run Output (Parameter Uncertainty or Stochastic)
 
-3. **Low parallelism**
-   **Fix:** Increase `low_level_workers` in `run_simulation.py`
+Each compartment holds a summary across runs instead. Note that the demographic nesting is **replaced** — multi-run output reports population-wide values only, even for age-stratified models:
 
-## Advanced Topics
+```json
+"time_series": [
+  {
+    "date": "2026-01-01",
+    "S": { "mean": 999900.0, "lower": 999900.0, "upper": 999900.0 },
+    "I": { "mean": 100.0, "lower": 100.0, "upper": 100.0 }
+  },
+  {
+    "date": "2026-01-02",
+    "S": { "mean": 999871.2, "lower": 999845.6, "upper": 999889.4 },
+    "I": { "mean": 126.9, "lower": 108.7, "upper": 152.1 }
+  }
+]
+```
 
-### Custom Distributions
+Three values per compartment per timestep:
 
-To add a new distribution (requires code modification):
+- **mean:** Median across all runs (50th percentile)
+- **lower:** Lower bound of the 95% simulation-based interval (2.5th percentile)
+- **upper:** Upper bound of the 95% simulation-based interval (97.5th percentile)
 
-1. **Add LHS function in `helpers.py`:**
-   ```python
-   def LHS_gamma(shape, scale, uniform_samples):
-       return stats.gamma.ppf(uniform_samples, shape, scale=scale)
-   ```
+The framework uses a **95% simulation-based interval** by default: the `lower` and `upper` bounds are the 2.5th and 97.5th percentiles of the simulated runs.
 
-2. **Update `generate_LHS_samples()`:**
-   ```python
-   elif dist == "gamma":
-       samples = LHS_gamma(cfg["shape"], cfg["scale"], base)
-   ```
+> **Visualizing bands:** `python tools/view_results.py results/<output>.json` plots the `mean` line and shades the `lower`–`upper` band for each compartment, with the intervention and control runs side by side. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md).
 
-3. **Use in config:**
-   ```json
-   {
-     "distribution_type": "GAMMA",
-     "shape": 2.0,
-     "scale": 1.5
-   }
-   ```
 
-### Varying Initial Conditions
-
-Currently, `variance_params` only supports transmission edges and interventions. To vary initial infections:
-
-**Workaround:** Run multiple configs with different `infected_population` values and aggregate externally.
-
-**Future enhancement:** Add `variance_params` support for `case_file` fields.
-
-### Covarying Parameters
-
-LHS assumes **independence** between parameters. To model correlation:
-
-**Workaround:** Use external tools (e.g., Cholesky decomposition) to generate correlated samples, then pass via custom parameter sets.
-
-**Future enhancement:** Add correlation matrix support to LHS.
 
 ## Related Documentation
+
+- **[interventions.md](./interventions.md)** — Varying intervention effectiveness
+- **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; shades the median/lower/upper uncertainty bands from multi-run output
+- **[compartment/run_simulation.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/run_simulation.py)** — UQ orchestration code
+- **[compartment/helpers.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/helpers.py)** — LHS implementation (`generate_LHS_samples`) and run-mode resolution (`resolve_run_mode`)
+
+
+
+## References
+
+
+
+### Latin Hypercube Sampling
+
+- **McKay, Beckman & Conover (1979).** ["A comparison of three methods for selecting values of input variables in the analysis of output from a computer code."](https://doi.org/10.1080/00401706.1979.10489755) *Technometrics* 21(2): 239-245.
+  - Original LHS paper
+- **Marino, Hogue, Ray & Kirschner (2008).** ["A methodology for performing global uncertainty and sensitivity analysis in systems biology."](https://doi.org/10.1016/j.jtbi.2008.04.011) *Journal of Theoretical Biology* 254(1): 178-196.
+  - LHS/PRCC methodology for epidemiological and immunological models
+- **Majeed et al. (2022).** ["Mitigating co-circulation of seasonal influenza and COVID-19 pandemic in the presence of vaccination: A mathematical modeling approach."](https://doi.org/10.3389/fpubh.2022.1086849) *Frontiers in Public Health* 10: 1086849.
+  - Recent epidemiological application of LHS (with PRCC sensitivity analysis)
+
+
 
 - **[INTERVENTIONS.md](./interventions.md)** — Varying intervention effectiveness
 - **[DEVELOPING_MODELS.md](./developing-models.md)** — Model development guide
@@ -849,33 +404,23 @@ LHS assumes **independence** between parameters. To model correlation:
 - **[compartment/helpers.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/helpers.py)** — LHS implementation (`generate_LHS_samples`)
 - **[compartment/batch_simulation_manager.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/batch_simulation_manager.py)** — Parallel simulation runner
 
-## References
+- **Allen (2017).** ["A primer on stochastic epidemic models: Formulation, numerical simulation, and analysis."](https://doi.org/10.1016/j.idm.2017.03.001) *Infectious Disease Modelling* 2(2): 128-142.
+  - Introduction to formulating and simulating stochastic epidemic models
+- **Britton (2010).** ["Stochastic epidemic models: A survey."](https://doi.org/10.1016/j.mbs.2010.01.006) *Mathematical Biosciences* 225(1): 24-35.
+  - Broader survey of stochastic epidemic models
 
-### Latin Hypercube Sampling
 
-- **McKay et al. (1979).** "A comparison of three methods for selecting values of input variables in the analysis of output from a computer code." *Technometrics* 21(2): 239-245.
-    - Original LHS paper
-
-- **Iman & Conover (1982).** "A distribution-free approach to inducing rank correlation among input variables." *Communications in Statistics* 11(3): 311-334.
-    - LHS with correlation
 
 ### Uncertainty Quantification in Epidemiology
 
-- **Ferguson et al. (2020).** "Report 9: Impact of non-pharmaceutical interventions (NPIs) to reduce COVID-19 mortality and healthcare demand." *Imperial College COVID-19 Response Team*.
-    - Influential UQ study with wide CIs
-
-- **Jewell et al. (2020).** "Predictive mathematical models of the COVID-19 pandemic: Underlying principles and value of projections." *JAMA* 323(19): 1893-1894.
-    - Discussion of model uncertainty
-
-- **Holmdahl & Buckee (2020).** "Wrong but Useful — What Covid-19 Epidemiologic Models Can and Cannot Tell Us." *New England Journal of Medicine* 383(4): 303-305.
-    - Limitations and appropriate use of uncertain models
-
-### Distribution Selection
-
-- **Vose (2008).** *Risk Analysis: A Quantitative Guide* (3rd ed.). John Wiley & Sons.
-    - Comprehensive guide to probability distributions for parameter uncertainty
+- **Ferguson et al. (2020).** ["Report 9: Impact of non-pharmaceutical interventions (NPIs) to reduce COVID-19 mortality and healthcare demand."](https://doi.org/10.25561/77482) *Imperial College COVID-19 Response Team*.
+  - Influential UQ study with wide intervals
+- **Jewell, Lewnard & Jewell (2020).** ["Predictive mathematical models of the COVID-19 pandemic: Underlying principles and value of projections."](https://doi.org/10.1001/jama.2020.6585) *JAMA* 323(19): 1893-1894.
+  - Discussion of model uncertainty
+- **Holmdahl & Buckee (2020).** ["Wrong but Useful — What Covid-19 Epidemiologic Models Can and Cannot Tell Us."](https://doi.org/10.1056/NEJMp2016822) *New England Journal of Medicine* 383(4): 303-305.
+  - Limitations and appropriate use of uncertain models
 
 ---
 
-**Last Updated:** May 20, 2026  
-**Version:** 0.1.9
+**Last Updated:** August 16, 2026  
+**Version:** 0.2.1

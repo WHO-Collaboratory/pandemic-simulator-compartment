@@ -43,7 +43,7 @@ This means a modeler is never fighting a hidden default, and σ shows up in the 
 **1. Declare the parameters as custom fields** in `define_parameters()`. Convention is `travel_sigma` as a `PERCENTAGE` in 0–100, plus whatever else your kernel needs:
 
 ```python
-schema.add_disease_parameter(
+schema.add_parameter(
     name="travel_sigma",
     label="Travel Rate (σ)",
     description="Percentage of each zone's population away from home on a given day.",
@@ -314,13 +314,13 @@ When none of the existing kernels fit, declare the parameters your formula needs
 class MyDiseaseModel(Model):
     @classmethod
     def define_parameters(cls, schema):
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="travel_sigma", label="Travel Rate (σ)",
             description="Percentage of each zone's population away from home on a given day.",
             value_type=ValueType.PERCENTAGE, default=20.0,
             min_value=0.0, max_value=100.0, unit="%",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="travel_scale_km", label="Travel Decay Length",
             description="Characteristic distance of the exponential mobility decay.",
             value_type=ValueType.FLOAT, default=500.0,

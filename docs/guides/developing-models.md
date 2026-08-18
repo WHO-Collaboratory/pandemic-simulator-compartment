@@ -197,7 +197,7 @@ class MyModel(Model):
         # 5. (optional) Travel — declare your mobility parameters as custom
         # fields, then override build_travel_matrix() to turn them into a
         # matrix. See gravity-model.md for the full treatment.
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="travel_sigma", label="Travel Rate (σ)",
             description="Percentage of each zone's population away from home on a given day.",
             value_type=ValueType.PERCENTAGE, default=20.0,
@@ -223,7 +223,7 @@ class MyModel(Model):
         # schema.add_admin_zone_field(name="seroprevalence", ...)
 
         # 8. (optional) Disease-specific top-level params — e.g. immunity_period
-        # schema.add_disease_parameter(name="immunity_period", ...)
+        # schema.add_parameter(name="immunity_period", ...)
 ```
 
 What the base class does for you after `define_parameters()`:
@@ -309,7 +309,7 @@ Some compartment-to-compartment movements can't be expressed as a single schema 
 - **Spatial coupling.** Mpox's S→I uses a travel-matrix-weighted FOI; the rate that the framework would multiply by `S` doesn't capture the coupling.
 
 For these, the pattern is:
-1. Declare the underlying constants via `schema.add_disease_parameter()` so they show up in the artifact and the validated config.
+1. Declare the underlying constants via `schema.add_parameter()` so they show up in the artifact and the validated config.
 2. Skip the corresponding edge in `_compute_equations()` (or just don't declare it) and apply the flow manually with `self._apply_flow(derivs, source_id, target_id, flow)`.
 3. **Declare the target's `*_total` compartment by hand** with `schema.add_compartment("X_total", ...)` if you want cumulative tracking. The framework only auto-generates `*_total` for compartments that are the target of at least one declared edge — flows applied via `_apply_flow()` will populate the `_total` counter, but only if it exists.
 
@@ -374,7 +374,7 @@ Mobility is **model-owned**: nothing is built for you automatically. A model tha
 
 ```python
 # In define_parameters() — surfaces as an editable custom field in the UI
-schema.add_disease_parameter(
+schema.add_parameter(
     name="travel_sigma", label="Travel Rate (σ)",
     value_type=ValueType.PERCENTAGE, default=20.0,
     min_value=0.0, max_value=100.0, unit="%",
@@ -571,7 +571,7 @@ There's also [tests/test_artifact.py](https://github.com/WHO-Collaboratory/pande
 ## Quality checklist before opening a PR
 
 - `define_parameters()` calls `set_model_info()` and adds at least one compartment. Every transmission edge's `source`/`target` matches a declared compartment id or label (case-insensitive).
-- Every compartment-to-compartment movement in your dynamics is either a declared edge (preferred) **or** intentionally a manual flow because the rate isn't a single tunable scalar (multi-rate FOI, demographic births, density-dependent deaths). For each manual flow the underlying rates are exposed as `add_disease_parameter()` and the target's `*_total` compartment is declared by hand if you need cumulative tracking.
+- Every compartment-to-compartment movement in your dynamics is either a declared edge (preferred) **or** intentionally a manual flow because the rate isn't a single tunable scalar (multi-rate FOI, demographic births, density-dependent deaths). For each manual flow the underlying rates are exposed as `add_parameter()` and the target's `*_total` compartment is declared by hand if you need cumulative tracking.
 - The compartments your `equation()` indexes are spelled the same as `self.COMPARTMENTS.X` — typos raise `AttributeError` with a helpful list.
 - `equation()` returns `jnp.stack([...])` in `self.compartment_list` order, including any `_total` rows.
 - `prepare_initial_state()` sets `self.travel_matrix` (use `np.eye(R)` if you don't model travel).

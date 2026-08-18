@@ -216,7 +216,7 @@ class HantavirusJaxModel(Model):
         # infectious-pool` forms that don't match the framework's edge
         # model, so β, β_a, β_f live as disease parameters and the flows
         # are applied manually in equation().
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="beta",
             label="Rodent–Rodent Transmission (β)",
             description=(
@@ -230,7 +230,7 @@ class HantavirusJaxModel(Model):
             min_value=0.0, max_value=10.0,
             unit="per rodent per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="beta_a",
             label="Spillover Rate (sector a)",
             description=(
@@ -244,7 +244,7 @@ class HantavirusJaxModel(Model):
             min_value=0.0, max_value=1e-2,
             unit="per rodent per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="beta_f",
             label="Spillover Rate (sector f)",
             description=(
@@ -257,7 +257,7 @@ class HantavirusJaxModel(Model):
             min_value=0.0, max_value=1e-2,
             unit="per rodent per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="case_fatality",
             label="Case Fatality (d)",
             description="Fraction of human spillover cases that die.",
@@ -269,7 +269,7 @@ class HantavirusJaxModel(Model):
         )
 
         # Rodent mobility f ↔ a (one-way out, then return).
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="phi",
             label="Rodent Exit Rate from f",
             description=(
@@ -283,7 +283,7 @@ class HantavirusJaxModel(Model):
             min_value=0.0, max_value=1.0,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="sigma_visit",
             label="Rodent Visit Duration",
             description="Mean time a visiting rodent stays in a before returning home.",
@@ -297,7 +297,7 @@ class HantavirusJaxModel(Model):
             ("s", "Susceptible"), ("e", "Exposed"),
             ("i", "Infectious"), ("r", "Recovered"),
         ):
-            schema.add_disease_parameter(
+            schema.add_parameter(
                 name=f"lambda_{state}",
                 label=f"Visit Fraction ({label})",
                 description=(
@@ -311,7 +311,7 @@ class HantavirusJaxModel(Model):
             )
 
         # Rodent demographics (uniform birth/death).
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="b_ma",
             label="Rodent Birth Rate (sector a)",
             description="Per-resident birth rate for rural-populated rodents.",
@@ -321,7 +321,7 @@ class HantavirusJaxModel(Model):
             min_value=0.0, max_value=1.0,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="b_mf",
             label="Rodent Birth Rate (sector f)",
             description="Per-resident birth rate for rural-empty rodents.",
@@ -331,7 +331,7 @@ class HantavirusJaxModel(Model):
             min_value=0.0, max_value=1.0,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="d_m",
             label="Rodent Mortality",
             description="Per-rodent natural mortality rate (uniform across states).",
@@ -343,7 +343,7 @@ class HantavirusJaxModel(Model):
         )
 
         # Human mobility (between sectors).
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="nu_u",
             label="Urban Exit Rate",
             description="Per-day rate at which urban residents leave u to commute.",
@@ -353,7 +353,7 @@ class HantavirusJaxModel(Model):
             min_value=0.0, max_value=1.0,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="nu_a",
             label="Rural-Populated Exit Rate",
             description="Per-day rate at which rural-populated residents leave a to commute.",
@@ -363,7 +363,7 @@ class HantavirusJaxModel(Model):
             min_value=0.0, max_value=1.0,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="tau_u",
             label="Urban Visit Duration",
             description="Mean time an urban resident spends visiting before returning home.",
@@ -373,7 +373,7 @@ class HantavirusJaxModel(Model):
             min_value=0.5, max_value=90.0,
             unit="days",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="tau_a",
             label="Rural-Populated Visit Duration",
             description="Mean time a rural-populated resident spends visiting before returning home.",
@@ -383,7 +383,7 @@ class HantavirusJaxModel(Model):
             min_value=0.5, max_value=90.0,
             unit="days",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="alpha_au",
             label="Urban → a Visit Fraction",
             description="Fraction of departing urban residents who go to rural-populated a.",
@@ -392,7 +392,7 @@ class HantavirusJaxModel(Model):
             default_min=0.5, default_max=1.0,
             min_value=0.0, max_value=1.0,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="alpha_fu",
             label="Urban → f Visit Fraction",
             description=(
@@ -404,7 +404,7 @@ class HantavirusJaxModel(Model):
             default_min=0.0, default_max=0.5,
             min_value=0.0, max_value=1.0,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="alpha_ua",
             label="Rural-pop → u Visit Fraction",
             description="Fraction of departing rural-populated residents who go to urban u.",
@@ -413,7 +413,7 @@ class HantavirusJaxModel(Model):
             default_min=0.2, default_max=1.0,
             min_value=0.0, max_value=1.0,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="alpha_fa",
             label="Rural-pop → f Visit Fraction",
             description=(

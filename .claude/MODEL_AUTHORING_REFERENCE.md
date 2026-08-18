@@ -51,7 +51,7 @@ Pick the closest analog before suggesting from scratch.
    - `model.py`
    - `main.py` (copy from `mpox_jax_model/main.py`, swap the class name)
    - `example-config.json` (generate via CLI after the schema is written)
-2. **Write `define_parameters()`** in this order: `set_model_info` → `add_compartment` (mark `infective=True` on FOI sources) → `add_transmission_edge` → `add_intervention` → mobility params → demographics / contact matrix → `add_admin_zone_field` → `add_disease_parameter`.
+2. **Write `define_parameters()`** in this order: `set_model_info` → `add_compartment` (mark `infective=True` on FOI sources) → `add_transmission_edge` → `add_intervention` → mobility params → demographics / contact matrix → `add_admin_zone_field` → `add_parameter`.
 3. **Write `__init__(self, config)`**. Default to `super().__init__(config)` then add what's missing (demographics, temperature, model-specific scalars). **Don't set `self.travel_matrix` here** — the framework does it.
 4. **Write `prepare_initial_state(self)`**. Return the `state` array (the population matrix). If the model travels, override `build_travel_matrix(admin_zones)` instead (see *Mobility* below).
 5. **Write `equation(self, y, t, p)`**. Lean on `_compute_equations()` first; only drop to manual flows for spatially-coupled or age-stratified FOI. For stochastic/Euler models the return is a per-step delta rather than a true derivative.
@@ -88,7 +88,7 @@ schema.add_intervention(id, label, description,
 schema.add_demographic_group(id, label, default_weight, age_range=(low, high))  # age_range optional
 schema.set_contact_override(from_group, to_group, value)                         # bespoke values — beats Prem auto-load
 schema.add_admin_zone_field(name, label, description, value_type, default, ...)
-schema.add_disease_parameter(name, label, description, value_type, default, ...)
+schema.add_parameter(name, label, description, value_type, default, ...)
 ```
 
 `ValueType` choices: `RATE`, `DAYS`, `PERCENTAGE`, `COUNT`, `DATE`, `BOOLEAN`, `TEXT`, `SELECT`, `FLOAT`, `INTEGER`, `COORDINATE`. `DAYS` and `PERCENTAGE` get auto-converted to per-day fractional rates inside `_load_transmission_params()` — **for transmission edges only**. Disease parameters arrive in native units (a `PERCENTAGE` param is `20.0`, not `0.2`); convert at the point of use with `self._to_rate(value, ValueType.PERCENTAGE)`.
@@ -99,7 +99,7 @@ There is **no shared mobility library and no framework-level gravity model**. A 
 
 1. Declare the parameters as ordinary custom fields, so they render in the UI and are editable per simulation. Convention is `travel_sigma` (`PERCENTAGE`, 0–100) plus whatever else the kernel needs:
    ```python
-   schema.add_disease_parameter(
+   schema.add_parameter(
        name="travel_sigma", label="Travel Rate (σ)",
        description="Percentage of each zone's population away from home on a given day.",
        value_type=ValueType.PERCENTAGE, default=20.0,
@@ -199,7 +199,7 @@ Distinct from the bundled Prem 2021 contact matrices under `compartment/contact_
 - **`super().__init__()` must be called when the model is "migrated"** (i.e. uses `define_parameters()`). It's what populates `self.beta`, `self.gamma`, contact matrix, intervention runtime objects. If I see `AttributeError: ... has no attribute 'beta'`, the cause is usually a forgotten `super().__init__()` or a typo in `variable_name`.
 - **`compartment_list` order matters**. `equation()` indexes `y` by position, and `_compute_equations()` returns a dict keyed by ID. Always stack with `jnp.stack([derivs[c] for c in self.compartment_list])`, never with a hardcoded order.
 - **`_total` compartments are auto-generated** — don't declare `I_total` in `define_parameters()` unless I'm overriding `_add_total_compartments()` (dengue does). Declaring duplicates raises `ValueError`.
-- **Every compartment-to-compartment movement should be a schema edge** when the flow has the form `rate * source` or `source * rate * sum(infective) / N`. Skipping an edge silently is almost always a bug. **Exceptions** (legitimate manual flows): multi-rate FOI mixing several β values across different infectious sources (hantavirus's `Sm → Em = Sm * (β_mm·Im + β_f·If)`), demographic births (`μ·N`, harmonic-mean), and density-dependent deaths (`a + c·N`). For these: declare the rate constants via `add_disease_parameter()`, apply the flow with `_apply_flow(derivs, source_id, target_id, flow)`, and **declare the target's `*_total` compartment by hand** if the target isn't already an edge target (the framework only auto-generates totals for declared edge targets). See [hantavirus_jax_model/model.py](../compartment/models/hantavirus_jax_model/model.py) for the canonical example.
+- **Every compartment-to-compartment movement should be a schema edge** when the flow has the form `rate * source` or `source * rate * sum(infective) / N`. Skipping an edge silently is almost always a bug. **Exceptions** (legitimate manual flows): multi-rate FOI mixing several β values across different infectious sources (hantavirus's `Sm → Em = Sm * (β_mm·Im + β_f·If)`), demographic births (`μ·N`, harmonic-mean), and density-dependent deaths (`a + c·N`). For these: declare the rate constants via `add_parameter()`, apply the flow with `_apply_flow(derivs, source_id, target_id, flow)`, and **declare the target's `*_total` compartment by hand** if the target isn't already an edge target (the framework only auto-generates totals for declared edge targets). See [hantavirus_jax_model/model.py](../compartment/models/hantavirus_jax_model/model.py) for the canonical example.
 - **`infective=True` is critical for `frequency_dependent=True` edges**. Without it, the FOI sum is empty and the model produces zero flow. Mark every compartment that contributes infectious pressure (in dengue that's all primary `Ix` and all secondary `Ixy`).
 - **`value_type=ValueType.DAYS`** means `default=10.0` is interpreted as a 10-day mean ⇒ rate `0.1`. Do not pre-divide.
 - **Don't build a data-file path by hand.** `Path(__file__).parent / "data" / "contacts.csv"` appears to work and then silently reads stale data the moment `datasets.yaml` bumps the version — and resolves to nothing in the cloud if the file was never declared, since only declared datasets get staged into the image. Use `self.dataset(name)`.

@@ -123,7 +123,7 @@ class Dengue2StrainModel(Model):
         )
 
         # ---- Disease parameters (configurable via the Disease block) ----
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="transmission_rate",
             label="Transmission Rate",
             description="Baseline force-of-infection coefficient (per day).",
@@ -135,7 +135,7 @@ class Dengue2StrainModel(Model):
             default_max=0.05,
             unit="per day",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="seasonality_amplitude",
             label="Seasonality Amplitude",
             description=(
@@ -147,7 +147,7 @@ class Dengue2StrainModel(Model):
             min_value=0.0,
             max_value=1.0,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="ade_factor",
             label="ADE Enhancement Factor",
             description=(
@@ -159,7 +159,7 @@ class Dengue2StrainModel(Model):
             min_value=1.0,
             max_value=5.0,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="cross_immunity_leak",
             label="Cross-Immunity Leak",
             description=(
@@ -171,7 +171,7 @@ class Dengue2StrainModel(Model):
             min_value=0.0,
             max_value=1.0,
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="infectious_period",
             label="Infectious Period",
             description="Mean duration of infectiousness for primary and secondary infections.",
@@ -181,7 +181,7 @@ class Dengue2StrainModel(Model):
             max_value=365.0,
             unit="days",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="cross_immunity_period",
             label="Cross-Immunity Period",
             description=(
@@ -195,7 +195,7 @@ class Dengue2StrainModel(Model):
             max_value=3650.0,
             unit="days",
         )
-        schema.add_disease_parameter(
+        schema.add_parameter(
             name="life_expectancy",
             label="Life Expectancy",
             description="Mean host life expectancy; sets balanced birth and death rates.",

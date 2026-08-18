@@ -865,7 +865,7 @@ class Model(ABC):
         constructed model (whose ``__init__`` may have already baked params
         into derived constants like ``1/latent_period``), the runner rebuilds
         the model from an overridden config so every value declared via
-        ``add_transmission_edge`` / ``add_disease_parameter`` /
+        ``add_transmission_edge`` / ``add_parameter`` /
         ``add_intervention`` is re-derived from scratch.
 
         Override keys are routed by kind, using the schema to disambiguate:
@@ -1290,7 +1290,7 @@ class Model(ABC):
         The default is the identity matrix — no inter-zone travel.
         Override this to define the model's mobility, reading whatever
         parameters ``define_parameters()`` declared.  Declare them with
-        ``schema.add_disease_parameter()`` (by convention ``travel_sigma``,
+        ``schema.add_parameter()`` (by convention ``travel_sigma``,
         plus any kernel-specific extras such as ``travel_alpha`` or
         ``travel_scale_km``) so they surface as custom fields in the UI.
 
