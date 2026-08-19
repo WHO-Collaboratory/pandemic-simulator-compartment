@@ -277,11 +277,8 @@ The scaffold appends `_model` to the directory name, so `example_parameter_uncer
 - **`__init__.py`** — leave empty. It marks the directory as a Python package.
 - **`model.py`** — the disease class: parameters, input formatting, and the equation function for a minimal SIR model.
 - **`main.py`** — loads the model and executes the simulation.
+- **`model.md`** — a skeleton listing the sections to cover; replace the suggested sections with your own write-up. See [model.md](#modelmd).
 - **`example-config.json`** — configuration for running the simulation locally.
-
-**File you add yourself (optional)**
-
-- **`model.md`** — see [model.md](#modelmd).
 
 `label` and `description` are shown to users in the Pandemic Simulator UI. `disease-type` is used only by the back end to identify which model to load, and **must be unique across all models**. If it collides, running the model produces:
 
@@ -728,7 +725,7 @@ if __name__ == "__main__":
 
 ### model.md
 
-Optional, and not created by the scaffold — add it yourself in the model directory. Use [Markdown syntax](https://www.markdownguide.org/basic-syntax/). Its contents appear in the **"You should know"** section of the results page; without the file, that section is omitted.
+Created by the scaffold as a skeleton listing suggested sections — replace those with your own write-up. Use [Markdown syntax](https://www.markdownguide.org/basic-syntax/). Its contents appear in the **"You should know"** section of the results page; delete the file and that section is omitted.
 
 Cover anything users should be aware of: limitations, data sources, assumptions, intended use. All three example models include one. From `example_stochastic_model/model.md`:
 

@@ -46,6 +46,7 @@ This creates `compartment/models/my_disease_model/` containing:
 - `__init__.py` — empty package marker
 - `model.py` — `MyDiseaseModel` with a minimal SIR (`define_parameters` + `equation`)
 - `main.py` — standard CLI wrapper around `drive_simulation()`
+- `model.md` — documentation skeleton listing the sections to write up
 - `example-config.json` — minimal runnable config wired to the template's edges
 
 ### Naming conventions
