@@ -911,20 +911,39 @@ class ModelParameterSchema:
             "disease_type": self.disease_type,
         }
 
-        # Transmission edges
+        # Transmission edges use the normalized join-table shape consumed by
+        # SimulationConfig and ValidationPostProcessor.  Keep values in the
+        # model schema's native units; Model._load_transmission_params() is the
+        # single place that converts DAYS / PERCENTAGE values to rates.
         if self.transmission_edges:
             edges = []
             for edge_def in self.transmission_edges:
+                edge_metadata = edge_def.to_dict()
                 edges.append(
                     {
-                        "source": edge_def.source,
-                        "target": edge_def.target,
-                        "data": {
-                            "transmission_rate": edge_def.parameter.default,
+                        "transmission_edge": {
+                            "source": edge_def.source,
+                            "target": edge_def.target,
+                            "value_type": edge_metadata["value_type"],
+                        },
+                        "value": edge_def.parameter.default,
+                        "FieldConfigs": {
+                            "items": [
+                                {
+                                    "field_key": "value",
+                                    "has_variance": False,
+                                    "distribution_type": "UNIFORM",
+                                    # Required for custom edges that are not in
+                                    # helpers.edge_to_variable.
+                                    "disease_param": edge_def.variable_name.upper(),
+                                }
+                            ]
                         },
                     }
                 )
-            disease["transmission_edges"] = edges
+            config_edges = {"items": edges}
+        else:
+            config_edges = None
 
         # Disease-specific params
         for param in self.disease_parameters:
@@ -948,17 +967,36 @@ class ModelParameterSchema:
             )
             config["end_date"] = val
 
+        # Emit the remaining declared simulation defaults.  run_mode is
+        # model-owned, so use the schema's derived value rather than the
+        # shared field's deterministic default for stochastic models.
+        for name, param in sim_params.items():
+            if name in {"start_date", "end_date"}:
+                continue
+            if name == "run_mode":
+                config[name] = self.run_mode
+            elif param.default is not None:
+                config[name] = param.default
+
         config["Disease"] = disease
+
+        if config_edges is not None:
+            config["TransmissionEdges"] = config_edges
 
         # --- Interventions stub ---
         if self.interventions:
-            interventions_list = []
+            intervention_items = []
             for intv_def in self.interventions:
-                intv: dict[str, Any] = {"id": intv_def.id}
+                intv: dict[str, Any] = {
+                    "Intervention": {
+                        "name": intv_def.id,
+                        "display_name": intv_def.label,
+                    }
+                }
                 for p in intv_def.parameters:
                     intv[p.name] = p.default
-                interventions_list.append(intv)
-            config["interventions"] = interventions_list
+                intervention_items.append(intv)
+            config["Interventions"] = {"items": intervention_items}
 
         # --- Case file with example zones ---
         base_zone_fields: dict[str, Any] = {

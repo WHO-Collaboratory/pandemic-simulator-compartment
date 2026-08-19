@@ -7,6 +7,8 @@ Run:
     python3 -m pytest tests/test_artifact.py -v
 """
 
+import json
+
 import pytest
 
 
@@ -147,3 +149,162 @@ class TestArtifactDiscovery:
         assert first_config is not second_config
         assert "first_only" in first_config.model_fields
         assert "second_only" in second_config.model_fields
+
+
+class TestExampleConfigGeneration:
+    """Generated examples use the same normalized shape as the runtime."""
+
+    def test_emits_normalized_runtime_sections(self):
+        from compartment.models.mpox_jax_model.model import MpoxJaxModel
+        from compartment.models.example_stochastic_model.model import (
+            ExampleStochasticModel,
+        )
+
+        example = MpoxJaxModel.generate_example_config()
+
+        assert "transmission_edges" not in example["Disease"]
+        assert "interventions" not in example
+        assert example["run_mode"] == "DETERMINISTIC"
+        assert example["simulation_type"] == "COMPARTMENTAL"
+        assert (
+            ExampleStochasticModel.generate_example_config()["run_mode"]
+            == "STOCHASTIC"
+        )
+
+        edge_items = example["TransmissionEdges"]["items"]
+        assert [item["value"] for item in edge_items] == [0.3, 10.0, 60.0]
+        assert [
+            item["transmission_edge"]["value_type"] for item in edge_items
+        ] == ["RATE", "DAYS", "DAYS"]
+        assert [
+            item["FieldConfigs"]["items"][0]["disease_param"]
+            for item in edge_items
+        ] == ["BETA", "GAMMA", "OMEGA"]
+
+        intervention = example["Interventions"]["items"][0]
+        assert intervention["Intervention"] == {
+            "name": "ring_vaccination",
+            "display_name": "Ring Vaccination",
+        }
+        assert intervention["adherence_min"] == 70.0
+        assert intervention["transmission_percentage"] == 75.0
+
+    def test_generated_config_round_trips_to_model_parameters(self, tmp_path):
+        from compartment.helpers import load_config_from_json
+        from compartment.models.mpox_jax_model.model import MpoxJaxModel
+        from compartment.validation import load_simulation_config
+
+        config_path = tmp_path / "example-config.json"
+        config_path.write_text(
+            json.dumps(MpoxJaxModel.generate_example_config()),
+            encoding="utf-8",
+        )
+
+        raw = load_config_from_json(str(config_path))
+        processed = load_simulation_config(raw, MpoxJaxModel.MODEL_KEY)
+
+        assert processed.transmission_dict == {
+            "beta": 0.3,
+            "gamma": 10.0,
+            "omega": 60.0,
+        }
+        assert processed.intervention_dict["ring_vaccination"][
+            "adherence_min"
+        ] == pytest.approx(0.7)
+        assert processed.intervention_dict["ring_vaccination"][
+            "transmission_percentage"
+        ] == pytest.approx(0.75)
+
+        # Exercise the model's schema-driven conversion without invoking its
+        # dataset-backed constructor.
+        model = MpoxJaxModel.__new__(MpoxJaxModel)
+        model._load_transmission_params(processed.transmission_dict)
+        assert model.beta == pytest.approx(0.3)
+        assert model.gamma == pytest.approx(0.1)
+        assert model.omega == pytest.approx(1 / 60)
+
+    def test_loader_upgrades_legacy_generated_sections(self, tmp_path):
+        from compartment.helpers import load_config_from_json
+        from compartment.models.test_klebsiella_amr_model.model import (
+            KlebsiellaAmrModel,
+        )
+
+        schema = KlebsiellaAmrModel._build_parameter_schema()
+        legacy = schema.to_example_config()
+
+        # Recreate the format emitted by the old generator. Klebsiella uses
+        # custom source/target pairs, so this also verifies schema-aware edge
+        # recovery rather than the small hardcoded fallback mapping.
+        legacy_edges = [
+            {
+                "source": edge.source,
+                "target": edge.target,
+                "data": {"transmission_rate": edge.parameter.default},
+            }
+            for edge in schema.transmission_edges
+        ]
+        legacy_edges[0]["data"]["variance_params"] = {
+            "has_variance": True,
+            "distribution_type": "UNIFORM",
+            "field_name": None,
+            "min": 0.005,
+            "max": 0.015,
+        }
+        legacy["Disease"]["transmission_edges"] = legacy_edges
+        legacy.pop("TransmissionEdges")
+        legacy_interventions = [
+            {
+                "id": intervention.id,
+                **{
+                    parameter.name: parameter.default
+                    for parameter in intervention.parameters
+                },
+            }
+            for intervention in schema.interventions
+        ]
+        legacy_interventions[0]["variance_params"] = [
+            {
+                "has_variance": True,
+                "distribution_type": "UNIFORM",
+                "field_name": "adherence_min",
+                "min": 70.0,
+                "max": 90.0,
+            }
+        ]
+        legacy["interventions"] = legacy_interventions
+        legacy.pop("Interventions")
+
+        config_path = tmp_path / "legacy-example-config.json"
+        config_path.write_text(json.dumps(legacy), encoding="utf-8")
+        job = load_config_from_json(str(config_path))["data"]["getSimulationJob"]
+
+        assert "transmission_edges" not in job["Disease"]
+        assert "interventions" not in job
+        assert [
+            item["FieldConfigs"]["items"][0]["disease_param"]
+            for item in job["TransmissionEdges"]["items"]
+        ] == [edge.variable_name.upper() for edge in schema.transmission_edges]
+        assert [
+            item["transmission_edge"]["value_type"]
+            for item in job["TransmissionEdges"]["items"]
+        ] == [edge.to_dict()["value_type"] for edge in schema.transmission_edges]
+        edge_variance = job["TransmissionEdges"]["items"][0]["FieldConfigs"][
+            "items"
+        ][0]
+        assert edge_variance["has_variance"] is True
+        assert edge_variance["min"] == 0.005
+        assert edge_variance["max"] == 0.015
+        assert [
+            item["Intervention"]["name"]
+            for item in job["Interventions"]["items"]
+        ] == [intervention.id for intervention in schema.interventions]
+        intervention_variance = job["Interventions"]["items"][0]["FieldConfigs"][
+            "items"
+        ][0]
+        assert intervention_variance == {
+            "field_key": "adherence_min",
+            "has_variance": True,
+            "distribution_type": "UNIFORM",
+            "min": 70.0,
+            "max": 90.0,
+        }
