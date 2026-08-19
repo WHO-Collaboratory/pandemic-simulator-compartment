@@ -180,6 +180,10 @@ class TestExampleConfigGeneration:
             item["FieldConfigs"]["items"][0]["disease_param"]
             for item in edge_items
         ] == ["BETA", "GAMMA", "OMEGA"]
+        assert all(
+            item["FieldConfigs"]["items"][0]["has_variance"] is False
+            for item in edge_items
+        )
 
         intervention = example["Interventions"]["items"][0]
         assert intervention["Intervention"] == {
@@ -188,6 +192,74 @@ class TestExampleConfigGeneration:
         }
         assert intervention["adherence_min"] == 70.0
         assert intervention["transmission_percentage"] == 75.0
+
+    def test_uncertainty_mode_uses_schema_declared_bounds(self):
+        from compartment.registry import resolve
+
+        covid_model = resolve("COVID_SEIHDR")
+        example = covid_model.generate_example_config(uncertainty=True)
+
+        assert example["run_mode"] == "UNCERTAINTY"
+        assert example["n_simulations"] == 30
+        assert "variance_params" not in example["Disease"]
+
+        edge_configs = {
+            item["FieldConfigs"]["items"][0]["disease_param"]: item[
+                "FieldConfigs"
+            ]["items"][0]
+            for item in example["TransmissionEdges"]["items"]
+        }
+        assert edge_configs["BETA"] == {
+            "field_key": "value",
+            "has_variance": True,
+            "distribution_type": "UNIFORM",
+            "disease_param": "BETA",
+            "min": 0.2,
+            "max": 0.3,
+        }
+        assert edge_configs["THETA"]["min"] == 2.0
+        assert edge_configs["THETA"]["max"] == 14.0
+        assert all(config["has_variance"] for config in edge_configs.values())
+
+        # Disease-specific parameters use the local config's inline variance
+        # representation rather than TransmissionEdges FieldConfigs.
+        klebsiella_model = resolve("KLEBSIELLA_AMR")
+        disease_example = klebsiella_model.generate_example_config(
+            uncertainty=True
+        )
+        disease_ranges = {
+            item["param"]: item
+            for item in disease_example["Disease"]["variance_params"]
+        }
+        assert disease_ranges["hospital_transmission_mult"] == {
+            "param": "hospital_transmission_mult",
+            "dist": "uniform",
+            "min": 5.0,
+            "max": 30.0,
+        }
+
+    def test_cli_uncertainty_flag(self, monkeypatch, capsys):
+        from compartment.generate_artifact import main
+
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "generate_artifact",
+                "COVID_SEIHDR",
+                "--example-config",
+                "--uncertainty",
+            ],
+        )
+
+        main()
+
+        example = json.loads(capsys.readouterr().out)
+        beta_config = example["TransmissionEdges"]["items"][0][
+            "FieldConfigs"
+        ]["items"][0]
+        assert beta_config["has_variance"] is True
+        assert beta_config["min"] == 0.2
+        assert beta_config["max"] == 0.3
 
     def test_generated_config_round_trips_to_model_parameters(self, tmp_path):
         from compartment.helpers import load_config_from_json

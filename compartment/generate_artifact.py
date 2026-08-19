@@ -11,6 +11,9 @@ Usage:
     # Generate an example simulation config instead
     python -m compartment.generate_artifact MPOX --example-config
 
+    # Generate an uncertainty-enabled example using schema-declared bounds
+    python -m compartment.generate_artifact MPOX --example-config --uncertainty
+
     # Generate both artifact and example config to files
     python -m compartment.generate_artifact MPOX --output artifact.json --example-config --config-output example.json
 """
@@ -143,6 +146,14 @@ def main():
         help="Generate an example simulation config instead of (or in addition to) the artifact.",
     )
     parser.add_argument(
+        "--uncertainty",
+        action="store_true",
+        help=(
+            "Enable schema-declared default uncertainty ranges in the example "
+            "config (requires --example-config)."
+        ),
+    )
+    parser.add_argument(
         "--config-output",
         help="Write example config to this file (only with --example-config).",
     )
@@ -169,6 +180,9 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.uncertainty and not args.example_config:
+        parser.error("--uncertainty requires --example-config")
 
     # --list mode
     if args.list_types or (args.disease_type is None and args.model_dir is None):
@@ -242,7 +256,7 @@ def main():
 
     # --- Example config ---
     if args.example_config:
-        example = schema.to_example_config()
+        example = schema.to_example_config(uncertainty=args.uncertainty)
         example_json = json.dumps(example, indent=4)
 
         if args.config_output:

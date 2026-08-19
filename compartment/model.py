@@ -496,14 +496,19 @@ class Model(ABC):
         return cls._build_parameter_schema().to_artifact_dict()
 
     @classmethod
-    def generate_example_config(cls) -> dict[str, Any]:
+    def generate_example_config(
+        cls, uncertainty: bool = False
+    ) -> dict[str, Any]:
         """
         Generate an example simulation config from parameter defaults.
 
         The output is in the "short-form" JSON format accepted by
-        ``load_config_from_json()``.
+        ``load_config_from_json()``. Pass ``uncertainty=True`` to enable every
+        variance-capable parameter that declares default uncertainty bounds.
         """
-        return cls._build_parameter_schema().to_example_config()
+        return cls._build_parameter_schema().to_example_config(
+            uncertainty=uncertainty
+        )
 
     # ------------------------------------------------------------------
     # Runtime helpers for schema-driven models

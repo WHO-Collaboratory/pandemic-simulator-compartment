@@ -893,7 +893,7 @@ class ModelParameterSchema:
         """Serialize the artifact dict to a JSON string."""
         return json.dumps(self.to_artifact_dict(), indent=indent)
 
-    def to_example_config(self) -> dict:
+    def to_example_config(self, uncertainty: bool = False) -> dict:
         """
         Generate an example simulation config JSON from parameter defaults.
 
@@ -903,8 +903,22 @@ class ModelParameterSchema:
         For required date fields that have no default, sensible placeholder
         values are generated automatically so the config is immediately
         runnable.
+
+        When ``uncertainty`` is true, parameters that opt into variance and
+        declare both ``default_min`` and ``default_max`` are enabled for
+        uniform sampling using those bounds.
         """
         from datetime import date, timedelta
+
+        def has_uncertainty_bounds(parameter: ParameterDef) -> bool:
+            return bool(
+                uncertainty
+                and parameter.enable_variance
+                and parameter.default_min is not None
+                and parameter.default_max is not None
+            )
+
+        uncertainty_fields_added = False
 
         # --- Disease section ---
         disease: dict[str, Any] = {
@@ -919,6 +933,23 @@ class ModelParameterSchema:
             edges = []
             for edge_def in self.transmission_edges:
                 edge_metadata = edge_def.to_dict()
+                field_config = {
+                    "field_key": "value",
+                    "has_variance": False,
+                    "distribution_type": "UNIFORM",
+                    # Required for custom edges that are not in
+                    # helpers.edge_to_variable.
+                    "disease_param": edge_def.variable_name.upper(),
+                }
+                if has_uncertainty_bounds(edge_def.parameter):
+                    field_config.update(
+                        {
+                            "has_variance": True,
+                            "min": edge_def.parameter.default_min,
+                            "max": edge_def.parameter.default_max,
+                        }
+                    )
+                    uncertainty_fields_added = True
                 edges.append(
                     {
                         "transmission_edge": {
@@ -927,18 +958,7 @@ class ModelParameterSchema:
                             "value_type": edge_metadata["value_type"],
                         },
                         "value": edge_def.parameter.default,
-                        "FieldConfigs": {
-                            "items": [
-                                {
-                                    "field_key": "value",
-                                    "has_variance": False,
-                                    "distribution_type": "UNIFORM",
-                                    # Required for custom edges that are not in
-                                    # helpers.edge_to_variable.
-                                    "disease_param": edge_def.variable_name.upper(),
-                                }
-                            ]
-                        },
+                        "FieldConfigs": {"items": [field_config]},
                     }
                 )
             config_edges = {"items": edges}
@@ -946,8 +966,21 @@ class ModelParameterSchema:
             config_edges = None
 
         # Disease-specific params
+        disease_variance = []
         for param in self.disease_parameters:
             disease[param.name] = param.default
+            if has_uncertainty_bounds(param):
+                disease_variance.append(
+                    {
+                        "param": param.name,
+                        "dist": "uniform",
+                        "min": param.default_min,
+                        "max": param.default_max,
+                    }
+                )
+                uncertainty_fields_added = True
+        if disease_variance:
+            disease["variance_params"] = disease_variance
 
         # --- Top-level simulation fields ---
         config: dict[str, Any] = {}
@@ -993,10 +1026,29 @@ class ModelParameterSchema:
                         "display_name": intv_def.label,
                     }
                 }
+                field_configs = []
                 for p in intv_def.parameters:
                     intv[p.name] = p.default
+                    if has_uncertainty_bounds(p):
+                        field_configs.append(
+                            {
+                                "field_key": p.name,
+                                "has_variance": True,
+                                "distribution_type": "UNIFORM",
+                                "min": p.default_min,
+                                "max": p.default_max,
+                            }
+                        )
+                        uncertainty_fields_added = True
+                if field_configs:
+                    intv["FieldConfigs"] = {"items": field_configs}
                 intervention_items.append(intv)
             config["Interventions"] = {"items": intervention_items}
+
+        if uncertainty_fields_added:
+            if self.run_mode != "STOCHASTIC":
+                config["run_mode"] = "UNCERTAINTY"
+            config["n_simulations"] = min(self.num_runs, 30)
 
         # --- Case file with example zones ---
         base_zone_fields: dict[str, Any] = {
