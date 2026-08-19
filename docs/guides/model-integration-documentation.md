@@ -39,22 +39,20 @@ Your model code is identical whether it runs locally on your own machine or remo
 
 Running locally, you hand the model a JSON file. In the Simulator, the frontend collects the user's choices and the backend supplies the population and geography — then passes them to your model in that same shape. So `example-config.json` is a stand-in for a filled-in UI form plus the backend data behind it, and a model that runs locally will run in the Simulator.
 
-Think of your model directory as having two halves: what the user can touch, and what only you control.
+Think of your model directory as having two halves: what the user can touch, and what only you control. The rule of thumb: **anything you declare on the `schema` becomes something a user can see or change. Anything you write in `equation()` is yours alone.** For example, if the modeler changes a default value when adding a transmission edge via `schema.add_transmission_edge()` this shows that new default value in the UI for every future user; rewriting `equation()` changes the model's behavior without changing the UI at all.
 
-| In your model | What it becomes in the UI |
-| :---- | :---- |
-| `example-config.json` | The user's form selections, plus backend data — populations from WorldPop, admin zone coordinates from OpenStreetMap. Editing it locally is you standing in for the user. |
-| `schema.set_model_info()` | Your model's name and description in the model picker. |
-| `schema.add_compartment()` | The compartments offered for the model, which users can select or deselect. |
-| `schema.add_transmission_edge()` | The arrows between compartments, each with a control whose default, minimum, and maximum are the ones you declared. |
-| `schema.add_parameter()` | An extra input field, for anything that isn't a flow between compartments. |
-| `schema.add_intervention()` | An intervention the user can switch on and give dates, adherence, and a transmission reduction. |
-| `schema.add_demographic_group()` | The age breakdown available for the run. |
-| `model.md` | The "You should know" panel on the results page. |
-| `main.py` | The file that starts a run. Locally you launch it yourself from the terminal; in the Simulator the platform launches it for you when a user starts a simulation. |
-| `equation()` | **Nothing.** It runs only in the backend. No UI user can see or change it. |
-
-The rule of thumb: **anything you declare on the `schema` becomes something a user can see or change. Anything you write in `equation()` is yours alone.** Widening a parameter's `min_value` widens a slider for every future user; rewriting `equation()` changes the model's behavior without changing the UI at all.
+| Model component | Location | Representation in the UI |
+| :---- | :---- | :---- |
+| `schema.set_model_info()` | `model.py` | Your model's name and description in the model picker. |
+| `schema.add_compartment()` | `model.py` | The compartments offered for the model, which users can select or deselect. |
+| `schema.add_transmission_edge()` | `model.py` | The arrows between compartments, each with a control whose default, minimum, and maximum are the ones you declared. |
+| `schema.add_parameter()` | `model.py` | An extra input field, for anything that isn't a flow between compartments. |
+| `schema.add_intervention()` | `model.py` | An intervention the user can switch on and give dates, adherence, and a transmission reduction. |
+| `schema.add_demographic_group()` | `model.py` | The age breakdown available for the run. |
+| `equation()` | `model.py` | **Nothing.** It runs only in the backend. No UI user can see or change it. |
+| `example-config.json` | standalone file | The user's form selections, plus backend data — populations from WorldPop, admin zone coordinates from OpenStreetMap. Editing it locally is you standing in for the user. |
+| `model.md` | standalone file | The "You should know" panel on the results page. |
+| `main.py` | standalone file | The file that starts a run. Locally you launch it yourself from the terminal; in the Simulator the platform launches it for you when a user starts a simulation. |
 
 A local run also produces the same results JSON the Simulator charts, which is why the [results viewer](#visualize-model-results) looks like the results page.
 
