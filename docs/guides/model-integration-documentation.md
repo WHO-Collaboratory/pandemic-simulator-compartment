@@ -6,7 +6,7 @@ This documentation describes the steps required to integrate a compartmental mod
 
 Two roles recur throughout this document: a **user** runs a model from the Pandemic Simulator's front end, choosing location, parameter values, and interventions through the interface, while a **modeler** writes the model code that runs in the backend so that users can run it. One person can be both; this guide is written for modelers.
 
-The Pandemic Simulator supports **deterministic** compartmental models, models with **parameter uncertainty** (Latin Hypercube Sampling), and **stochastic** models. After running a simulation, users can compare results across models, evaluate intervention scenarios alongside control (no-intervention) simulations, and view AI-generated interpretations of the results.
+The Pandemic Simulator supports **deterministic** compartmental models, models with **parameter uncertainty** (Latin Hypercube Sampling), and **stochastic** models. After running a simulation, users can compare results across all models, evaluate intervention scenarios alongside control (no-intervention) simulations, and view AI-generated interpretations of the results.
 
 ### How to read the commands in this guide
 
@@ -25,9 +25,9 @@ example --with --everything-on-one-line
 
 The only routine differences are line continuations (`\` on macOS/Linux, not supported in Command Prompt) and path separators (`/` vs `\`).
 
-### The example models
+### Example models
 
-This guide follows three models that ship with the repository. Read the one closest to what you are building.
+This guide follows three models that ship with the repository.
 
 | Directory | `disease_type` | What it demonstrates |
 | :---- | :---- | :---- |
@@ -66,6 +66,7 @@ A local run also produces the same results JSON the Simulator charts, which is w
 - [Initial environment setup](#initial-environment-setup)
   - [Cloning the repository](#cloning-the-repository)
   - [Installing Python](#installing-python)
+  - [Installing uv](#installing-uv)
   - [Create a virtual environment](#create-a-virtual-environment)
   - [Git workflow](#git-workflow)
 - [Add a new model](#add-a-new-model)
@@ -114,6 +115,8 @@ git --version
 
 Move to where you want the repository stored, then clone it. HTTPS is easiest for new users; SSH avoids repeated authentication prompts.
 
+The examples below clone into the Desktop, which this guide uses as its example location throughout. The repository can live in any directory you like — substitute your own path wherever you see `~/Desktop` (macOS/Linux) or `%USERPROFILE%\Desktop` (Windows).
+
 **macOS / Linux**
 ```shell
 cd ~/Desktop
@@ -140,11 +143,13 @@ git remote -v
 Useful commands after cloning (`git branch -a` opens a pager — type `q` to exit):
 
 ```shell
-git branch -a                      # list branches
-git pull                           # download latest changes
-git checkout -b my-feature-branch  # create a branch
-git log --oneline                  # view commit history
+git branch -a                              # list branches
+git pull                                   # download latest changes
+git checkout -b add-example-disease-model  # create a branch
+git log --oneline                          # view commit history
 ```
+
+> This guide uses `add-example-disease-model` as the working branch, matching the example model it builds. Name your branch after the model you are adding, and use that name wherever this guide shows `add-example-disease-model`.
 
 **Troubleshooting**
 
@@ -181,28 +186,62 @@ python --version
 
 **Optional but recommended:** install [Visual Studio Code](https://code.visualstudio.com/) and its **Python** extension.
 
-### Create a virtual environment
+### Installing uv
 
-`uv` is the recommended environment manager for this project: it installs dependencies faster and matches the project's development workflow.
-
-From the repository root:
-
-```shell
-uv venv
-uv sync
-```
-
-Activate the environment. **Do this every time you open a new terminal.**
+`uv` is the environment and dependency manager for this project: it installs dependencies faster and matches the project's development workflow. It is a separate tool, so install it once before setting up the environment.
 
 **macOS / Linux**
 ```shell
-source .venv/bin/activate
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 **Windows Command Prompt**
 ```shell
-.venv\Scripts\activate.bat
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
+
+If you would rather use a package manager you already have, `pip install uv`, `brew install uv` (macOS), and `winget install --id=astral-sh.uv -e` (Windows) all work too.
+
+Open a new terminal so the updated PATH takes effect, then verify:
+
+```shell
+uv --version
+```
+
+**Troubleshooting**
+
+- `uv is not recognized as a command` — the installer updated your PATH, but the terminal you ran it in still has the old one. Close it and open a new one.
+- Installed with `pip` while a virtual environment was active — `uv` then exists only inside that environment. Install it with one of the commands above instead, outside any environment.
+
+Reference: [uv installation docs](https://docs.astral.sh/uv/getting-started/installation/)
+
+### Create a virtual environment
+
+Run these three steps from the repository root the first time you set up a clone: create the environment, activate it, then install the project's dependencies into it.
+
+1. **Create the environment.** This makes a `.venv/` folder in the repository, isolated from your system Python.
+
+   ```shell
+   uv venv
+   ```
+
+2. **Activate it. Do this every time you open a new terminal**, not just the first time.
+
+   **macOS / Linux**
+   ```shell
+   source .venv/bin/activate
+   ```
+
+   **Windows Command Prompt**
+   ```shell
+   .venv\Scripts\activate.bat
+   ```
+
+3. **Install the dependencies** into the activated environment. Re-run this whenever the project's dependencies change.
+
+   ```shell
+   uv sync
+   ```
 
 Confirm the right environment is active:
 
@@ -911,28 +950,6 @@ python -m compartment.generate_artifact example_stochastic
 python -m compartment.generate_artifact example_stochastic --output artifact.json
 ```
 
-To generate an artifact for every model registered in a model directory, writing each to its own file:
-
-**macOS / Linux**
-```shell
-python -m compartment.generate_artifact \
-    --model-dir compartment/models/example_parameter_uncertainty_declarative_model \
-    --output-dir compartment/models/example_parameter_uncertainty_declarative_model/artifacts
-```
-
-**Windows Command Prompt**
-```shell
-python -m compartment.generate_artifact --model-dir compartment\models\example_parameter_uncertainty_declarative_model --output-dir compartment\models\example_parameter_uncertainty_declarative_model\artifacts
-```
-
-Each file is named after the disease type it was generated from:
-
-```
-Artifact written to .../artifacts/example_parameter_uncertainty_declarative.json
-```
-
-**Note:** `compartment/models/*/artifacts/` is in `.gitignore`, so generated artifacts stay local and are not committed.
-
 ---
 
 ## Install additional packages
@@ -1094,7 +1111,7 @@ Once your model runs and passes tests, open a pull request so WHO Collaboratory 
 3. **Push your branch**
 
    ```shell
-   git push origin my-feature-name
+   git push origin add-example-disease-model
    ```
 
 4. **Open the pull request.** After `git push`, the terminal output usually includes a `Create a pull request` link (a GitHub URL for your branch) — Cmd-click (or Ctrl-click) it to open the PR form directly in your browser. Otherwise go to the repository on GitHub, where a yellow banner reading **"Compare & pull request"** usually appears at the top of the page just after pushing — click it to jump straight to the PR form. If neither shows up, open the **Pull requests** tab, click **New pull request**, and pick your branch manually. Either way, confirm **base** is set to `main` and **compare** is set to your feature branch, then click **Create pull request**.
