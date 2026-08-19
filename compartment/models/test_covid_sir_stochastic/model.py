@@ -29,6 +29,13 @@ class CovidSirStochasticModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare the stochastic SIR compartments, edges, and parameters.
+
+        Args:
+            schema (ParameterSchemaBuilder): Schema builder to populate with
+                model info, the S/I/R compartments, the ``beta`` and ``gamma``
+                transmission edges, and the stochastic run count.
+        """
         schema.set_model_info(
             disease_type="COVID_SIR_STOCHASTIC",
             label="COVID-19 Stochastic SIR",
@@ -85,6 +92,17 @@ class CovidSirStochasticModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, input):
+        """Initialize the model and seed its PRNG for stochastic draws.
+
+        Falls back to ``beta = 0.4`` and a 7-day recovery period when the config
+        omits them. A ``seed`` in the config gives reproducible trajectories;
+        otherwise the PRNG is seeded from system entropy.
+
+        Args:
+            input (dict): Validated simulation configuration providing
+                ``initial_population``, ``transmission_dict``, ``start_date``,
+                ``time_steps``, ``admin_units``, and an optional ``seed``.
+        """
         self.population_matrix = np.array(input["initial_population"]).T
         self.compartment_list = list(self.COMPARTMENTS)
 
@@ -114,15 +132,31 @@ class CovidSirStochasticModel(Model):
         self._key = jax.random.PRNGKey(seed)
 
     def prepare_initial_state(self):
+        """Return the initial compartment populations for the solver.
+
+        Returns:
+            jnp.ndarray: Population matrix (compartments x admin zones)
+                used as the solver's initial state.
+        """
         # No inter-zone travel — the base class supplies the identity matrix.
         return self.population_matrix
 
     def equation(self, y, t, p):
-        """Tau-leaping stochastic step.
+        """Tau-leaping stochastic SIR step.
 
-        Returns the *change* (delta) for one timestep so the Euler
-        integrator y_{t+1} = y_t + dt * equation gives the correct
-        stochastic update.
+        Returns the per-step change (delta); the Euler integrator applies
+        ``y_{t+1} = y_t + dt * equation(...)``. Infection and recovery counts are
+        Poisson draws around the deterministic rates, clamped so no more
+        individuals move than exist.
+
+        Args:
+            y (jnp.ndarray): Current compartment values, ordered by
+                ``compartment_list``.
+            t (float): Current time in days since the simulation start date.
+            p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
+
+        Returns:
+            jnp.ndarray: Stacked per-compartment deltas for this step.
         """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)

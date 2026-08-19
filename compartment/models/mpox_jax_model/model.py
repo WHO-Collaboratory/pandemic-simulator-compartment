@@ -30,6 +30,15 @@ class MpoxJaxModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare the SIRS compartments, edges, mobility fields, and intervention.
+
+        Declares the S->I, I->R, and waning R->S edges, the cumulative ``I_total``
+        tracker, the ring-vaccination intervention, and the exponential
+        distance-decay mobility fields consumed by ``build_travel_matrix``.
+
+        Args:
+            schema (ParameterSchemaBuilder): Schema builder to populate.
+        """
         schema.set_model_info(
             disease_type="MPOX",
             label="MPOX",
@@ -148,7 +157,18 @@ class MpoxJaxModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, input):
-        """Initialize the MPOX SIRS model with a configuration dictionary"""
+        """Initialise the MPOX SIRS model from a configuration dictionary.
+
+        Sets up the population matrix, transmission parameters, simulation window,
+        mobility fields, ring-vaccination state, and the modeler-supplied
+        transition-multiplier schedule.
+
+        Args:
+            input (dict): Simulation configuration with ``initial_population``,
+                ``transmission_dict``, ``start_date``, ``time_steps``,
+                ``admin_units``, and optional ``Disease`` and
+                ``intervention_dict`` blocks.
+        """
         # Population data
         self.population_matrix = np.array(input["initial_population"]).T
         self.compartment_list = list(self.COMPARTMENTS)
@@ -181,7 +201,16 @@ class MpoxJaxModel(Model):
         self.payload = input
 
     def _load_transition_schedule(self):
-        """Load a region-independent event-rate schedule from modeler data."""
+        """Load a region-independent event-rate schedule from modeler data.
+
+        Validates that the dataset has ``day``, ``infection``, and ``recovery``
+        columns, starts at day 0, has unique increasing days, and no negative
+        multipliers.
+
+        Returns:
+            dict: Maps each of ``day``, ``infection``, and ``recovery`` to its
+                column as a ``jnp.ndarray``.
+        """
         table = pd.read_csv(self.dataset("mpox-transition-multipliers"))
         required = {"day", "infection", "recovery"}
         missing = required - set(table.columns)
@@ -200,7 +229,16 @@ class MpoxJaxModel(Model):
         }
 
     def _transition_multiplier(self, transition, t):
-        """Interpolate a transition multiplier for elapsed simulation day ``t``."""
+        """Interpolate a transition multiplier for elapsed simulation day ``t``.
+
+        Args:
+            transition (str): Schedule column to read, ``"infection"`` or
+                ``"recovery"``.
+            t (float): Elapsed simulation time in days.
+
+        Returns:
+            jnp.ndarray: Multiplier interpolated from the transition schedule.
+        """
         return np.interp(
             t,
             self.transition_schedule["day"],
@@ -212,24 +250,38 @@ class MpoxJaxModel(Model):
     # ------------------------------------------------------------------
 
     def build_travel_matrix(self, admin_zones):
-        """
-        Exponential distance-decay mobility driven by the ``travel_sigma``
-        and ``travel_scale_km`` custom fields.
+        """Build the exponential distance-decay mobility matrix.
+
+        Driven by the ``travel_sigma`` and ``travel_scale_km`` custom fields.
+
+        Args:
+            admin_zones (list[dict]): Admin-zone dicts with ``center_lat``,
+                ``center_lon``, and ``population``.
+
+        Returns:
+            np.ndarray: Travel matrix of shape (n_zones, n_zones).
         """
         sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
         return self.mobility(admin_zones, sigma, scale_km=self.travel_scale_km)
 
     def mobility(self, admin_zones, sigma, scale_km=500.0):
-        """
-        Simple exponential distance-decay mobility model built from case file admin zones.
+        """Build an exponential distance-decay travel matrix from admin zones.
 
-        Flow from zone i to zone j is proportional to:
-            population_j * exp(-distance_ij / scale_km)
+        Flow from zone ``i`` to zone ``j`` is proportional to
+        ``population_j * exp(-distance_ij / scale_km)``, using great-circle
+        distances. Returns the identity matrix for a single zone or zero sigma.
 
-        sigma controls the overall leaving rate (fraction of population that
-        travels out of each zone per timestep). Returns an (n x n) travel
-        matrix where entry [i, j] is the fraction of zone i's population
-        present in zone j.
+        Args:
+            admin_zones (list[dict]): Admin-zone dicts with ``center_lat``,
+                ``center_lon``, and ``population``.
+            sigma (float): Fraction (0-1) of each zone's population travelling out
+                per timestep.
+            scale_km (float): Characteristic decay distance in km.
+
+        Returns:
+            np.ndarray: Travel matrix of shape (n_zones, n_zones) whose entry
+                ``[i, j]`` is the fraction of zone ``i``'s population present in
+                zone ``j``.
         """
         n = len(admin_zones)
         if n <= 1 or sigma == 0.0:
@@ -271,13 +323,23 @@ class MpoxJaxModel(Model):
     # ------------------------------------------------------------------
 
     def ring_vaccination_intervention(self, beta, t, prop_infective):
-        """
-        Mpox ring vaccination intervention defined on the disease class.
+        """Apply the mpox ring-vaccination reduction to the transmission rate.
 
         Activates either when the simulation date falls within the configured
-        window (date-based) or when the proportion of infectives crosses the
-        start threshold (threshold-based). Reduces beta by
-        adherence * transmission_reduction while active.
+        window (date-based) or when the proportion of infectives crosses the start
+        threshold (threshold-based), and reduces beta by
+        ``adherence * transmission_reduction`` while active. Returns beta unchanged
+        when the intervention is not configured.
+
+        Args:
+            beta (jnp.ndarray): Baseline transmission rate before the reduction.
+            t (float): Elapsed simulation time in days since ``start_date``.
+            prop_infective (jnp.ndarray): Current proportion of the population
+                that is infectious, used for threshold activation.
+
+        Returns:
+            tuple: The possibly reduced beta and the updated intervention-status
+                dict.
         """
         cfg = self.intervention_dict.get("ring_vaccination")
         if cfg is None:
@@ -335,10 +397,31 @@ class MpoxJaxModel(Model):
     # ------------------------------------------------------------------
 
     def prepare_initial_state(self):
+        """Return the initial compartment populations for the solver.
+
+        Returns:
+            jnp.ndarray: Population matrix of shape (n_compartments, n_zones).
+        """
         # The travel matrix is built by the framework via build_travel_matrix().
         return self.population_matrix
 
     def equation(self, y, t, p):
+        """Compute the SIRS compartment derivatives for one integration step.
+
+        The I->R and R->S edges are handled by the base class, while the S->I flow
+        is applied manually so the force of infection can be coupled across zones
+        through the travel matrix. Ring vaccination and the scheduled transition
+        multipliers scale the rates before the flows are computed.
+
+        Args:
+            y (jnp.ndarray): Current compartment values, ordered by
+                ``compartment_list``.
+            t (float): Current time in days since the simulation start date.
+            p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
+
+        Returns:
+            jnp.ndarray: Stacked per-compartment derivatives (dy/dt).
+        """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)
 

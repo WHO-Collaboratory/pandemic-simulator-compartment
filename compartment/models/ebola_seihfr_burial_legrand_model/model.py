@@ -73,6 +73,16 @@ class EbolaSeihfrBurialLegrandModel(Model):
 
     @classmethod
     def _add_total_compartments(cls, schema):
+        """Append this model's fixed cumulative ``_total`` compartments.
+
+        Replaces the framework's per-edge auto-generation, which would only
+        produce ``I_total`` and ``R_total``; the remaining trackers follow manual
+        multi-rate flows and are assigned explicitly in ``equation``.
+
+        Args:
+            schema (ModelParameterSchema): Schema whose ``compartments`` list
+                receives one entry per ``_TOTAL_COMPARTMENTS`` definition.
+        """
         # Replaces the framework's per-edge auto-generation entirely: every
         # _total this model needs is declared below, in a fixed order, and its
         # derivative is assigned explicitly at the end of equation().
@@ -83,6 +93,16 @@ class EbolaSeihfrBurialLegrandModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare the SEIHFR compartments, parameters, and control interventions.
+
+        Declares the two simple transmission edges (E->I incubation, F->R burial),
+        the community/hospital/burial transmission coefficients as day-scaled
+        Legrand et al. 2007 DRC 1995 estimates, the raw durations feeding the
+        derived exit-split rates, and one intervention per transmission route.
+
+        Args:
+            schema (ParameterSchemaBuilder): Schema builder to populate.
+        """
         schema.set_model_info(
             disease_type="ebola-seihfr-burial-legrand",
             label="Ebola (SEIHFR, Community/Hospital/Burial) — Legrand et al. 2007",
@@ -351,6 +371,14 @@ class EbolaSeihfrBurialLegrandModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, config):
+        """Initialise the model from the validated configuration.
+
+        The source model has no inter-zone travel and no demographic
+        stratification, so no extra setup is needed beyond the base class.
+
+        Args:
+            config (dict): Validated simulation configuration.
+        """
         super().__init__(config)
         # No inter-zone travel and no demographic stratification in the
         # source model — nothing further to set up here.
@@ -360,6 +388,11 @@ class EbolaSeihfrBurialLegrandModel(Model):
     # ------------------------------------------------------------------
 
     def prepare_initial_state(self):
+        """Return the initial compartment populations for the solver.
+
+        Returns:
+            jnp.ndarray: Population matrix of shape (n_compartments, n_zones).
+        """
         return self.population_matrix
 
     # ------------------------------------------------------------------
@@ -369,14 +402,20 @@ class EbolaSeihfrBurialLegrandModel(Model):
     def equation(self, y, t, p):
         """Compute the SEIHFR compartment derivatives for one integration step.
 
+        Mixes the community, hospital, and burial transmission coefficients into a
+        single S->E force of infection, then derives the theta1/delta1/delta2 exit
+        splits for I and H from gamma_h, gamma_i, gamma_d and the target
+        hospitalisation and case-fatality proportions (Legrand et al. 2007).
+
         Args:
-            y: Current compartment values, ordered by ``compartment_list``.
-            t: Current time in days since the simulation start date.
-            p: Packed transmission-edge parameter tuple (alpha, gamma_f),
+            y (jnp.ndarray): Current compartment values, ordered by
+                ``compartment_list``.
+            t (float): Current time in days since the simulation start date.
+            p (tuple): Packed transmission-edge parameter tuple (alpha, gamma_f),
                 unpacked via ``_unpack_params``.
 
         Returns:
-            The stacked per-compartment derivatives (dy/dt).
+            jnp.ndarray: Stacked per-compartment derivatives (dy/dt).
         """
         states = {c: y[i] for i, c in enumerate(self.compartment_list)}
         params = self._unpack_params(p)

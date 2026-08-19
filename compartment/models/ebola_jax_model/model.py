@@ -58,12 +58,30 @@ class EbolaJaxModel(Model):
 
     @classmethod
     def _add_total_compartments(cls, schema):
+        """Suppress the framework's automatic per-edge ``_total`` compartments.
+
+        This model declares its own aggregate cumulative compartments
+        (``E_total`` ... ``R_total``) in ``define_parameters`` instead.
+
+        Args:
+            schema (ModelParameterSchema): Schema left deliberately unchanged.
+        """
         # Suppress framework auto-generation; we declare our own aggregate
         # cumulative compartments below in define_parameters().
         return
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare compartments, transmission edges, parameters, and interventions.
+
+        Builds the Erlang(2) linear-chain structure (S, E1/E2, I1/I2, H1/H2,
+        Funeral, R) plus aggregate cumulative trackers, the ETU and funeral
+        transmission-risk parameters, gravity-model mobility, and the stochastic
+        run count (Li et al. 2019; Getz & Dougherty 2018).
+
+        Args:
+            schema (ParameterSchemaBuilder): Schema builder to populate.
+        """
         schema.set_model_info(
             disease_type="EBOLA",
             label="Ebola Virus Disease",
@@ -265,9 +283,19 @@ class EbolaJaxModel(Model):
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
         """Distribute each zone's population across S and I1/I2 (50/50 split).
 
-        The 50/50 I1/I2 split approximates steady-state Erlang(2) seeding;
-        the chain relaxes to the correct distribution within a few simulated
-        days regardless of the initial split.
+        The 50/50 I1/I2 split approximates steady-state Erlang(2) seeding; the
+        chain relaxes to the correct distribution within a few simulated days
+        regardless of the initial split.
+
+        Args:
+            admin_zones (list[dict]): Admin-zone dicts providing ``population``
+                and the ``infected_population`` percentage.
+            compartment_list (list[str]): Ordered compartment names, used for
+                column indexing.
+            **kwargs (Any): Additional keyword arguments (unused).
+
+        Returns:
+            np.ndarray: Initial populations of shape (n_zones, n_compartments).
         """
         col = {v: i for i, v in enumerate(compartment_list)}
         pop = onp.zeros((len(admin_zones), len(compartment_list)))
@@ -288,6 +316,18 @@ class EbolaJaxModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, config):
+        """Initialise the model, derive Erlang(2) step probabilities, and seed the PRNG.
+
+        Converts the mean exposed and infectious periods into per-step Erlang(k=2)
+        transition probabilities (``p = 1 - exp(-k / mean_period)`` at ``dt = 1``
+        day), reads the community/ETU/funeral proportions from the ``Disease``
+        config block, and fixes the FOI denominator to the initial population sum.
+
+        Args:
+            config (dict): Validated simulation configuration. A ``seed`` entry
+                gives reproducible trajectories; otherwise the PRNG is seeded from
+                the clock.
+        """
         super().__init__(config)
 
         if self.beta is None:
@@ -318,14 +358,29 @@ class EbolaJaxModel(Model):
     # ------------------------------------------------------------------
 
     def build_travel_matrix(self, admin_zones):
-        """
-        Inverse-square gravity mobility driven by the ``travel_sigma``
-        custom field, used for spatial FOI mixing in ``equation()``.
+        """Build the inverse-square gravity mobility matrix.
+
+        Driven by the ``travel_sigma`` custom field and used for spatial FOI
+        mixing in ``equation``.
+
+        Args:
+            admin_zones (list[dict]): Admin-zone dicts with ``center_lat``,
+                ``center_lon``, and ``population``.
+
+        Returns:
+            np.ndarray: Travel matrix of shape (n_zones, n_zones) whose entry
+                ``[i, j]`` is the fraction of zone ``i``'s population present in
+                zone ``j``.
         """
         sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
         return get_gravity_model_travel_matrix(admin_zones, sigma)
 
     def prepare_initial_state(self):
+        """Return the initial compartment populations for the integrator.
+
+        Returns:
+            jnp.ndarray: Population matrix of shape (n_compartments, n_zones).
+        """
         return self.population_matrix
 
     # ------------------------------------------------------------------
@@ -333,10 +388,22 @@ class EbolaJaxModel(Model):
     # ------------------------------------------------------------------
 
     def equation(self, y, t, p):
-        """Per-timestep change for the discrete stochastic Erlang(2) chain model.
+        """Compute the per-step deltas for the discrete stochastic Erlang(2) chain.
 
         With ``STOCHASTIC = True`` the framework uses Euler integration:
-        ``y_{t+1} = y_t + 1 * equation(y_t, t, p)``.
+        ``y_{t+1} = y_t + 1 * equation(y_t, t, p)``. Transitions are binomial draws
+        on the per-step probabilities, and the force of infection combines
+        community, ETU, and funeral infectiousness mixed across zones by the
+        travel matrix.
+
+        Args:
+            y (jnp.ndarray): Current compartment values, ordered by
+                ``compartment_list``.
+            t (float): Current time in days since the simulation start date.
+            p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
+
+        Returns:
+            jnp.ndarray: Stacked per-compartment deltas for this step.
         """
         params = self._unpack_params(p)
         beta = params["beta"]
@@ -382,6 +449,16 @@ class EbolaJaxModel(Model):
         self._key = keys[0]
 
         def _binom(key, n, p):
+            """Draw binomial transition counts, clamped to the available population.
+
+            Args:
+                key (jnp.ndarray): PRNG key for this draw.
+                n (jnp.ndarray): Per-zone population available to transition.
+                p (jnp.ndarray): Per-step transition probability.
+
+            Returns:
+                jnp.ndarray: Event counts, never negative and never exceeding ``n``.
+            """
             n = jnp.maximum(n, 0.0)
             draw = jax.random.binomial(key, n, p).astype(n.dtype)
             return jnp.minimum(draw, n)

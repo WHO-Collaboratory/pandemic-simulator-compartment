@@ -17,9 +17,10 @@ class ExampleParameterUncertaintyCustomModel(Model):
         config validator and parameter set are generated.
 
         Args:
-            schema: The schema builder to populate with model info,
-                compartments, transmission edges, disease parameters, and the
-                intervention consumed by ``custom_intervention``.
+            schema (ParameterSchemaBuilder): Schema builder to populate with
+                model info, compartments, transmission edges, disease
+                parameters, and the intervention consumed by
+                ``custom_intervention``.
         """
         schema.set_model_info(
             disease_type="example_parameter_uncertainty_custom",
@@ -127,7 +128,7 @@ class ExampleParameterUncertaintyCustomModel(Model):
         """Initialize the model from a validated simulation config.
 
         Args:
-            config: The validated simulation configuration produced by the
+            config (dict): Validated simulation configuration produced by the
                 framework's config loader.
         """
         super().__init__(config)
@@ -147,41 +148,35 @@ class ExampleParameterUncertaintyCustomModel(Model):
         """Return the initial compartment populations for the solver.
 
         Returns:
-            The population matrix (admin zones x compartments) used as the
-            solver's initial state.
+            jnp.ndarray: Population matrix (compartments x admin zones) used as
+                the solver's initial state.
         """
         return self.population_matrix
 
 
     def custom_intervention(self, t, beta):
-        """Example of a custom intervention written by hand.
+        """Scale ``beta`` by a hand-written intervention that ramps gradually.
 
-        This replaces the built-in ``_apply_interventions`` helper so you can
-        see exactly what an intervention does. It reads the ``my_intervention``
-        settings (adherence, transmission reduction, and active date window)
-        from the config-loaded intervention object, but instead of switching on
-        and off instantly it **ramps gradually**:
-
-        - adherence climbs linearly from baseline to full over ``ramp_up_days``
-          starting on the intervention's start date,
-        - holds at full effect through the window, then
-        - falls linearly back to baseline over ``ramp_down_days`` after the end
-          date.
-
-        ``ramp_up_days`` and ``ramp_down_days`` are read from the config's
-        "Disease" block (see ``define_parameters``).
-
-        The full effect matches the framework's formula,
-        ``beta * (1 - adherence * transmission_reduction)``, scaled by the ramp.
-        ``jnp.clip`` keeps this JAX-traceable since ``t`` is a traced value.
+        Replaces the built-in ``_apply_interventions`` helper. Reads the
+        ``my_intervention`` adherence, transmission reduction, and active date
+        window from the config-loaded intervention object, then instead of
+        switching on and off instantly it climbs linearly from baseline to full
+        effect over ``ramp_up_days`` from the start date, holds through the
+        window, and falls back to baseline over ``ramp_down_days`` after the end
+        date (both read from the config's "Disease" block). The full effect
+        matches the framework's ``beta * (1 - adherence *
+        transmission_reduction)``, scaled by the ramp; ``jnp.clip`` keeps this
+        JAX-traceable since ``t`` is a traced value.
 
         Args:
-            t: Current time in days since the simulation start date (a traced
-                JAX value).
-            beta: The baseline transmission rate to scale.
+            t (float): Current time in days since the simulation start date (a
+                traced JAX value).
+            beta (float): Baseline transmission rate to scale.
 
         Returns:
-            The transmission rate after applying the ramped intervention.
+            jnp.ndarray: Transmission rate after applying the ramped
+                intervention, or ``beta`` unchanged when the intervention is not
+                configured (as in the control run).
         """
         # Look up the intervention loaded from config by its schema id. The
         # ``id in self.intervention_dict`` check matches the built-in helper so
@@ -234,12 +229,13 @@ class ExampleParameterUncertaintyCustomModel(Model):
         to the transmission rate instead of the built-in intervention helper.
 
         Args:
-            y: Current compartment values, ordered by ``compartment_list``.
-            t: Current time in days since the simulation start date.
-            p: Packed parameter tuple, unpacked via ``_unpack_params``.
+            y (jnp.ndarray): Current compartment values, ordered by
+                ``compartment_list``.
+            t (float): Current time in days since the simulation start date.
+            p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
 
         Returns:
-            The stacked per-compartment derivatives (dy/dt).
+            jnp.ndarray: Stacked per-compartment derivatives (dy/dt).
         """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)

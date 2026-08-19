@@ -27,6 +27,16 @@ class DengueJaxModel(Model):
 
     @classmethod
     def _add_total_compartments(cls, schema):
+        """Suppress the framework's automatic per-edge ``_total`` compartments.
+
+        This model declares its own aggregate cumulative compartments
+        (``E_total``, ``I_total``, and so on) spanning all four serotypes in
+        ``define_parameters`` instead.
+
+        Args:
+            schema (ModelParameterSchema): The schema, intentionally left
+                unchanged.
+        """
         # Suppress framework auto-generation of per-edge _total
         # compartments.  Dengue declares its own aggregate totals
         # (E_total, I_total, etc.) covering all serotypes.
@@ -57,6 +67,19 @@ class DengueJaxModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare the dengue compartments, parameters, and interventions.
+
+        The 4-serotype x 2-infection compartment structure is fixed, so
+        compartments are enumerated explicitly rather than derived from
+        transmission edges. Also declares the gravity-model travel rate, the
+        seroprevalence and temperature admin-zone fields, and the bite-reduction
+        and vector-control interventions.
+
+        Args:
+            schema (ParameterSchemaBuilder): The schema builder to populate with
+                model info, metadata, compartments, disease parameters, admin
+                zone fields, and interventions.
+        """
         schema.set_model_info(
             disease_type="VECTOR_BORNE",
             label="Dengue (4-serotype)",
@@ -408,6 +431,19 @@ class DengueJaxModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, config):
+        """Initialize compartment state, temperature inputs, and rate constants.
+
+        Unpacks the fixed compartment layout, demographics, temperature, and
+        intervention blocks directly, then converts the ``Disease`` parameters
+        from mean durations in days into per-day rates. A zero cross-immunity
+        period yields a rate of 0 (no waning out of cross-protection).
+
+        Args:
+            config (dict): Validated simulation config providing
+                ``initial_population``, ``start_date``, ``time_steps``,
+                ``admin_units``, ``case_file``, ``hemisphere``, ``temperature``,
+                an optional ``intervention_dict``, and the ``Disease`` block.
+        """
         self.population_matrix = np.array(config["initial_population"])
         self.compartment_list = list(self.COMPARTMENTS)
 
@@ -437,6 +473,16 @@ class DengueJaxModel(Model):
         disease_cfg = config.get("Disease", {})
 
         def _get(key, default):
+            """Read a ``Disease`` parameter, falling back when it is unset.
+
+            Args:
+                key (str): Parameter name within the ``Disease`` config block.
+                default (float | int): Value to use when the key is missing or
+                    explicitly ``None``.
+
+            Returns:
+                float | int: The configured value, or ``default``.
+            """
             v = disease_cfg.get(key, default)
             return default if v is None else v
 
@@ -455,18 +501,43 @@ class DengueJaxModel(Model):
         self.travel_sigma = _get("travel_sigma", 20.0)
 
     def build_travel_matrix(self, admin_zones):
-        """
-        Inverse-square gravity mobility driven by the ``travel_sigma``
-        custom field.
+        """Build an inverse-square gravity mobility matrix.
 
-        The resulting matrix doubles as the spatial mixing matrix in the
-        human force of infection (see ``equation()``).
+        Driven by the ``travel_sigma`` custom field. The resulting matrix
+        doubles as the spatial mixing matrix in the human force of infection
+        (see ``equation``).
+
+        Args:
+            admin_zones (list[dict]): Admin-zone dicts with ``center_lat``,
+                ``center_lon``, and ``population``.
+
+        Returns:
+            np.ndarray: Row-normalized ``(n_zones, n_zones)`` travel matrix.
         """
         sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
         return get_gravity_model_travel_matrix(admin_zones, sigma)
 
     @classmethod
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
+        """Seed the initial human compartments for each admin zone.
+
+        ``seroprevalence`` and ``infected_population`` are percentages spread
+        evenly across the four serotypes, seeding ``Snot1``-``Snot4`` and
+        ``I1``-``I4``; the remainder is fully susceptible (``S0``). Mosquito
+        compartments start at zero and are grown by the temperature-driven
+        vector dynamics in ``equation``.
+
+        Args:
+            admin_zones (list[dict]): Admin-zone dicts with ``population``,
+                ``seroprevalence``, and ``infected_population``.
+            compartment_list (list[str]): Ordered compartment names, used for
+                column indexing.
+            **kwargs (Any): Additional keyword arguments (unused).
+
+        Returns:
+            np.ndarray: Initial populations of shape
+                ``(n_zones, n_compartments)``.
+        """
         column_mapping = {v: i for i, v in enumerate(compartment_list)}
         initial_population = onp.zeros((len(admin_zones), len(compartment_list)))
 
@@ -503,7 +574,13 @@ class DengueJaxModel(Model):
         return initial_population
 
     def get_params(self):
-        """Pack temperature/calendar params for the ODE solver."""
+        """Pack temperature and calendar parameters for the ODE solver.
+
+        Returns:
+            tuple: ``(temp_max, temp_min, temp_mean, day_of_year,
+                hemisphere_flag)``, where the flag is 0 for the northern
+                hemisphere and 1 for the southern.
+        """
         numeric_day = int(self.start_date.strftime("%j"))
         hemisphere_flag = 0 if self.hemisphere == "North" else 1
         return (
@@ -519,6 +596,11 @@ class DengueJaxModel(Model):
     # ------------------------------------------------------------------
 
     def prepare_initial_state(self):
+        """Transpose the population matrix into solver orientation.
+
+        Returns:
+            jnp.ndarray: Initial state of shape ``(n_compartments, n_zones)``.
+        """
         # Transpose: rows=compartments, columns=regions
         self.population_matrix = self.population_matrix.T
         return self.population_matrix
@@ -528,6 +610,25 @@ class DengueJaxModel(Model):
     # ------------------------------------------------------------------
 
     def equation(self, y, t, p):
+        """Compute derivatives for the coupled host and vector ODE system.
+
+        Vector rates are recomputed each step from a seasonal temperature curve
+        through an Arrhenius thermal response, with mosquito carrying capacity
+        set as a multiple of the local human population. Host demography uses a
+        fixed birth and all-cause death rate of 1/(73 x 365) per day, and
+        interventions rescale the biting rate (``b_V_T``) and vector survival
+        (``s_V_T``).
+
+        Args:
+            y (jnp.ndarray): Current compartment values of shape
+                ``(n_compartments, n_zones)``, ordered by ``compartment_list``.
+            t (float): Days elapsed since the simulation start date.
+            p (tuple): Packed parameters from ``get_params`` —
+                ``(temp_max, temp_min, temp_mean, day_of_year, hemisphere)``.
+
+        Returns:
+            jnp.ndarray: Stacked per-compartment derivatives.
+        """
         y = np.clip(y, 0.0, 1e9)
         Tmax, Tmin, Tmean, numeric_day, hemisphere = p
 

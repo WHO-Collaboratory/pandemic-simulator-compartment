@@ -17,9 +17,9 @@ class ExampleParameterUncertaintyDeclarativeModel(Model):
         config validator and parameter set are generated.
 
         Args:
-            schema: The schema builder to populate with model info,
-                compartments, transmission edges, interventions, and
-                demographic groups.
+            schema (ParameterSchemaBuilder): Schema builder to populate with
+                model info, compartments, transmission edges, interventions,
+                and demographic groups.
         """
         schema.set_model_info(
             disease_type="example_parameter_uncertainty_declarative",
@@ -101,7 +101,7 @@ class ExampleParameterUncertaintyDeclarativeModel(Model):
         """Initialize the model from a validated simulation config.
 
         Args:
-            config: The validated simulation configuration produced by the
+            config (dict): Validated simulation configuration produced by the
                 framework's config loader.
         """
         super().__init__(config)
@@ -121,8 +121,8 @@ class ExampleParameterUncertaintyDeclarativeModel(Model):
         """Return the initial compartment populations for the solver.
 
         Returns:
-            The population matrix (admin zones x compartments) used as the
-            solver's initial state.
+            jnp.ndarray: Population matrix (compartments x admin zones) used as
+                the solver's initial state.
         """
         return self.population_matrix
 
@@ -130,12 +130,13 @@ class ExampleParameterUncertaintyDeclarativeModel(Model):
         """Compute the compartment derivatives for one integration step.
 
         Args:
-            y: Current compartment values, ordered by ``compartment_list``.
-            t: Current time in days since the simulation start date.
-            p: Packed parameter tuple, unpacked via ``_unpack_params``.
+            y (jnp.ndarray): Current compartment values, ordered by
+                ``compartment_list``.
+            t (float): Current time in days since the simulation start date.
+            p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
 
         Returns:
-            The stacked per-compartment derivatives (dy/dt).
+            jnp.ndarray: Stacked per-compartment derivatives (dy/dt).
         """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)

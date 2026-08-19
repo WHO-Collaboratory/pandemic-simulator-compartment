@@ -72,6 +72,18 @@ class KlebsiellaAmrModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare the Klebsiella AMR compartments, edges, and parameters.
+
+        Registers the 27 core compartments (setting x colonization state x
+        treatment) plus the ``IE_total`` / ``IR_total`` cumulative trackers, the
+        four user-configurable rate edges, the Kachalov et al. (2021) disease
+        parameters, and the stewardship / infection-control interventions.
+
+        Args:
+            schema (ParameterSchemaBuilder): Schema builder to populate with
+                model info, compartments, transmission edges, disease
+                parameters, and interventions.
+        """
         schema.set_model_info(
             disease_type="KLEBSIELLA_AMR",
             label="Klebsiella pneumoniae AMR",
@@ -534,7 +546,18 @@ class KlebsiellaAmrModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, input):
-        """Initialize the Klebsiella AMR model with a configuration dict."""
+        """Initialize the Klebsiella AMR model from a configuration payload.
+
+        Fills in fallback transmission rates, and converts percentage fitness
+        costs, per-100,000 strain imports, and DDD/1,000/day antibiotic
+        consumption into per-capita daily rates.
+
+        Args:
+            input (dict): Validated simulation configuration providing
+                ``initial_population``, ``transmission_dict``, ``Disease``,
+                ``start_date``, ``time_steps``, ``admin_units``, and an
+                optional ``intervention_dict``.
+        """
         self.population_matrix = np.array(input["initial_population"]).T
         self.compartment_list = list(self.COMPARTMENTS)
 
@@ -593,7 +616,24 @@ class KlebsiellaAmrModel(Model):
 
     @classmethod
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
-        """Compute initial population across hospital/community and colonization states."""
+        """Seed the initial population across settings, strains, and treatments.
+
+        Places 0.5% of each zone's population in hospital and converts the
+        zone's ``infected_population`` percentage into colonization prevalence
+        (split 80/15/5 across WT/ESBL/CRK in the community, 70/20/10 in
+        hospital), distributes each group over the untreated / Drug A / Drug B
+        sub-states, and seeds a small number of bloodstream infections.
+
+        Args:
+            admin_zones (list[dict]): Admin zone dicts providing ``population``
+                and ``infected_population``.
+            compartment_list (list[str]): Ordered compartment names, used for
+                column indexing.
+            **kwargs (Any): Additional keyword arguments (unused).
+
+        Returns:
+            np.ndarray: Initial populations of shape (n_zones, n_compartments).
+        """
         col = {v: i for i, v in enumerate(compartment_list)}
         n_zones = len(admin_zones)
         pop = onp.zeros((n_zones, len(compartment_list)))
@@ -675,6 +715,12 @@ class KlebsiellaAmrModel(Model):
     # ------------------------------------------------------------------
 
     def prepare_initial_state(self):
+        """Return the initial compartment populations for the solver.
+
+        Returns:
+            jnp.ndarray: Population matrix (compartments x admin zones)
+                used as the solver's initial state.
+        """
         # No spatial travel matrix — hospital/community coupling is modelled
         # internally via admission/discharge flows, so this model declares no
         # travel parameters and inherits the base class's identity matrix.
@@ -685,7 +731,21 @@ class KlebsiellaAmrModel(Model):
     # ------------------------------------------------------------------
 
     def _intervention_multiplier(self, cfg, t):
-        """Return JAX-traced multiplier (0–1) for an intervention config."""
+        """Return the rate multiplier for an intervention at time ``t``.
+
+        Yields ``1.0`` outside the intervention's date window, or when no config
+        or start date is supplied, and ``1 - adherence * reduction`` while the
+        intervention is active.
+
+        Args:
+            cfg (dict | None): Intervention config providing ``adherence_min``,
+                ``transmission_percentage``, ``start_date_ordinal``, and an
+                optional ``end_date_ordinal``.
+            t (float): Time in days since the simulation start date.
+
+        Returns:
+            float | jnp.ndarray: JAX-traced multiplier in the range 0–1.
+        """
         if cfg is None:
             return 1.0
 
@@ -712,6 +772,24 @@ class KlebsiellaAmrModel(Model):
     # ------------------------------------------------------------------
 
     def equation(self, y, t, p):
+        """Compute derivatives for the Klebsiella AMR compartmental system.
+
+        Applies, in each setting, treatment start/stop flows, primary
+        colonization driven by the frequency-dependent plus imported force of
+        infection, horizontal-gene-transfer super-colonization, natural and
+        drug-enhanced clearance (Drug A clears wild-type only; Drug B clears
+        wild-type and ESBL), and plasmid loss, then the hospital
+        admission/discharge, infection-development, and recovery flows.
+
+        Args:
+            y (jnp.ndarray): Current compartment values, ordered by
+                ``compartment_list``.
+            t (float): Current time in days since the simulation start date.
+            p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
+
+        Returns:
+            jnp.ndarray: Stacked per-compartment derivatives.
+        """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)
         states = {c: y[i] for i, c in enumerate(C)}
@@ -756,6 +834,15 @@ class KlebsiellaAmrModel(Model):
         G = self._GROUPS
 
         def _sum3(key):
+            """Sum the untreated, Drug A, and Drug B compartments of a group.
+
+            Args:
+                key (tuple): ``(strain, setting)`` key into ``_GROUPS``.
+
+            Returns:
+                jnp.ndarray: Combined population across the three treatment
+                    sub-states.
+            """
             u, a, b = G[key]
             return states[u] + states[a] + states[b]
 

@@ -49,6 +49,18 @@ class Dengue2StrainModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare the two-strain compartments, parameters, and zone fields.
+
+        No transmission edges are declared, because the multi-term force of
+        infection is applied manually in ``equation``; the cumulative ``_total``
+        trackers are therefore declared explicitly to preserve the legacy output
+        columns.
+
+        Args:
+            schema (ParameterSchemaBuilder): The schema builder to populate with
+                model info, compartments, disease parameters, and the
+                seroprevalence admin-zone field.
+        """
         schema.set_model_info(
             disease_type=cls.DISEASE_TYPE,
             label=cls.DISEASE_LABEL,
@@ -227,6 +239,19 @@ class Dengue2StrainModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, config):
+        """Derive the ODE rate constants from the configured disease parameters.
+
+        Durations are inverted into per-day rates here rather than in
+        ``equation`` so uncertainty runs, which rebuild the model from an
+        overridden config, re-derive every constant. Demography is balanced
+        (births equal deaths at 1/(life expectancy x 365) per day), and the
+        seasonal forcing constants ``omega`` and ``phi`` are fixed rather than
+        configurable.
+
+        Args:
+            config (dict): Validated simulation config, passed through to the
+                base ``Model`` initializer.
+        """
         super().__init__(config)
 
         # Map the configurable disease parameters (native units, as declared in
@@ -255,13 +280,24 @@ class Dengue2StrainModel(Model):
 
     @classmethod
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
-        """Seed S / I1 / I2 / S1 / S2 per zone.
+        """Seed ``S`` / ``I1`` / ``I2`` / ``S1`` / ``S2`` per admin zone.
 
         ``infected_population`` and ``seroprevalence`` are percentages, each
-        split evenly across the two strains (hence division by 200):
-        infections seed I1/I2 and prior exposure seeds the post-primary
-        susceptibles S1/S2.  All other compartments (including the cumulative
-        ``_total`` trackers) start at zero.
+        split evenly across the two strains (hence the division by 200):
+        infections seed ``I1``/``I2`` and prior exposure seeds the post-primary
+        susceptibles ``S1``/``S2``. All other compartments, including the
+        cumulative ``_total`` trackers, start at zero.
+
+        Args:
+            admin_zones (list[dict]): Admin-zone dicts with ``population``,
+                ``seroprevalence``, and ``infected_population``.
+            compartment_list (list[str]): Ordered compartment names, used for
+                column indexing.
+            **kwargs (Any): Additional keyword arguments (unused).
+
+        Returns:
+            np.ndarray: Initial populations of shape
+                ``(n_zones, n_compartments)``.
         """
         column_mapping = {value: index for index, value in enumerate(compartment_list)}
         initial_population = onp.zeros((len(admin_zones), len(compartment_list)))
@@ -291,12 +327,34 @@ class Dengue2StrainModel(Model):
         return initial_population
 
     def prepare_initial_state(self):
+        """Return the base-class population matrix unchanged.
+
+        Returns:
+            jnp.ndarray: Initial state of shape ``(n_compartments, n_zones)``.
+        """
         # Base __init__ already produced population_matrix as (compartments, regions)
         # (it transposes config["initial_population"]).  No demographic
         # stratification is used, so the state is passed through unchanged.
         return self.population_matrix
 
     def equation(self, y, t, p):
+        """Compute derivatives for the two-strain ODE system.
+
+        The transmission rate is seasonally forced, secondary infections are
+        scaled by the ADE factor ``epsilon``, and a constant ``rho * N`` leak
+        represents background importation. Flows are applied manually because
+        this force of infection has no single-rate transmission-edge form.
+
+        Args:
+            y (jnp.ndarray): Current compartment values of shape
+                ``(n_compartments, n_zones)``, ordered by ``compartment_list``.
+            t (float): Days elapsed since the simulation start date.
+            p (tuple): Packed transmission parameters; empty here, since the
+                rate constants are derived in ``__init__``.
+
+        Returns:
+            jnp.ndarray: Stacked per-compartment derivatives.
+        """
         y = np.clip(y, 0.0, 1e9)  # clip to avoid infs/negatives feeding back in
 
         states = {comp: y[i] for i, comp in enumerate(self.compartment_list)}

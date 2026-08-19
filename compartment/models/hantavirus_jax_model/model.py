@@ -72,6 +72,16 @@ class HantavirusJaxModel(Model):
 
     @classmethod
     def _add_total_compartments(cls, schema):
+        """Suppress the framework's automatic per-edge ``_total`` compartments.
+
+        Rodent cumulative incidence is not a model output; cumulative human
+        infections are tracked explicitly by the ``H_*D`` compartments and
+        cumulative deaths by ``H_d``.
+
+        Args:
+            schema (ModelParameterSchema): Model schema, intentionally left
+                unchanged.
+        """
         # Suppress framework auto-generation. Rodent cumulative incidence
         # isn't a model output; cumulative *human* infections are tracked
         # explicitly via H_*D, and cumulative deaths via H_d.
@@ -83,6 +93,20 @@ class HantavirusJaxModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare the model's compartments, edges, parameters, and intervention.
+
+        Registers the 12 rodent SEIR compartments
+        (``M_<residence><current><state>``), the six susceptible human commuting
+        compartments plus the cumulative case (``H_*D``) and death (``H_d``)
+        trackers, the rodent E→I and I→R edges, the rates applied manually in
+        ``equation`` (β, β_a, β_f, case fatality, rodent and human mobility,
+        rodent demographics), the four custom admin-zone sector fields, and the
+        ``environmental_management`` intervention with its ``spillover_scale``
+        sentinel edge.
+
+        Args:
+            schema (ParameterSchemaBuilder): Schema builder to populate.
+        """
         schema.set_model_info(
             disease_type="HANTAVIRUS",
             label="Hantavirus (spatial spillover)",
@@ -522,15 +546,24 @@ class HantavirusJaxModel(Model):
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
         """Distribute each zone's population across the 23 compartments.
 
-        The four custom admin-zone fields drive seeding:
-          - ``rural_population_fraction``: % of humans living in a (rest in u).
-          - ``rodents_in_a`` / ``rodents_in_f``: rodent populations per sector.
-          - ``infected_rodent_fraction``: % of rodents initially infectious
-            (split evenly between sector a and sector f rodents; visitors
-            ``M_af*`` and exposed/recovered start at zero).
+        Seeding is driven by four custom admin-zone fields:
+        ``rural_population_fraction`` (% of humans living in rural-populated
+        sector a, the rest in urban u), ``rodents_in_a`` / ``rodents_in_f``
+        (rodents resident per sector), and ``infected_rodent_fraction`` (% of
+        rodents initially infectious, split evenly between sectors a and f). At
+        t = 0 every human is at home, and visiting rodents (``M_af*``), exposed
+        and recovered rodents, and the cumulative trackers (``H_*D``, ``H_d``)
+        all start at zero.
 
-        At t = 0 every human is at home (visiting compartments = 0) and
-        cumulative trackers (H_*D, H_d) are zero.
+        Args:
+            admin_zones (list[dict]): Admin zone dicts providing ``population``
+                and the four custom sector fields.
+            compartment_list (list[str]): Ordered compartment names, used for
+                column indexing.
+            **kwargs (Any): Additional keyword arguments (unused).
+
+        Returns:
+            np.ndarray: Initial populations of shape (n_zones, n_compartments).
         """
         col = {v: i for i, v in enumerate(compartment_list)}
         pop = onp.zeros((len(admin_zones), len(compartment_list)))
@@ -562,6 +595,16 @@ class HantavirusJaxModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, config):
+        """Initialize the model and resolve its manually applied parameters.
+
+        Supplies fallback rates for the schema edges so the model runs without an
+        explicit ``TransmissionEdges`` block, then reads transmission, case
+        fatality, rodent mobility and demographics, and human mobility from the
+        config's ``Disease`` section. Case fatality is stored as a fraction.
+
+        Args:
+            config (dict): Validated simulation configuration.
+        """
         super().__init__(config)
 
         # No region-to-region travel — each admin zone is an independent
@@ -584,6 +627,15 @@ class HantavirusJaxModel(Model):
         disease_cfg = config.get("Disease", {}) or {}
 
         def _f(key, default):
+            """Read a float parameter from the ``Disease`` config section.
+
+            Args:
+                key (str): Parameter name to look up.
+                default (float): Value used when the key is absent or ``None``.
+
+            Returns:
+                float: The configured value, or ``default``.
+            """
             v = disease_cfg.get(key, default)
             return default if v is None else float(v)
 
@@ -618,6 +670,11 @@ class HantavirusJaxModel(Model):
     # ------------------------------------------------------------------
 
     def prepare_initial_state(self):
+        """Return the seeded compartment populations as the solver's initial state.
+
+        Returns:
+            jnp.ndarray: Population matrix of shape (n_compartments, n_zones).
+        """
         return self.population_matrix
 
     # ------------------------------------------------------------------
@@ -625,6 +682,26 @@ class HantavirusJaxModel(Model):
     # ------------------------------------------------------------------
 
     def equation(self, y, t, p):
+        """Compute derivatives for the three-sector rodent–human hantavirus system.
+
+        Schema edges cover the rodent E→I and I→R flows; the rest are applied
+        manually: frequency-dependent rodent FOI ``β·S·I/N_sector`` (instead of the
+        paper's raw mass action, so R₀ ≈ β/γ is independent of the absolute rodent
+        count), rodent commuting f → a, rodent births and natural mortality,
+        bidirectional human commuting between u, a, and f, and rodent-to-human
+        spillover at β_a (sector a) or β_f (sector f) scaled by the
+        ``spillover_scale`` intervention multiplier. Spillover accumulates into the
+        ``H_*D`` case trackers and, times the case fatality, into ``H_d``.
+
+        Args:
+            y (jnp.ndarray): Current compartment values, ordered by
+                ``compartment_list``.
+            t (float): Current time in days since the simulation start date.
+            p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
+
+        Returns:
+            jnp.ndarray: Stacked per-compartment derivatives.
+        """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)
         states = {c: y[i] for i, c in enumerate(self.compartment_list)}

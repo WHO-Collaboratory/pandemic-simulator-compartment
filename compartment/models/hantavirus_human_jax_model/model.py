@@ -55,6 +55,19 @@ class HantavirusHumanJaxModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare the coupled human/rodent compartments, edges, and parameters.
+
+        Registers the human SEIR (plus the cumulative death tracker ``D_h``), the
+        rodent SEIR, and the risk-perception state ``P``. Only the pure
+        ``rate * source`` E->I and I->R flows become schema edges; the multi-rate
+        forces of infection, demographics, and lethality are applied manually in
+        ``equation()``.
+
+        Args:
+            schema (ParameterSchemaBuilder): Schema builder to populate with model
+                info, compartments, transmission edges, disease parameters,
+                admin-zone fields, and the case-isolation intervention.
+        """
         schema.set_model_info(
             disease_type="HANTAVIRUS_HUMAN_TRANSMISSION",
             label="Hantavirus (person-to-person + risk perception)",
@@ -518,13 +531,22 @@ class HantavirusHumanJaxModel(Model):
     def get_initial_population(cls, admin_zones, compartment_list, **kwargs):
         """Seed humans, rodents, and risk perception per zone.
 
-        Standard fields:
-          - ``population`` — total human population N_h.
-          - ``infected_population`` — initial I_h.
-        Custom fields:
-          - ``rodent_population`` — total rodents N_m.
-          - ``infected_rodent_count`` — initial I_m.
-          - ``initial_risk_perception`` — initial P (percent, 0-100).
+        Reads the standard ``population`` (total human population N_h) and
+        ``infected_population`` (initial ``I_h``) fields, plus the custom
+        ``rodent_population`` (total rodents N_m), ``infected_rodent_count``
+        (initial ``I_m``), and ``initial_risk_perception`` (initial ``P``, given
+        as a percent from 0-100) fields. Exposed and recovered compartments start
+        empty.
+
+        Args:
+            admin_zones (list[dict]): Admin zone dicts supplying the human,
+                rodent, and risk-perception seeding fields.
+            compartment_list (list[str]): Ordered compartment names, used for
+                column indexing.
+            **kwargs (Any): Additional keyword arguments (unused).
+
+        Returns:
+            np.ndarray: Initial populations of shape (n_zones, n_compartments).
         """
         col = {v: i for i, v in enumerate(compartment_list)}
         pop = onp.zeros((len(admin_zones), len(compartment_list)))
@@ -559,6 +581,17 @@ class HantavirusHumanJaxModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, config):
+        """Initialize the model and resolve its disease and risk-perception rates.
+
+        Caches the admin zones for the per-zone ``exposed_fraction``, supplies
+        fallback rates for the schema edges so the model can run without an
+        explicit ``TransmissionEdges`` block, and converts the percentage CFR
+        inputs to fractions.
+
+        Args:
+            config (dict): Validated simulation configuration holding the
+                ``case_file`` admin zones and the ``Disease`` parameter block.
+        """
         super().__init__(config)
 
         # Admin zones — source of the per-zone exposed_fraction below.
@@ -584,6 +617,15 @@ class HantavirusHumanJaxModel(Model):
         disease_cfg = config.get("Disease", {}) or {}
 
         def _f(key, default):
+            """Read a float parameter from the ``Disease`` config block.
+
+            Args:
+                key (str): Parameter name to look up.
+                default (float): Value used when the key is missing or ``None``.
+
+            Returns:
+                float: The configured value, or ``default``.
+            """
             v = disease_cfg.get(key, default)
             return default if v is None else float(v)
 
@@ -623,26 +665,43 @@ class HantavirusHumanJaxModel(Model):
     # ------------------------------------------------------------------
 
     def build_travel_matrix(self, admin_zones):
-        """
-        Haversine gravity mobility driven by the ``travel_sigma`` and
-        ``travel_alpha`` custom fields.
+        """Build the inter-zone travel matrix from the mobility parameters.
+
+        Delegates to ``gravity()``, a Haversine gravity kernel driven by the
+        ``travel_sigma`` and ``travel_alpha`` custom fields.
+
+        Args:
+            admin_zones (list[dict]): Admin zone dicts with ``center_lat``,
+                ``center_lon``, and ``population``.
+
+        Returns:
+            np.ndarray: The (n_zones, n_zones) travel matrix.
         """
         sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
         return self.gravity(admin_zones, sigma, alpha=self.travel_alpha)
 
     def gravity(self, admin_zones, sigma, alpha=1.5):
-        """Gravity travel matrix from admin-zone lat/lon/population.
+        """Build a gravity travel matrix from admin-zone lat/lon/population.
 
-        Entry T[i, j] = fraction of zone i's population present in zone j.
+        Entry ``T[i, j]`` is the fraction of zone *i*'s population present in
+        zone *j*. Attraction from *i* to *j* is proportional to
+        ``pop_j / dist_ij^alpha`` over great-circle (Haversine) distances; rows
+        are normalised so the off-diagonal mass sums to ``sigma`` and the
+        diagonal is the stay-home fraction ``1 - sigma``. Falls back to an
+        identity matrix when there is only one zone or ``sigma`` is 0.
 
-        Attraction from i to j is proportional to pop_j / dist_ij^alpha.
-        Rows are normalised so the off-diagonal mass sums to sigma; the
-        diagonal is 1 - sigma (the stay-home fraction).
+        Args:
+            admin_zones (list[dict]): Admin zone dicts with ``center_lat``,
+                ``center_lon``, and ``population``.
+            sigma (float): Fraction of each zone's population away from home on a
+                given day.
+            alpha (float): Distance-decay exponent. The default 1.5 is a typical
+                empirical value for inter-regional US mobility, steeper than the
+                1.0 used in simple gravity models because very distant zones
+                contribute little.
 
-        alpha=1.5 is a typical empirical value for inter-regional US
-        mobility (steeper than the 1.0 used in simple gravity models,
-        reflecting that very distant zones contribute little). Falls back
-        to an identity matrix when there is only one zone or sigma == 0.
+        Returns:
+            np.ndarray: The (n_zones, n_zones) travel matrix.
         """
         n = len(admin_zones)
         if n <= 1 or sigma == 0.0:
@@ -678,6 +737,11 @@ class HantavirusHumanJaxModel(Model):
         return T
 
     def prepare_initial_state(self):
+        """Return the initial compartment populations for the solver.
+
+        Returns:
+            jnp.ndarray: The (compartments, zones) initial state matrix.
+        """
         # The travel matrix is built by the framework via build_travel_matrix().
         return self.population_matrix
 
@@ -686,6 +750,28 @@ class HantavirusHumanJaxModel(Model):
     # ------------------------------------------------------------------
 
     def equation(self, y, t, p):
+        """Compute derivatives for the coupled human, rodent, and risk states.
+
+        Schema edges supply the E->I flows, while the ``gamma_h`` edge is skipped
+        so ``I_h`` exits via competing hazards to ``R_h`` and ``D_h`` with an
+        effective CFR rising from ``cfr`` toward ``cfr_max`` as concurrent cases
+        exceed ``hospital_capacity * N_h``. Risk perception scales both betas by
+        ``P_star / P``; a cosine peaking at ``seasonal_peak_day`` modulates
+        spillover only, spillover reaches just the per-zone ``exposed_fraction``,
+        and person-to-person pressure is coupled across zones by the gravity
+        travel matrix. Births enter the susceptible compartments, natural
+        mortality is removed from every live compartment, and perception evolves
+        as ``dP/dt = -lambda_1 * (P - P_star) + lambda_2 * I_h / N_h``.
+
+        Args:
+            y (jnp.ndarray): Current compartment values, ordered by
+                ``compartment_list``.
+            t (float): Current time in days since the simulation start date.
+            p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
+
+        Returns:
+            jnp.ndarray: Stacked per-compartment derivatives.
+        """
         params = self._unpack_params(p)
         states = {c: y[i] for i, c in enumerate(self.compartment_list)}
 
