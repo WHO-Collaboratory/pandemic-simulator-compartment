@@ -1,27 +1,24 @@
-# Pandemic Simulator - Compartment Models
+# Pandemic Simulator - Compartmental Models
 
-Compartmental disease models built with systems of ordinary differential
-equations for the [WHO Pandemic Simulator](https://uat.pandemicsimulator.com/).
-
-## Overview
-
-This framework provides a declarative parameter system for defining
-compartmental models (SIR, SEIR, vector-borne, etc.) with rich metadata.
-From a single `ModelParameterSchema`, the framework generates:
-
-- **Artifact JSON** for UI form population, database tables, and Zod schema generation
-- **Pydantic validation models** for runtime config validation
-- **Example config JSON** files with sensible defaults
+A library of compartmental disease models in the
+[WHO Pandemic Simulator](https://uat.pandemicsimulator.com/).
 
 ## For Modelers
 
-If you are building or configuring a disease model, start here:
+Describe a model once -- its compartments, the flows between them, and the
+parameters it takes -- and the framework builds everything else from that
+description:
 
+- the file the web app reads to build its input forms and store model settings
+- the checks that catch a bad or incomplete configuration before a run starts
+- a ready-to-run example configuration, filled in with sensible defaults
+
+You can use functions from any of the [existing models](#disease-models), or write your
+own custom model -- see the
+[Model Integration Documentation](guides/model-integration-documentation.md) to
+get started.
 - [**Parameter Framework Reference**](api/parameters.md) -- all available
   parameter types, the `ParameterSchemaBuilder` API, and `ValueType` options
-- [**Developing Models Guide**](guides/developing-models.md) -- step-by-step
-  walkthrough for creating a new model
-- [**Disease Models**](#disease-models) -- reference for each implemented model
 
 ## API Reference
 

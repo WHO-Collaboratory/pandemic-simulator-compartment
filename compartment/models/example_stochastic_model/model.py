@@ -44,9 +44,9 @@ class ExampleStochasticModel(Model):
         stochastic run count.
 
         Args:
-            schema: The schema builder to populate with model info, metadata,
-                compartments, transmission edges, disease parameters, and the
-                intervention.
+            schema (ParameterSchemaBuilder): Schema builder to populate with
+                model info, metadata, compartments, transmission edges, disease
+                parameters, and the intervention.
         """
         schema.set_model_info(
             disease_type="example_stochastic",
@@ -205,7 +205,8 @@ class ExampleStochasticModel(Model):
         ``R_total`` in ``define_parameters`` instead.
 
         Args:
-            schema: The schema builder (intentionally left unchanged).
+            schema (ModelParameterSchema): Model schema, intentionally left
+                unchanged.
         """
         # Suppress the framework's per-edge _total compartments (same approach
         # as DengueJaxModel). We declare our own aggregate I_total in
@@ -216,9 +217,9 @@ class ExampleStochasticModel(Model):
         """Initialize the model and seed its PRNG for stochastic draws.
 
         Args:
-            config: The validated simulation configuration. If it is a dict
-                containing a ``seed``, that seed is used for reproducible
-                trajectories; otherwise the PRNG is seeded from system entropy.
+            config (dict): Validated simulation configuration. A ``seed`` entry
+                gives reproducible trajectories; otherwise the PRNG is seeded
+                from system entropy.
         """
         super().__init__(config)
         # Stochastic models need a PRNG key for the random draws in equation().
@@ -249,14 +250,15 @@ class ExampleStochasticModel(Model):
         asymptomatic fraction.
 
         Args:
-            admin_zones: Admin zone dicts providing ``population`` and the
-                ``infected_population`` percentage.
-            compartment_list: Ordered compartment names, used for column
-                indexing.
-            **kwargs: Additional keyword arguments (unused).
+            admin_zones (list[dict]): Admin zone dicts providing ``population``
+                and the ``infected_population`` percentage.
+            compartment_list (list[str]): Ordered compartment names, used for
+                column indexing.
+            **kwargs (Any): Additional keyword arguments (unused).
 
         Returns:
-            A (zones x compartments) array of initial populations.
+            np.ndarray: Initial populations of shape
+                ``(n_zones, n_compartments)``.
         """
         # The base implementation seeds a single "I" compartment, but this model
         # has no "I" — infectious individuals live in A (asymptomatic) and Sym
@@ -286,8 +288,8 @@ class ExampleStochasticModel(Model):
         """Return the initial compartment populations for the solver.
 
         Returns:
-            The population matrix (admin zones x compartments) used as the
-            solver's initial state.
+            jnp.ndarray: Population matrix (compartments x admin zones) used as
+                the solver's initial state.
         """
         return self.population_matrix
 
@@ -295,18 +297,20 @@ class ExampleStochasticModel(Model):
         """Tau-leaping stochastic step with two infectious compartments.
 
         Returns the per-step change (delta); the Euler integrator applies
-        ``y_{t+1} = y_t + dt * equation(...)``. We build the derivatives by hand
-        so new infections can be split into an asymptomatic (``A``) and a
-        symptomatic (``Sym``) compartment, which are combined into one
-        "Infected" curve for graphing via COMPARTMENT_DELTA_GROUPING.
+        ``y_{t+1} = y_t + dt * equation(...)``. Infection and recovery counts are
+        Poisson draws around the deterministic rates, and new infections are
+        split between the asymptomatic (``A``) and symptomatic (``Sym``)
+        compartments, which are combined into one "Infected" curve for graphing
+        via ``COMPARTMENT_DELTA_GROUPING``.
 
         Args:
-            y: Current compartment values, ordered by ``compartment_list``.
-            t: Current time in days since the simulation start date.
-            p: Packed parameter tuple, unpacked via ``_unpack_params``.
+            y (jnp.ndarray): Current compartment values, ordered by
+                ``compartment_list``.
+            t (float): Current time in days since the simulation start date.
+            p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
 
         Returns:
-            The stacked per-compartment deltas for this step.
+            jnp.ndarray: Stacked per-compartment deltas for this step.
         """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)

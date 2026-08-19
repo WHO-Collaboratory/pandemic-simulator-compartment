@@ -17,6 +17,20 @@ class CovidJaxModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
+        """Declare the SEIHDR compartments, transmission edges, and parameters.
+
+        Called once by the framework to build the model schema, from which the
+        config validator and parameter set are generated. Declares the six
+        S-E-I-H-D-R compartments, seven transmission edges, the mask-wearing /
+        social-isolation / lockdown / vaccination interventions, the
+        ``travel_sigma`` mobility field, and three age bands (0-17, 18-55, 56+)
+        whose ``age_range`` tags enable the country's Prem 2021 contact matrix.
+
+        Args:
+            schema (ParameterSchemaBuilder): Schema builder to populate with
+                model info, metadata, compartments, transmission edges,
+                interventions, parameters, and demographic groups.
+        """
         schema.set_model_info(
             disease_type=cls.DISEASE_TYPE,
             label=cls.DISEASE_LABEL,
@@ -259,6 +273,15 @@ class CovidJaxModel(Model):
     # ------------------------------------------------------------------
 
     def __init__(self, config):
+        """Initialize the model and adopt the config's compartment list.
+
+        The config's ``compartment_list`` may be a variant subset, so it
+        replaces the full schema-derived list.
+
+        Args:
+            config (dict): Validated simulation configuration, including
+                ``compartment_list``.
+        """
         super().__init__(config)
 
         # Override with the compartment list from config (may be a variant subset).
@@ -272,28 +295,51 @@ class CovidJaxModel(Model):
         # and the contact matrix are declared in define_parameters().
 
     def build_travel_matrix(self, admin_zones):
-        """
-        Inverse-square gravity mobility driven by the ``travel_sigma``
-        custom field.
+        """Build an inverse-square gravity travel matrix from ``travel_sigma``.
 
-        Rows sum to 1 with the diagonal at ``1 - sigma``, so the FOI in
-        ``equation()`` conserves each region's population.
+        Rows sum to 1 with the diagonal at ``1 - sigma``, so the force of
+        infection in ``equation()`` conserves each region's population.
+
+        Args:
+            admin_zones (list[dict]): Admin-zone dicts with ``id``,
+                ``center_lat``, ``center_lon``, and ``population``.
+
+        Returns:
+            np.ndarray: The ``(n_zones, n_zones)`` travel matrix.
         """
         sigma = self._to_rate(self.travel_sigma, ValueType.PERCENTAGE)
         return get_gravity_model_travel_matrix(admin_zones, sigma)
 
     def prepare_initial_state(self):
+        """Return the age-stratified initial populations for the solver.
+
+        Returns:
+            np.ndarray: Initial populations shaped
+                ``(compartments, age groups, zones)``, including the ``_total``
+                rows appended for the active compartments.
+        """
         # Expand (K, R) → (K, A, R) and append _total rows for active compartments.
         self._prepare_demographic_state()
         return self.population_matrix
 
     def equation(self, y, t, p):
-        """Compute derivatives with age-stratified force of infection.
+        """Compute the compartment derivatives with an age-stratified force of infection.
 
-        Uses the escape-hatch pattern: ``_compute_equations()`` handles
-        the 6 standard edges (E->I, I->H, I->D, H->D, I->R, H->R),
-        while S->E uses an age-stratified contact matrix and is applied
-        manually via ``_apply_flow()``.
+        Uses the conditional pattern: ``_compute_equations()`` handles the six
+        standard edges (E->I, I->H, I->D, H->D, I->R, H->R), while the S->E
+        force of infection mixes zones through the travel matrix and age groups
+        through the contact matrix and is applied manually via
+        ``_apply_flow()``. Deceased and ``_total`` compartments are excluded
+        from the population that scales the frequency-dependent force of infection.
+
+        Args:
+            y (np.ndarray): Current compartment values, ordered by
+                ``compartment_list``.
+            t (float): Current time in days since the simulation start date.
+            p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
+
+        Returns:
+            np.ndarray: Stacked per-compartment derivatives (dy/dt).
         """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)

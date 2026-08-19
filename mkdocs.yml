@@ -30,6 +30,9 @@ plugins:
           paths: [.]
           options:
             docstring_style: google
+            # Parse "np.ndarray: description" in Returns as a type, not a name.
+            docstring_options:
+              returns_named_value: false
             show_source: true
             show_root_heading: true
             show_root_full_path: false
