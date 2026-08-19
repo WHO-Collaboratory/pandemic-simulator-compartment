@@ -7,7 +7,7 @@ Usage:
         --disease-type MY_DISEASE --description "An SIR model for my disease"
 
 Creates compartment/models/my_disease_model/ with:
-    __init__.py, model.py, main.py, example-config.json
+    __init__.py, model.py, main.py, model.md, example-config.json
 
 The generated model is a minimal SIR with frequency-dependent transmission.
 Edit model.py to add compartments, parameters, and ODE logic specific to
@@ -259,6 +259,30 @@ if __name__ == "__main__":
     drive_simulation(model_class=CLASS_NAME, args=vars(args))
 '''
 
+_MODEL_MD = '''\
+# LABEL
+
+Suggested sections:
+
+- **Model overview** — Brief plain-language description of how the model works.
+- **Compartment and state definitions** — Meaning of each compartment, state,
+  or population group.
+- **Inputs and parameters** — Required inputs, definitions, units, valid ranges,
+  and defaults.
+- **Initial conditions** — How the starting population is distributed and any
+  required initialization rules.
+- **Outputs** — Available results, units, aggregation levels, and how each
+  output should be interpreted.
+- **Model nuances** — Subtle behaviors, implementation details, special
+  conventions, or interpretation considerations that users should understand
+  when configuring the model or evaluating its results.
+- **Known edge cases** — Inputs or scenarios that may produce unstable,
+  unrealistic, or invalid results.
+- **Differences from the source model** — Any deliberate implementation changes
+  or numerical approximations.
+- **Related models** — When users might choose another model in the repository.
+'''
+
 # The TransmissionEdges.items top-level key is the correct wiring format.
 # The generator-emitted Disease.transmission_edges format silently drops params.
 _EXAMPLE_CONFIG = {
@@ -391,6 +415,7 @@ def scaffold(
         "__init__.py": "",
         "model.py": _fill_template(_MODEL_PY, class_name, disease_type, label, dir_name, safe_description),
         "main.py": _fill_template(_MAIN_PY, class_name, disease_type, label, dir_name, safe_description),
+        "model.md": _fill_template(_MODEL_MD, class_name, disease_type, label, dir_name, safe_description),
         "example-config.json": json.dumps(
             _patch_config(disease_type), indent=4
         ) + "\n",
@@ -421,8 +446,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Scaffold a new disease model directory under compartment/models/. "
-            "Creates __init__.py, model.py, main.py, and example-config.json "
-            "from a minimal SIR template."
+            "Creates __init__.py, model.py, main.py, model.md, and "
+            "example-config.json from a minimal SIR template."
         )
     )
     parser.add_argument(
@@ -492,6 +517,8 @@ def main() -> None:
     print(f"           --output_file results/{dir_name}-test.json")
     print(f"  4. Run the smoke test:")
     print(f"       python -m pytest tests/test_smoke.py -v -m integration -k '{dir_name}'")
+    print(f"  5. Replace the suggested sections in {dest}/model.md with your")
+    print(f"     own write-up — it is emitted in the artifact and shown to users")
     print()
     print("See docs/DEVELOPING_MODELS.md for the full authoring guide.")
 
