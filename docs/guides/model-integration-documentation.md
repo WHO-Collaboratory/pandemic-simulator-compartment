@@ -39,13 +39,13 @@ Your model code is identical whether it runs locally on your own machine or remo
 
 Running locally, you hand the model a JSON file. In the Simulator, the frontend collects the user's choices and the backend supplies the population and geography — then passes them to your model in that same shape. So `example-config.json` is a stand-in for a filled-in UI form plus the backend data behind it, and a model that runs locally will run in the Simulator.
 
-Think of your model directory as having two halves: what the user can touch, and what only you control. The rule of thumb: **anything you declare on the `schema` becomes something a user can see or change. Anything you write in `equation()` is yours alone.** For example, if the modeler changes a default value when adding a transmission edge via `schema.add_transmission_edge()` this shows that new default value in the UI for every future user; rewriting `equation()` changes the model's behavior without changing the UI at all.
+Think of your model directory as having two halves: what the user can touch, and what only you control. The rule of thumb: **anything you declare on the `schema` becomes something a user can see or change. Anything you write in `equation()` is yours alone.** For example, if the modeler changes a default value when adding a transmission edge via `schema.add_transmission_parameter()` this shows that new default value in the UI for every future user; rewriting `equation()` changes the model's behavior without changing the UI at all.
 
 | Model component | Location | Representation in the UI |
 | :---- | :---- | :---- |
 | `schema.set_model_info()` | `model.py` | Your model's name and description in the model picker. |
 | `schema.add_compartment()` | `model.py` | The compartments offered for the model, which users can select or deselect. |
-| `schema.add_transmission_edge()` | `model.py` | The arrows between compartments, each with a control whose default, minimum, and maximum are the ones you declared. |
+| `schema.add_transmission_parameter()` | `model.py` | The arrows between compartments, each with a control whose default, minimum, and maximum are the ones you declared. |
 | `schema.add_parameter()` | `model.py` | An extra input field, for anything that isn't a flow between compartments. |
 | `schema.add_intervention()` | `model.py` | An intervention the user can switch on and give dates, adherence, and a transmission reduction. |
 | `schema.add_demographic_group()` | `model.py` | The age breakdown available for the run. |
@@ -89,6 +89,8 @@ A local run also produces the same results JSON the Simulator charts, which is w
 ---
 
 ## Technical API
+
+The API reference site is generated from the source code itself, so it lists every argument, default, and return value of the framework's classes and methods, along with a page for each model already in the repository. This guide walks you through integrating a model from start to finish; the technical API is the lookup you reach for while writing the code, when you need the exact signature of a call.
 
 <https://who-collaboratory.github.io/pandemic-simulator-compartment/>
 
@@ -439,7 +441,7 @@ schema.add_compartment("R", "Recovered", "Recovered and immune")
 
 # The framework auto-generates the I_total / R_total cumulative compartments
 # for these edge targets — do not declare them by hand.
-schema.add_transmission_edge(
+schema.add_transmission_parameter(
     source="susceptible",
     target="infected",
     variable_name="beta",
@@ -453,7 +455,7 @@ schema.add_transmission_edge(
     max_value=2.0,
     unit="per day",
 )
-schema.add_transmission_edge(
+schema.add_transmission_parameter(
     source="infected",
     target="recovered",
     variable_name="gamma",
@@ -659,7 +661,7 @@ There is no flag for parameter uncertainty. The framework detects it automatical
 Give the parameter a `default_min` / `default_max` in `define_parameters()`:
 
 ```python
-schema.add_transmission_edge(
+schema.add_transmission_parameter(
     source="susceptible",
     target="infected",
     variable_name="beta",
