@@ -154,7 +154,7 @@ def _read_noncanonical(fd: int) -> str:
 def _read_cache() -> str | None:
     """Return the cached token if it is still comfortably in date."""
     try:
-        cached = json.loads(CACHE_PATH.read_text())
+        cached = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
 
@@ -170,7 +170,7 @@ def _write_cache(token: str) -> None:
     CACHE_PATH.write_text(json.dumps({
         "token": token,
         "expires_at": token_expiry(token),
-    }))
+    }), encoding="utf-8")
     # The token is a live credential — keep it off other users' radar.
     CACHE_PATH.chmod(0o600)
 

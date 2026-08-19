@@ -308,7 +308,7 @@ python -m compartment.new_model example_parameter_uncertainty_declarative --labe
 > That directory already exists in the repository, so running the command verbatim exits with `Error: '...' already exists.` Substitute your own model name, or add `--dry-run` to preview the output without writing files:
 >
 > ```shell
-> python -m compartment.new_model my_disease --dry-run
+> python -m compartment.new_model example_parameter_uncertainty_declarative --dry-run
 > ```
 
 The scaffold appends `_model` to the directory name, so `example_parameter_uncertainty_declarative` becomes `compartment/models/example_parameter_uncertainty_declarative_model/`. Class names and the code that instantiates them are generated to match.
