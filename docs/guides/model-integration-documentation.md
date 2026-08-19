@@ -4,6 +4,8 @@
 
 This documentation describes the steps required to integrate a compartmental model into the Pandemic Simulator. Once integrated, users can run the model in the Pandemic Simulator and modify the parameters you define to explore different scenarios through the user interface.
 
+Two roles recur throughout this document: a **user** runs a model from the Pandemic Simulator's front end, choosing location, parameter values, and interventions through the interface, while a **modeler** writes the model code that runs in the backend so that users can run it. One person can be both; this guide is written for modelers.
+
 The Pandemic Simulator supports **deterministic** compartmental models, models with **parameter uncertainty** (Latin Hypercube Sampling), and **stochastic** models. After running a simulation, users can compare results across models, evaluate intervention scenarios alongside control (no-intervention) simulations, and view AI-generated interpretations of the results.
 
 ### How to read the commands in this guide
@@ -277,7 +279,7 @@ The scaffold appends `_model` to the directory name, so `example_parameter_uncer
 - **`__init__.py`** — leave empty. It marks the directory as a Python package.
 - **`model.py`** — the disease class: parameters, input formatting, and the equation function for a minimal SIR model.
 - **`main.py`** — loads the model and executes the simulation.
-- **`model.md`** — a skeleton listing the sections to cover; replace the suggested sections with your own write-up. See [model.md](#modelmd).
+- **`model.md`** — a outline listing the sections to cover; replace the suggested sections with your own write-up. See [model.md](#modelmd).
 - **`example-config.json`** — configuration for running the simulation locally.
 
 `label` and `description` are shown to users in the Pandemic Simulator UI. `disease-type` is used only by the back end to identify which model to load, and **must be unique across all models**. If it collides, running the model produces:
@@ -725,9 +727,28 @@ if __name__ == "__main__":
 
 ### model.md
 
-Created by the scaffold as a skeleton listing suggested sections — replace those with your own write-up. Use [Markdown syntax](https://www.markdownguide.org/basic-syntax/). Its contents appear in the **"You should know"** section of the results page; delete the file and that section is omitted.
+Created by the scaffold as a template listing suggested sections — replace those with your own write-up. Use [Markdown syntax](https://www.markdownguide.org/basic-syntax/). Its contents appear in the **"You should know"** section of the results page; delete the file and that section is omitted.
 
-Cover anything users should be aware of: limitations, data sources, assumptions, intended use. All three example models include one. From `example_stochastic_model/model.md`:
+Cover anything users should be aware of, suggestions in the template include:
+- **Model overview** — Brief plain-language description of how the model works.
+- **Compartment and state definitions** — Meaning of each compartment, state,
+  or population group.
+- **Inputs and parameters** — Required inputs, definitions, units, valid ranges,
+  and defaults.
+- **Initial conditions** — How the starting population is distributed and any
+  required initialization rules.
+- **Outputs** — Available results, units, aggregation levels, and how each
+  output should be interpreted.
+- **Model nuances** — Subtle behaviors, implementation details, special
+  conventions, or interpretation considerations that users should understand
+  when configuring the model or evaluating its results.
+- **Known edge cases** — Inputs or scenarios that may produce unstable,
+  unrealistic, or invalid results.
+- **Differences from the source model** — Any deliberate implementation changes
+  or numerical approximations.
+- **Related models** — When users might choose another model in the repository. 
+
+All three example models include one. From `example_stochastic_model/model.md`:
 
 ```markdown
 # Example Disease (Stochastic) — Model Summary
