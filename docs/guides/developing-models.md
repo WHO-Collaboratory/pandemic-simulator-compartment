@@ -115,7 +115,7 @@ compartment/models/your_model/
 └── artifacts/             # OPTIONAL — generated artifact JSON checked into the repo
 ```
 
-The auto-discovery registry scans every directory under `compartment/models/`, importing `model.py` and (if present) `variants.py`. Any class that subclasses `Model` and exposes a `DISEASE_TYPE` is registered automatically. **There is no manual registry edit.**
+The auto-discovery registry scans every directory under `compartment/models/`, importing `model.py` and (if present) `variants.py`. Any class that subclasses `Model` and exposes a `DISEASE_TYPE` is registered automatically. **There is no manual registry edit.** The documentation site (sidebar, per-model pages, and the home-page Disease Models table) is generated from that same registry at docs-build time.
 
 ## Writing `model.py`
 
@@ -142,8 +142,8 @@ class MyModel(Model):
         # 1. Identity (required, exactly once)
         schema.set_model_info(
             disease_type="MY_DISEASE",         # disease family; duplicates are allowed
-            label="My Disease",                # UI / artifact name
-            description="A short SIR model for my disease",
+            label="My Disease",                # UI / artifact / docs name
+            description="A short SIR model for my disease",  # UI + docs home table
         )
 
         # 2. Compartments — id is the short key used in arrays
