@@ -1,3 +1,9 @@
+<!--
+  MkDocs + mkdocstrings shell. The `:::` block expands from docstrings in
+  compartment/model.py when the site is built. Read the published page,
+  not this file: https://who-collaboratory.github.io/pandemic-simulator-compartment/api/model/
+-->
+
 # Base Model Reference
 
 Base class for all compartmental disease models. Subclasses **must**

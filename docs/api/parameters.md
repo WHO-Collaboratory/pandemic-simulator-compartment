@@ -1,3 +1,9 @@
+<!--
+  MkDocs + mkdocstrings shell. The `:::` blocks expand from docstrings in
+  compartment/parameters.py when the site is built. Read the published page,
+  not this file: https://who-collaboratory.github.io/pandemic-simulator-compartment/api/parameters/
+-->
+
 # Parameter Framework Reference
 
 This is the primary reference for modelers. The parameter framework lets you
