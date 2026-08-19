@@ -827,14 +827,20 @@ def equation(self, y, t, p):
     """Compute the compartment derivatives for one integration step.
 
     Args:
-        y: Current compartment values, ordered by ``compartment_list``.
-        t: Current time in days since the simulation start date.
-        p: Packed parameter tuple, unpacked via ``_unpack_params``.
+        y (jnp.ndarray): Current compartment values, ordered by ``compartment_list``.
+        t (float): Current time in days since the simulation start date.
+        p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
 
     Returns:
-        The stacked per-compartment derivatives (dy/dt).
+        jnp.ndarray: The stacked per-compartment derivatives (dy/dt).
     """
 ```
+
+Give each argument a type in parentheses and start the `Returns:` line with the type followed by a colon. Because these signatures carry no type annotations, the types you write in the docstring are the only thing that fills the **Type** column in the rendered tables.
+
+To see the result, compare the docstring above with the published page for [`ExampleStochasticModel.equation`][equation-rendered]: the summary becomes the description, the arguments become a Parameters table, and the return line becomes a Returns table.
+
+[equation-rendered]: https://who-collaboratory.github.io/pandemic-simulator-compartment/models/example-stochastic/#compartment.models.example_stochastic_model.model.ExampleStochasticModel.equation
 
 Any public class or method without a docstring is omitted from the docs.
 
