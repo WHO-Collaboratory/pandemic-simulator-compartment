@@ -48,11 +48,11 @@ import matplotlib.pyplot as plt
 
 
 # --------------------------------------------------------------------------- #
-# Compartment naming — mirrors the frontend
+# Compartment naming — model artifact metadata with legacy fallbacks
 # --------------------------------------------------------------------------- #
-# Ported from packages/nextjs/src/data/constants.tsx
-# (compartmentObjectLabelsCovid / compartmentObjectLabelsDengue) so this viewer
-# uses the same display names and colours as the Pandemic Simulator web app.
+# Local simulation output includes the display-related subset of the same model
+# artifact consumed by the cloud UI. The maps below remain as fallbacks for old
+# result files that predate embedded artifact metadata.
 
 COVID_LABELS = {
     "S": ("Susceptible", "#00bba7"),
@@ -104,16 +104,62 @@ def _generate_color(key):
     return (r, g, b)
 
 
-def resolve_labels(compartments):
+def extract_model_artifact(runs):
+    """Return embedded model artifact metadata from a collection of runs.
+
+    New local result files store the artifact subset directly under
+    ``model_artifact``. The cloud-shaped ``ModelArtifact.artifact_json`` form is
+    also accepted so exported payloads can use the same viewer path.
+    """
+    for run in runs:
+        artifact = run.get("model_artifact") or run.get("ModelArtifact")
+        if isinstance(artifact, dict) and "artifact_json" in artifact:
+            artifact = artifact["artifact_json"]
+        if isinstance(artifact, str):
+            try:
+                artifact = json.loads(artifact)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+        if isinstance(artifact, dict):
+            return artifact
+    return {}
+
+
+def order_compartments(compartments, model_artifact=None):
+    """Apply the artifact's cloud-UI display order, preserving unknown keys."""
+    display_order = (model_artifact or {}).get("compartment_display_order", [])
+    rank = {compartment: index for index, compartment in enumerate(display_order)}
+    original_order = {
+        compartment: index for index, compartment in enumerate(compartments)
+    }
+    return sorted(
+        compartments,
+        key=lambda compartment: (
+            rank.get(compartment, len(rank)),
+            original_order[compartment],
+        ),
+    )
+
+
+def resolve_labels(compartments, model_artifact=None):
     """Return {key: (display_name, colour)} for the given compartments.
 
-    Uses the dengue label map when vector-borne compartments are present,
-    otherwise the covid/respiratory map. Unknown keys fall back to the raw key
-    and a generated colour.
+    Artifact labels take precedence, matching the cloud UI's model metadata.
+    Older results fall back to the legacy dengue/COVID maps, then the raw key.
     """
     base = DENGUE_LABELS if (set(compartments) & _DENGUE_MARKER_KEYS) else COVID_LABELS
+    artifact_labels = {
+        compartment.get("id"): compartment.get("label")
+        for compartment in (model_artifact or {}).get("compartments", [])
+        if isinstance(compartment, dict)
+        and compartment.get("id")
+        and compartment.get("label")
+    }
     return {
-        c: base[c] if c in base else (c, _generate_color(c))
+        c: (
+            artifact_labels.get(c, base[c][0] if c in base else c),
+            base[c][1] if c in base else _generate_color(c),
+        )
         for c in compartments
     }
 
@@ -411,7 +457,7 @@ def plot_deltas_table(ax, panels, selected, labels):
     return True
 
 
-def plot_panel(ax, run, colors, selected, log_scale, draw_markers):
+def plot_panel(ax, run, labels, selected, log_scale, draw_markers):
     """Draw one run onto ``ax``. Returns True if uncertainty bands were drawn."""
     dates, series, _ = parse_parent_admin_total(run)
     drew_band = False
@@ -420,8 +466,14 @@ def plot_panel(ax, run, colors, selected, log_scale, draw_markers):
         data = series.get(comp)
         if data is None:
             continue
-        color = colors[comp]
-        ax.plot(dates, data["median"], label=comp, color=color, linewidth=1.6)
+        display_name, color = labels[comp]
+        ax.plot(
+            dates,
+            data["median"],
+            label=display_name,
+            color=color,
+            linewidth=1.6,
+        )
         if data["lower"] is not None and data["upper"] is not None:
             ax.fill_between(dates, data["lower"], data["upper"],
                             color=color, alpha=0.18, linewidth=0)
@@ -468,6 +520,7 @@ def _draw_markers(ax, starts, ends):
 def build_figure(path, compartments=None, log_scale=False, title=None, show_deltas=True):
     runs = load_runs(path)
     with_iv, control = split_runs(runs)
+    model_artifact = extract_model_artifact(runs)
 
     # Union of compartments (stable order from the with-interventions run first).
     all_comps = []
@@ -478,6 +531,7 @@ def build_figure(path, compartments=None, log_scale=False, title=None, show_delt
         for c in series:
             if c not in all_comps:
                 all_comps.append(c)
+    all_comps = order_compartments(all_comps, model_artifact)
 
     if compartments:
         requested = [c.strip() for c in compartments.split(",") if c.strip()]
@@ -491,9 +545,7 @@ def build_figure(path, compartments=None, log_scale=False, title=None, show_delt
     else:
         selected = all_comps
 
-    labels = resolve_labels(all_comps)
-    colors = {c: labels[c][1] for c in all_comps}
-
+    labels = resolve_labels(all_comps, model_artifact)
     panels = [("With interventions", with_iv)]
     if control is not None:
         panels.append(("Without interventions (control)", control))
@@ -521,7 +573,7 @@ def build_figure(path, compartments=None, log_scale=False, title=None, show_delt
     for ax, (label, run) in zip(ts_axes, panels):
         # Markers only make sense on the run that used interventions.
         draw_markers = run is with_iv
-        drew = plot_panel(ax, run, colors, selected, log_scale, draw_markers)
+        drew = plot_panel(ax, run, labels, selected, log_scale, draw_markers)
         any_band = any_band or drew
         ax.set_title(label, fontsize=11)
         ax.set_xlabel("Date")
