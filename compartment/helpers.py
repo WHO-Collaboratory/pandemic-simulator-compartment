@@ -939,12 +939,34 @@ def build_uncertainty_params(transmission_edge_items: list, intervention_items: 
                         edge_id = f"{lookup.get('source', '')}->{lookup.get('target', '')}"
                         param_name = edge_to_variable.get(edge_id)
                     if param_name:
+                        deterministic_value = edge.get("value", 0)
+                        min_value = fc.get("min")
+                        max_value = fc.get("max")
+                        missing_bounds = [
+                            bound
+                            for bound, value in (("min", min_value), ("max", max_value))
+                            if value is None
+                        ]
+                        if missing_bounds:
+                            logger.warning(
+                                "Uncertainty parameter '%s' does not provide %s; "
+                                "using its deterministic value (%s) for the missing "
+                                "%s.",
+                                param_name,
+                                " or ".join(missing_bounds),
+                                deterministic_value,
+                                "bound" if len(missing_bounds) == 1 else "bounds",
+                            )
                         uncertainty_params.append(
                             {
                                 "param": param_name,
                                 "dist": fc.get("distribution_type", "uniform"),
-                                "min": fc.get("min", 0),
-                                "max": fc.get("max", 0),
+                                "min": min_value
+                                if min_value is not None
+                                else deterministic_value,
+                                "max": max_value
+                                if max_value is not None
+                                else deterministic_value,
                             }
                         )
 
