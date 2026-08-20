@@ -893,7 +893,7 @@ class ModelParameterSchema:
         """Serialize the artifact dict to a JSON string."""
         return json.dumps(self.to_artifact_dict(), indent=indent)
 
-    def to_example_config(self) -> dict:
+    def to_example_config(self, uncertainty: bool = False) -> dict:
         """
         Generate an example simulation config JSON from parameter defaults.
 
@@ -903,32 +903,84 @@ class ModelParameterSchema:
         For required date fields that have no default, sensible placeholder
         values are generated automatically so the config is immediately
         runnable.
+
+        When ``uncertainty`` is true, parameters that opt into variance and
+        declare both ``default_min`` and ``default_max`` are enabled for
+        uniform sampling using those bounds.
         """
         from datetime import date, timedelta
+
+        def has_uncertainty_bounds(parameter: ParameterDef) -> bool:
+            return bool(
+                uncertainty
+                and parameter.enable_variance
+                and parameter.default_min is not None
+                and parameter.default_max is not None
+            )
+
+        uncertainty_fields_added = False
 
         # --- Disease section ---
         disease: dict[str, Any] = {
             "disease_type": self.disease_type,
         }
 
-        # Transmission edges
+        # Transmission edges use the normalized join-table shape consumed by
+        # SimulationConfig and ValidationPostProcessor.  Keep values in the
+        # model schema's native units; Model._load_transmission_params() is the
+        # single place that converts DAYS / PERCENTAGE values to rates.
         if self.transmission_edges:
             edges = []
             for edge_def in self.transmission_edges:
+                edge_metadata = edge_def.to_dict()
+                field_config = {
+                    "field_key": "value",
+                    "has_variance": False,
+                    "distribution_type": "UNIFORM",
+                    # Required for custom edges that are not in
+                    # helpers.edge_to_variable.
+                    "disease_param": edge_def.variable_name.upper(),
+                }
+                if has_uncertainty_bounds(edge_def.parameter):
+                    field_config.update(
+                        {
+                            "has_variance": True,
+                            "min": edge_def.parameter.default_min,
+                            "max": edge_def.parameter.default_max,
+                        }
+                    )
+                    uncertainty_fields_added = True
                 edges.append(
                     {
-                        "source": edge_def.source,
-                        "target": edge_def.target,
-                        "data": {
-                            "transmission_rate": edge_def.parameter.default,
+                        "transmission_edge": {
+                            "source": edge_def.source,
+                            "target": edge_def.target,
+                            "value_type": edge_metadata["value_type"],
                         },
+                        "value": edge_def.parameter.default,
+                        "FieldConfigs": {"items": [field_config]},
                     }
                 )
-            disease["transmission_edges"] = edges
+            config_edges = {"items": edges}
+        else:
+            config_edges = None
 
         # Disease-specific params
+        disease_variance = []
         for param in self.disease_parameters:
             disease[param.name] = param.default
+            if has_uncertainty_bounds(param):
+                disease_variance.append(
+                    {
+                        "param": param.name,
+                        "dist": "uniform",
+                        "min": param.default_min,
+                        "max": param.default_max,
+                    }
+                )
+                uncertainty_fields_added = True
+        if disease_variance:
+            disease["variance_params"] = disease_variance
 
         # --- Top-level simulation fields ---
         config: dict[str, Any] = {}
@@ -948,17 +1000,55 @@ class ModelParameterSchema:
             )
             config["end_date"] = val
 
+        # Emit the remaining declared simulation defaults.  run_mode is
+        # model-owned, so use the schema's derived value rather than the
+        # shared field's deterministic default for stochastic models.
+        for name, param in sim_params.items():
+            if name in {"start_date", "end_date"}:
+                continue
+            if name == "run_mode":
+                config[name] = self.run_mode
+            elif param.default is not None:
+                config[name] = param.default
+
         config["Disease"] = disease
+
+        if config_edges is not None:
+            config["TransmissionEdges"] = config_edges
 
         # --- Interventions stub ---
         if self.interventions:
-            interventions_list = []
+            intervention_items = []
             for intv_def in self.interventions:
-                intv: dict[str, Any] = {"id": intv_def.id}
+                intv: dict[str, Any] = {
+                    "Intervention": {
+                        "name": intv_def.id,
+                        "display_name": intv_def.label,
+                    }
+                }
+                field_configs = []
                 for p in intv_def.parameters:
                     intv[p.name] = p.default
-                interventions_list.append(intv)
-            config["interventions"] = interventions_list
+                    if has_uncertainty_bounds(p):
+                        field_configs.append(
+                            {
+                                "field_key": p.name,
+                                "has_variance": True,
+                                "distribution_type": "UNIFORM",
+                                "min": p.default_min,
+                                "max": p.default_max,
+                            }
+                        )
+                        uncertainty_fields_added = True
+                if field_configs:
+                    intv["FieldConfigs"] = {"items": field_configs}
+                intervention_items.append(intv)
+            config["Interventions"] = {"items": intervention_items}
+
+        if uncertainty_fields_added:
+            if self.run_mode != "STOCHASTIC":
+                config["run_mode"] = "UNCERTAINTY"
+            config["n_simulations"] = min(self.num_runs, 30)
 
         # --- Case file with example zones ---
         base_zone_fields: dict[str, Any] = {

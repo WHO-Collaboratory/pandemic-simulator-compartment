@@ -10,6 +10,7 @@ Run:
 from types import SimpleNamespace
 
 from compartment.helpers import (
+    build_uncertainty_params,
     collect_uncertainty_params,
     extract_disease_variance_params,
     resolve_run_mode,
@@ -170,3 +171,60 @@ class TestCollectUncertaintyParams:
             Interventions=None,
         )
         assert collect_uncertainty_params(cfg, None) == []
+
+
+class TestBuildUncertaintyParams:
+    def test_missing_edge_bounds_use_deterministic_value_and_warn(self, caplog):
+        edges = [
+            {
+                "value": 0.25,
+                "transmission_edge": {"source": "S", "target": "E"},
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "disease_param": "BETA",
+                            "has_variance": True,
+                            "distribution_type": "UNIFORM",
+                        }
+                    ]
+                },
+            }
+        ]
+
+        result = build_uncertainty_params(edges, [])
+
+        assert result == [
+            {
+                "param": "beta",
+                "dist": "UNIFORM",
+                "min": 0.25,
+                "max": 0.25,
+            }
+        ]
+        assert "Uncertainty parameter 'beta' does not provide min or max" in caplog.text
+        assert "using its deterministic value (0.25)" in caplog.text
+
+    def test_only_missing_edge_bound_uses_deterministic_value_and_warns(self, caplog):
+        edges = [
+            {
+                "value": 0.25,
+                "transmission_edge": {"source": "S", "target": "E"},
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "disease_param": "BETA",
+                            "has_variance": True,
+                            "distribution_type": "UNIFORM",
+                            "min": 0.1,
+                            "max": None,
+                        }
+                    ]
+                },
+            }
+        ]
+
+        result = build_uncertainty_params(edges, [])
+
+        assert result[0]["min"] == 0.1
+        assert result[0]["max"] == 0.25
+        assert "does not provide max" in caplog.text

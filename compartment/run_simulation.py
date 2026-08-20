@@ -56,6 +56,31 @@ def batch_simulate_and_postprocess(model, n_sims, param_list, ci, num_workers):
     return processor.process(ci=ci)
 
 
+def _local_viewer_model_artifact(model_class):
+    """Return the artifact metadata needed to render local results.
+
+    Cloud results obtain this metadata through their associated ModelArtifact.
+    Local result files are standalone, so include the display-related subset
+    alongside each run for ``tools/view_results.py``.
+    """
+    schema = model_class._get_cached_schema()
+    if schema is None:
+        return None
+
+    artifact = schema.to_artifact_dict()
+    return {
+        key: artifact[key]
+        for key in (
+            "model_key",
+            "disease_type",
+            "name",
+            "compartments",
+            "compartment_display_order",
+        )
+        if key in artifact
+    }
+
+
 def run_simulation(
     model_class,
     simulation_params=None,
@@ -312,6 +337,10 @@ def run_simulation(
         _add_compartment_deltas_v2(result)
 
     if mode == "local":
+        model_artifact = _local_viewer_model_artifact(model_class)
+        if model_artifact:
+            for result in results:
+                result["model_artifact"] = model_artifact
         if output_path is None:
             print(results)
         elif output_path is not None:

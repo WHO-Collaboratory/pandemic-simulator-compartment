@@ -500,6 +500,16 @@ python -m compartment.generate_artifact MY_DISEASE --example-config \
        --config-output compartment/models/your_model/example-config.json
 ```
 
+To generate a parameter-uncertainty example, add ``--uncertainty``. The
+generator enables every parameter with ``enable_variance=True`` and declared
+``default_min`` / ``default_max`` bounds, using those bounds for uniform
+sampling:
+
+```bash
+python -m compartment.generate_artifact MY_DISEASE --example-config \
+       --uncertainty --config-output example-config-uncertainty.json
+```
+
 Local-mode configs accept the "short form" — top-level `admin_zones` and `demographics` are wrapped into `case_file` automatically by `load_config_from_json()`. Required keys:
 
 - `Disease.disease_type` — must match `set_model_info(disease_type=…)`.

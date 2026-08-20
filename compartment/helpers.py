@@ -12,38 +12,189 @@ import scipy.stats as stats
 import os
 import sys
 
+logger = logging.getLogger(__name__)
+
 # --------------------------------------------------
 # Helper Functions: Config Loading
 # --------------------------------------------------
+
+
+def _legacy_edge_metadata(config_data: dict) -> dict[tuple[str, str], dict]:
+    """Return schema metadata keyed by legacy edge source/target.
+
+    Older generated configs did not include ``variable_name`` or
+    ``value_type`` on their embedded ``Disease.transmission_edges``.  Resolve
+    the model lazily so custom edges can be upgraded without relying on the
+    small ``edge_to_variable`` compatibility table.
+    """
+    disease = config_data.get("Disease") or {}
+    artifact = config_data.get("ModelArtifact") or {}
+    model_identifier = artifact.get("model_key") or disease.get("disease_type")
+    if not model_identifier:
+        return {}
+
+    try:
+        from compartment.registry import resolve
+
+        model_class = resolve(model_identifier)
+        if model_class is None:
+            return {}
+        schema = model_class._build_parameter_schema()
+    except Exception:
+        logger.debug(
+            "Could not resolve parameter schema while upgrading legacy config",
+            exc_info=True,
+        )
+        return {}
+
+    return {
+        (edge.source.casefold(), edge.target.casefold()): {
+            "disease_param": edge.variable_name,
+            "value_type": edge.to_dict()["value_type"],
+        }
+        for edge in schema.transmission_edges
+    }
+
+
+def _legacy_field_config(
+    variance: dict | None,
+    *,
+    field_key: str,
+    disease_param: str | None = None,
+) -> dict:
+    """Translate one legacy variance declaration to a FieldConfig item."""
+    variance = variance or {}
+    item = {
+        "field_key": field_key,
+        "has_variance": bool(variance.get("has_variance", False)),
+        "distribution_type": str(
+            variance.get("distribution_type", "UNIFORM")
+        ).upper(),
+    }
+    if disease_param:
+        item["disease_param"] = disease_param.upper()
+    for bound in ("min", "max"):
+        if variance.get(bound) is not None:
+            item[bound] = variance[bound]
+    return item
+
+
+def _normalize_legacy_config(config_data: dict) -> None:
+    """Upgrade legacy generated sections in a SimulationJob config in place."""
+    disease = config_data.get("Disease")
+    if isinstance(disease, dict) and "transmission_edges" in disease:
+        legacy_edges = disease.pop("transmission_edges") or []
+        if "TransmissionEdges" not in config_data:
+            schema_edges = _legacy_edge_metadata(config_data)
+            normalized_edges = []
+            for edge in legacy_edges:
+                source = edge.get("source", "")
+                target = edge.get("target", "")
+                data = edge.get("data") or {}
+                variance = data.get("variance_params") or {}
+                schema_edge = schema_edges.get(
+                    (str(source).casefold(), str(target).casefold()),
+                    {},
+                )
+                disease_param = (
+                    variance.get("field_name")
+                    or schema_edge.get("disease_param")
+                    or edge_to_variable.get(f"{source}->{target}")
+                )
+                lookup = {"source": source, "target": target}
+                value_type = schema_edge.get("value_type") or edge.get("value_type")
+                if value_type:
+                    lookup["value_type"] = value_type
+                normalized_edges.append(
+                    {
+                        "transmission_edge": lookup,
+                        "value": data.get(
+                            "transmission_rate",
+                            edge.get("transmission_rate", 0),
+                        ),
+                        "FieldConfigs": {
+                            "items": [
+                                _legacy_field_config(
+                                    variance,
+                                    field_key="value",
+                                    disease_param=disease_param,
+                                )
+                            ]
+                        },
+                    }
+                )
+            config_data["TransmissionEdges"] = {"items": normalized_edges}
+
+    if "interventions" in config_data:
+        legacy_interventions = config_data.pop("interventions") or []
+        if "Interventions" not in config_data:
+            normalized_interventions = []
+            for intervention in legacy_interventions:
+                intervention = dict(intervention)
+                intervention_id = intervention.pop("id", None) or intervention.pop(
+                    "name", None
+                )
+                variance_params = intervention.pop("variance_params", []) or []
+                item = {
+                    "Intervention": {
+                        "name": intervention_id,
+                        "display_name": intervention.pop(
+                            "display_name",
+                            str(intervention_id).replace("_", " ").title(),
+                        ),
+                    },
+                    **intervention,
+                }
+                if variance_params:
+                    item["FieldConfigs"] = {
+                        "items": [
+                            _legacy_field_config(
+                                variance,
+                                field_key=variance.get("field_name", ""),
+                            )
+                            for variance in variance_params
+                        ]
+                    }
+                normalized_interventions.append(item)
+            config_data["Interventions"] = {"items": normalized_interventions}
 
 
 def load_config_from_json(config_path: str) -> dict:
     """Load simulation config from a local JSON file.
 
     Handles convenience shortcuts so users skip cloud-only boilerplate:
+    - Upgrades legacy Disease.transmission_edges and lowercase interventions
     - Wraps top-level admin_zones into case_file
     - Adds default demographics if missing
     """
     with open(config_path, "r") as f:
         config_data = json.load(f)
 
-    # Already in GraphQL response format — return as-is
-    if "data" in config_data and "getSimulationJob" in config_data["data"]:
+    # Upgrade both short-form files and already-wrapped GraphQL-shaped files.
+    is_wrapped = (
+        "data" in config_data and "getSimulationJob" in config_data["data"]
+    )
+    job_config = (
+        config_data["data"]["getSimulationJob"] if is_wrapped else config_data
+    )
+    _normalize_legacy_config(job_config)
+
+    if is_wrapped:
         return config_data
 
     # Wrap top-level admin_zones into case_file
-    if "admin_zones" in config_data and "case_file" not in config_data:
-        config_data["case_file"] = {"admin_zones": config_data.pop("admin_zones")}
+    if "admin_zones" in job_config and "case_file" not in job_config:
+        job_config["case_file"] = {"admin_zones": job_config.pop("admin_zones")}
 
     # Move top-level demographics into case_file
-    if "case_file" in config_data:
-        if "demographics" not in config_data["case_file"]:
-            config_data["case_file"]["demographics"] = config_data.pop(
+    if "case_file" in job_config:
+        if "demographics" not in job_config["case_file"]:
+            job_config["case_file"]["demographics"] = job_config.pop(
                 "demographics",
                 {},
             )
 
-    return {"data": {"getSimulationJob": config_data}}
+    return {"data": {"getSimulationJob": job_config}}
 
 
 def write_results_to_local(results: list, output_path: str):
@@ -788,12 +939,34 @@ def build_uncertainty_params(transmission_edge_items: list, intervention_items: 
                         edge_id = f"{lookup.get('source', '')}->{lookup.get('target', '')}"
                         param_name = edge_to_variable.get(edge_id)
                     if param_name:
+                        deterministic_value = edge.get("value", 0)
+                        min_value = fc.get("min")
+                        max_value = fc.get("max")
+                        missing_bounds = [
+                            bound
+                            for bound, value in (("min", min_value), ("max", max_value))
+                            if value is None
+                        ]
+                        if missing_bounds:
+                            logger.warning(
+                                "Uncertainty parameter '%s' does not provide %s; "
+                                "using its deterministic value (%s) for the missing "
+                                "%s.",
+                                param_name,
+                                " or ".join(missing_bounds),
+                                deterministic_value,
+                                "bound" if len(missing_bounds) == 1 else "bounds",
+                            )
                         uncertainty_params.append(
                             {
                                 "param": param_name,
                                 "dist": fc.get("distribution_type", "uniform"),
-                                "min": fc.get("min", 0),
-                                "max": fc.get("max", 0),
+                                "min": min_value
+                                if min_value is not None
+                                else deterministic_value,
+                                "max": max_value
+                                if max_value is not None
+                                else deterministic_value,
                             }
                         )
 
