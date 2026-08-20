@@ -7,7 +7,6 @@ from compartment.helpers import (
     setup_logging,
     format_jax_output,
     format_uncertainty_output,
-    get_simulation_step_size,
     compute_multi_run_compartment_deltas,
     get_compartment_delta_grouping
 )
@@ -26,7 +25,6 @@ class SimulationPostProcessor:
         self.n_timesteps = model.n_timesteps
         self.demographics = getattr(model, "demographics", None) or {}
         self.disease_type = model.disease_type
-        self.step = get_simulation_step_size(model.n_timesteps)
         self.intervention_dict = getattr(model, "intervention_dict", {})
         self.payload = model.payload
         self.n_runs = len(self.population_matrix)
@@ -103,7 +101,6 @@ class SimulationPostProcessor:
                 self.n_timesteps,
                 self.demographics,
                 self.disease_type,
-                self.step,
                 self.model.__class__
             )
         
@@ -149,7 +146,6 @@ class SimulationPostProcessor:
             self.admin_units,
             str(self.start_date),
             self.n_timesteps,
-            self.step,
             compartment_deltas,
             intervention_dict=self.intervention_dict,
         )

@@ -295,11 +295,8 @@ def transform_interventions(data):
     return transformed
 
 
-def compute_parent_admin_total(
-    data, payload, unique_id, parent_unique_id, num_timesteps, step
-):
-    # num_timesteps = len(data[0]["time_series"])
-    start_date = datetime.strptime(data[0]["time_series"][0]["date"], "%Y-%m-%d")
+def compute_parent_admin_total(data, payload, unique_id, parent_unique_id):
+    num_timesteps = len(data[0]["time_series"])
     time_series = []
     parent_admin_info = payload.get("AdminUnit")
     results = {
@@ -311,9 +308,11 @@ def compute_parent_admin_total(
     }
 
     for t in range(num_timesteps):
-        timestep_total = {
-            "date": (start_date + timedelta(days=t * step)).strftime("%Y-%m-%d")
-        }
+        # Reuse the child zones' date labels instead of recomputing them from a
+        # fixed step. The output grid appends the exact end date when the
+        # sampling step does not divide the duration evenly, so ``t * step``
+        # would overshoot the requested end date on downsampled runs.
+        timestep_total = {"date": data[0]["time_series"][t]["date"]}
         for zone in data:
             zone_timestep = zone["time_series"][t]
             for compartment, age_groups in zone_timestep.items():
@@ -418,7 +417,6 @@ def create_jax_intervention_results(
     start_date: datetime,
     disease_type: str,
     n_timesteps: int,
-    step: int,
 ):
     """
     Generate a list of {{id, trigger_date, trigger_type, active}} events
@@ -638,7 +636,6 @@ def format_jax_output(
     n_timesteps,
     demographics,
     disease_type,
-    step,
     model_class=None,
 ):
     """Im hoping this replaces the mess we have above"""
@@ -653,7 +650,6 @@ def format_jax_output(
         start_date,
         disease_type,
         n_timesteps,
-        step,
     )
     intervention_dict = transform_interventions(intervention_dict)
 
@@ -732,7 +728,6 @@ def format_jax_output(
             admin_zones_payload,
             n_regions,
             n_timesteps,
-            step,
             unique_id,
             payload,
         )
@@ -749,8 +744,6 @@ def format_jax_output(
         payload,
         unique_id,
         parent_unique_id,
-        population_matrix.shape[0],
-        step,
     )
     return formatted_data
 
@@ -762,7 +755,6 @@ def fast_format_jax_output_demographic(
     admin_zones_payload,
     n_regions,
     n_timesteps,
-    step,
     unique_id,
     payload,
 ):
@@ -840,7 +832,6 @@ def format_uncertainty_output(
     admin_units,
     start_date,
     n_timesteps,
-    step,
     compartment_deltas,
     intervention_dict=None,
 ):

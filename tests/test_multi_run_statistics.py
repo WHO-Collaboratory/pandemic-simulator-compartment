@@ -79,7 +79,6 @@ def test_multi_run_output_reports_date_interventions_once_and_skips_thresholds()
         admin_units=["zone-id"],
         start_date="2026-01-01",
         n_timesteps=6,
-        step=1,
         compartment_deltas={"I": {"median": 0, "lower": 0, "upper": 0}},
         intervention_dict={
             "mask_wearing": {

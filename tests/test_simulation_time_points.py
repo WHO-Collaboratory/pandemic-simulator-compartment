@@ -3,6 +3,7 @@ from datetime import date
 import numpy as np
 
 from compartment.helpers import (
+    compute_parent_admin_total,
     create_jax_intervention_results,
     get_simulation_time_points,
 )
@@ -49,7 +50,6 @@ def test_deterministic_intervention_can_end_on_simulation_end_date():
         start_date=start_date,
         disease_type="TEST",
         n_timesteps=duration,
-        step=1,
     )
 
     assert events == [
@@ -66,3 +66,35 @@ def test_deterministic_intervention_can_end_on_simulation_end_date():
             "active": False,
         },
     ]
+
+
+def test_parent_admin_total_reuses_child_zone_dates():
+    """The parent series must not re-derive dates from a fixed step.
+
+    On a downsampled run the last sample sits off the regular grid, so
+    ``t * step`` would run past the requested end date.
+    """
+    # A 6-day step whose final interval is short: ..., 12, 18, 20.
+    zone_dates = ["2026-01-01", "2026-01-07", "2026-01-13", "2026-01-19", "2026-01-21"]
+    zones = [
+        {
+            "time_series": [
+                {"date": d, "I": {"age_all": 1.0}} for d in zone_dates
+            ]
+        },
+        {
+            "time_series": [
+                {"date": d, "I": {"age_all": 2.0}} for d in zone_dates
+            ]
+        },
+    ]
+
+    parent = compute_parent_admin_total(
+        zones,
+        payload={"AdminUnit": {"id": "parent-id"}, "owner": "owner-id"},
+        unique_id="result-id",
+        parent_unique_id="parent-result-id",
+    )
+
+    assert [entry["date"] for entry in parent["time_series"]] == zone_dates
+    assert parent["time_series"][-1]["I"]["age_all"] == 3.0
