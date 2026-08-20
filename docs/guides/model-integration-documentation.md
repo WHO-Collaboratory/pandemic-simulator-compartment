@@ -46,6 +46,7 @@ Think of your model directory as having two halves: what the user can touch, and
 | Model component | Location | Representation in the UI |
 | :---- | :---- | :---- |
 | `schema.set_model_info()` | `model.py` | Your model's name and description in the model picker. |
+| `schema.set_model_metadata()` | `model.py` | Authorship, license, assumptions, and similar context on the Simulation Configuration page. |
 | `schema.add_compartment()` | `model.py` | The compartments offered for the model, which users can select or deselect. |
 | `schema.add_transmission_parameter()` | `model.py` | The arrows between compartments, each with a control whose default, minimum, and maximum are the ones you declared. |
 | `schema.add_parameter()` | `model.py` | An extra input field, for anything that isn't a flow between compartments. |
@@ -81,8 +82,11 @@ A local run also produces the same results JSON the Simulator charts, which is w
   - [Stochastic models](#stochastic-models)
   - [Parameter uncertainty](#parameter-uncertainty)
   - [main.py](#mainpy)
+  - [Additional files](#additional-files)
+- [Documenting your model](#documenting-your-model)
   - [model.md](#modelmd)
-  - [Documentation for your model](#documentation-for-your-model)
+  - [Model metadata](#model-metadata)
+  - [Docstrings for the technical API](#docstrings-for-the-technical-api)
 - [example-config.json](#example-configjson)
   - [Generating artifacts](#generating-artifacts)
 - [Install additional packages](#install-additional-packages)
@@ -332,7 +336,7 @@ python -m compartment.new_model example_parameter_uncertainty_declarative --labe
 - **`__init__.py`** — leave empty. It marks the directory as a Python package.
 - **`model.py`** — the disease class: parameters, input formatting, and the equation function for a minimal SIR model.
 - **`main.py`** — loads the model and executes the simulation.
-- **`model.md`** — an outline listing the sections to cover; replace the suggested sections with your own write-up. See [model.md](#modelmd).
+- **`model.md`** — a template for the write-up users see in the "You should know" section of the results page. See [Documenting your model](#documenting-your-model).
 - **`example-config.json`** — configuration for running the simulation locally.
 
 `label` and `description` are shown to users in the Pandemic Simulator UI. 
@@ -770,11 +774,30 @@ if __name__ == "__main__":
     )
 ```
 
+### Additional files
+
+To organize your code further, put extra functions in separate files inside your model directory and import them into `model.py`.
+
+---
+
+## Documenting your model
+
+A finished model needs three pieces of documentation. Each has a different audience and a different home:
+
+| What you write | Where it lives | Who reads it, and where |
+| :---- | :---- | :---- |
+| A write-up of how the model behaves | `model.md`, beside `model.py` | Users, in the **"You should know"** panel on the results page. |
+| `schema.set_model_metadata()` | inside `define_parameters()` in `model.py` | Users, on the **Simulation Configuration** page. |
+| Docstrings | throughout your Python source | Other modelers, on the [technical API](#technical-api) site. |
+
+The first two travel with your model into the Pandemic Simulator: both are collected into the artifact JSON the UI reads. The third is published separately, from the source code itself.
+
 ### model.md
 
-Created by the scaffold as a template listing suggested sections — replace those with your own write-up. Use [Markdown syntax](https://www.markdownguide.org/basic-syntax/). Its contents appear in the **"You should know"** section of the results page; delete the file and that section is omitted.
+Created by the scaffold as a template listing suggested sections — replace those with your own write-up. Use [Markdown syntax](https://www.markdownguide.org/basic-syntax/). Delete the file and the "You should know" panel is omitted.
 
-Cover anything users should be aware of, suggestions in the template include:
+Cover anything users should be aware of. The suggestions in the template are:
+
 - **Model overview** — Brief plain-language description of how the model works.
 - **Compartment and state definitions** — Meaning of each compartment, state,
   or population group.
@@ -791,7 +814,7 @@ Cover anything users should be aware of, suggestions in the template include:
   unrealistic, or invalid results.
 - **Differences from the source model** — Any deliberate implementation changes
   or numerical approximations.
-- **Related models** — When users might choose another model in the repository. 
+- **Related models** — When users might choose another model in the repository.
 
 All three example models include one. From `example_stochastic_model/model.md`:
 
@@ -808,7 +831,9 @@ population into **asymptomatic** and **symptomatic** compartments and uses
   infectious), `R`, plus a cumulative `I_total` tracker and `R_total`.
 ```
 
-You can also record structured metadata in `define_parameters()` with `schema.set_model_metadata()`, as `example_stochastic_model` does. This will appear on the Simulation Configuration page of the UI.
+### Model metadata
+
+Where `model.md` is prose, `schema.set_model_metadata()` records provenance and scope — who wrote the model, what it assumes, what it is for — as structured fields the UI can lay out on its own. Call it in `define_parameters()`, as `example_stochastic_model` does:
 
 ```python
 schema.set_model_metadata(
@@ -822,11 +847,11 @@ schema.set_model_metadata(
 )
 ```
 
-### Documentation for your model
+Every field is optional, and none of them affect how the simulation runs. Beyond those shown above you can also set `citations`, `applicability`, `not_for`, `constraints`, `biases`, and `validation` — see [`set_model_metadata`](https://who-collaboratory.github.io/pandemic-simulator-compartment/api/parameters/#compartment.parameters.ParameterSchemaBuilder.set_model_metadata) for what each one expects.
 
-The [technical API](https://who-collaboratory.github.io/pandemic-simulator-compartment/) rebuilds automatically whenever code is merged to `main`. Model pages are generated automatically — no extra files or configuration needed.
+### Docstrings for the technical API
 
-The only requirement is that docstrings follow [Google style](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods), using section headers like `Args:`, `Returns:`, and `Raises:` with indented descriptions:
+The [technical API](#technical-api) rebuilds whenever code is merged to `main`, and your model gets a page there with no extra files or configuration. The only requirement is that docstrings follow [Google style](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods), using section headers like `Args:`, `Returns:`, and `Raises:` with indented descriptions:
 
 ```python
 def equation(self, y, t, p):
@@ -848,11 +873,7 @@ To see the result, compare the docstring above with the published page for [`Exa
 
 [equation-rendered]: https://who-collaboratory.github.io/pandemic-simulator-compartment/models/example-stochastic/#compartment.models.example_stochastic_model.model.ExampleStochasticModel.equation
 
-Any public class or method without a docstring is omitted from the docs.
-
-### Additional files
-
-To organize your code further, put extra functions in separate files inside your model directory and import them into `model.py`.
+Any public class or method without a docstring is omitted from the site.
 
 ---
 
