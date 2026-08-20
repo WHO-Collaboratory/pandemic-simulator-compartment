@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 from jax.experimental.ode import odeint
 
-from compartment.helpers import get_simulation_step_size, setup_logging
+from compartment.helpers import get_simulation_time_points, setup_logging
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -18,9 +18,10 @@ class SimulationManager:
         logger.info("run_simulation function STARTING")
 
         logger.info(f"n_timesteps: {self.model.n_timesteps}")
-        step = get_simulation_step_size(self.model.n_timesteps)
+        ts = get_simulation_time_points(self.model.n_timesteps)
+        step = ts[1] - ts[0] if len(ts) > 1 else 0
         logger.info(f"step size (days): {step}")
-        ts = np.arange(0.0, float(self.model.n_timesteps), step)
+        logger.info(f"number of output time points: {len(ts)}")
 
         # Build the model's travel matrix before prepare_initial_state() so it
         # exists by the time equation() -> _apply_interventions() reads it.

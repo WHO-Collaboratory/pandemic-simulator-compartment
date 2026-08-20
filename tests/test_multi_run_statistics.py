@@ -52,8 +52,8 @@ def test_v2_deltas_preserve_median_schema_and_legacy_field_gets_central_value():
 
 
 def test_multi_run_output_reports_date_interventions_once_and_skips_thresholds():
-    shape_child = (6, 1, 1)
-    shape_parent = (6, 1)
+    shape_child = (7, 1, 1)
+    shape_parent = (7, 1)
     zeros_child = np.zeros(shape_child)
     zeros_parent = np.zeros(shape_parent)
     jan_1 = date(2026, 1, 1)
@@ -84,7 +84,7 @@ def test_multi_run_output_reports_date_interventions_once_and_skips_thresholds()
         intervention_dict={
             "mask_wearing": {
                 "start_date_ordinal": jan_1.toordinal() + 1,
-                "end_date_ordinal": jan_1.toordinal() + 4,
+                "end_date_ordinal": jan_1.toordinal() + 6,
             },
             "lock_down": {
                 "start_date_ordinal": None,
@@ -104,8 +104,9 @@ def test_multi_run_output_reports_date_interventions_once_and_skips_thresholds()
         },
         {
             "id": "mask_wearing",
-            "trigger_date": "2026-01-05",
+            "trigger_date": "2026-01-07",
             "trigger_type": "DATE",
             "active": False,
         },
     ]
+    assert result["parent_admin_total"]["time_series"][-1]["date"] == "2026-01-07"

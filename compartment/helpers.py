@@ -481,10 +481,21 @@ def create_jax_intervention_results(
     # Track ON/OFF status for each intervention across timesteps
     status = {name: False for name in intervention_dict.keys()}
 
-    for day in range(n_timesteps):
+    time_points = get_simulation_time_points(n_timesteps)
+    if len(time_points) != population_matrix.shape[0]:
+        raise ValueError(
+            "Population matrix time axis does not match the simulation time grid: "
+            f"{population_matrix.shape[0]} values for {len(time_points)} time points"
+        )
+
+    for day in range(n_timesteps + 1):
         current_date = start_date + timedelta(days=day)
         current_ordinal = current_date.toordinal()
-        idx = day // step  # index into population_matrix
+        # Threshold reconstruction uses the most recent solver output on or
+        # before this calendar day. This also maps the exact final day to the
+        # appended endpoint when the regular sampling step does not divide the
+        # duration evenly.
+        idx = int(np.searchsorted(time_points, day, side="right") - 1)
 
         if disease_type == "VECTOR_BORNE":
             humans_only = population_matrix[idx][
@@ -588,7 +599,7 @@ def create_date_based_intervention_results(
 
         if (
             start_ordinal is not None
-            and simulation_start.toordinal() <= start_ordinal < simulation_end_ordinal
+            and simulation_start.toordinal() <= start_ordinal <= simulation_end_ordinal
         ):
             events.append(
                 {
@@ -603,7 +614,7 @@ def create_date_based_intervention_results(
             # emitted after the intervention has activated in the simulation.
             if (
                 end_ordinal is not None
-                and start_ordinal < end_ordinal < simulation_end_ordinal
+                and start_ordinal < end_ordinal <= simulation_end_ordinal
             ):
                 events.append(
                     {
@@ -661,9 +672,15 @@ def format_jax_output(
     }
     admin_zones_payload = payload["case_file"]["admin_zones"]
 
+    time_points = get_simulation_time_points(n_timesteps)
+    if len(time_points) != population_matrix.shape[0]:
+        raise ValueError(
+            "Population matrix time axis does not match the simulation time grid: "
+            f"{population_matrix.shape[0]} values for {len(time_points)} time points"
+        )
     dates = [
-        (start_date + timedelta(days=i * step)).strftime("%Y-%m-%d")
-        for i in range(population_matrix.shape[0])
+        (start_date + timedelta(days=float(offset))).strftime("%Y-%m-%d")
+        for offset in time_points
     ]
 
     if population_matrix.ndim == 3:
@@ -752,9 +769,17 @@ def fast_format_jax_output_demographic(
     # Build index arrays - only include base compartments (not cumulative _total columns)
     master_list = [c for c in compartment_list if not c.endswith("_total")]
     age_labels = list(demographics.keys())
+    time_points = get_simulation_time_points(n_timesteps)
+    if len(time_points) != population_matrix.shape[0]:
+        raise ValueError(
+            "Population matrix time axis does not match the simulation time grid: "
+            f"{population_matrix.shape[0]} values for {len(time_points)} time points"
+        )
     dates = [
-        (payload["start_date"] + timedelta(days=i * step)).strftime("%Y-%m-%d")
-        for i in range(population_matrix.shape[0])
+        (
+            payload["start_date"] + timedelta(days=float(offset))
+        ).strftime("%Y-%m-%d")
+        for offset in time_points
     ]
     regions = [admin_zones_payload[i].get("id", None) for i in range(n_regions)]
     index = pd.MultiIndex.from_product(
@@ -854,6 +879,13 @@ def format_uncertainty_output(
     # number of timesteps in the output
     n_outputs_child = medians_child.shape[0]
     n_outputs_parent = medians_parent.shape[0]
+    time_points = get_simulation_time_points(n_timesteps)
+    if n_outputs_child != len(time_points) or n_outputs_parent != len(time_points):
+        raise ValueError(
+            "Multi-run output time axes do not match the simulation time grid: "
+            f"child={n_outputs_child}, parent={n_outputs_parent}, "
+            f"time_points={len(time_points)}"
+        )
 
     # Format child admin zones
     for zone_idx, zone in enumerate(admin_units):
@@ -865,8 +897,8 @@ def format_uncertainty_output(
             "time_series": [],
         }
 
-        for t in range(n_outputs_child):
-            date = base_date + timedelta(days=step * t)
+        for t, offset in enumerate(time_points):
+            date = base_date + timedelta(days=float(offset))
             record = {"date": date.isoformat()}
 
             # embed each compartment name as its own key (exclude cumulative columns)
@@ -883,8 +915,8 @@ def format_uncertainty_output(
 
     # Parent admin total (total population) output
     parent_time_series = []
-    for t in range(n_outputs_parent):
-        date = base_date + timedelta(days=step * t)
+    for t, offset in enumerate(time_points):
+        date = base_date + timedelta(days=float(offset))
         record = {"date": date.isoformat()}
         for c_idx, comp_name in display_compartments:
             record[comp_name] = {
@@ -1267,6 +1299,25 @@ def get_simulation_step_size(n_timesteps):
     import math
 
     return max(math.ceil(n_timesteps / 365), 1)
+
+
+def get_simulation_time_points(n_timesteps):
+    """Return solver/output day offsets including the exact end date.
+
+    ``n_timesteps`` is the elapsed simulation duration in days, not the number
+    of output rows. The initial state is reported at day zero and the final
+    state at ``n_timesteps``, producing 366 daily observations for a 365-day
+    simulation. For downsampled longer simulations, the exact endpoint is
+    appended when the regular step does not divide the duration evenly.
+    """
+    duration = float(n_timesteps)
+    step = get_simulation_step_size(n_timesteps)
+    time_points = np.arange(0.0, duration, step, dtype=float)
+
+    if time_points.size == 0 or not np.isclose(time_points[-1], duration):
+        time_points = np.append(time_points, duration)
+
+    return time_points
 
 
 def prepare_covid_initial_state(

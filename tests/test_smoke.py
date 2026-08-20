@@ -163,3 +163,11 @@ class TestModelSmoke:
                 assert dates[i] > dates[i - 1], (
                     f"Dates not sequential: {dates[i-1]} >= {dates[i]}"
                 )
+
+    def test_time_series_includes_simulation_end_date(self, model_run):
+        """The final computed state should be labeled with the requested end date."""
+        _, results = model_run
+        for run in results:
+            assert run["parent_admin_total"]["time_series"][-1]["date"] == run[
+                "end_date"
+            ]
