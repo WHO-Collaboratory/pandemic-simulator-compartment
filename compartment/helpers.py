@@ -561,6 +561,62 @@ def create_jax_intervention_results(
     return events
 
 
+def create_date_based_intervention_results(
+    intervention_dict: dict,
+    start_date,
+    n_timesteps: int,
+):
+    """Return one shared set of date-trigger events for a multi-run result.
+
+    Date schedules do not vary between uncertainty or stochastic trajectories,
+    so they can be reported once on the aggregate result. Threshold events are
+    intentionally excluded because their trigger dates can differ per run.
+    """
+    if isinstance(start_date, datetime):
+        simulation_start = start_date.date()
+    elif isinstance(start_date, date):
+        simulation_start = start_date
+    else:
+        simulation_start = datetime.strptime(str(start_date), "%Y-%m-%d").date()
+
+    simulation_end_ordinal = simulation_start.toordinal() + n_timesteps
+    events = []
+
+    for name, cfg in intervention_dict.items():
+        start_ordinal = cfg.get("start_date_ordinal")
+        end_ordinal = cfg.get("end_date_ordinal")
+
+        if (
+            start_ordinal is not None
+            and simulation_start.toordinal() <= start_ordinal < simulation_end_ordinal
+        ):
+            events.append(
+                {
+                    "id": name,
+                    "trigger_date": date.fromordinal(start_ordinal).isoformat(),
+                    "trigger_type": "DATE",
+                    "active": True,
+                }
+            )
+
+            # Match deterministic event semantics: an end event is only
+            # emitted after the intervention has activated in the simulation.
+            if (
+                end_ordinal is not None
+                and start_ordinal < end_ordinal < simulation_end_ordinal
+            ):
+                events.append(
+                    {
+                        "id": name,
+                        "trigger_date": date.fromordinal(end_ordinal).isoformat(),
+                        "trigger_type": "DATE",
+                        "active": False,
+                    }
+                )
+
+    return sorted(events, key=lambda event: event["trigger_date"])
+
+
 def format_jax_output(
     intervention_dict,
     payload,
@@ -766,6 +822,7 @@ def format_uncertainty_output(
 
     unique_id = str(uuid.uuid4())  # Generate unique id for gql
     parent_unique_id = str(uuid.uuid4())
+    base_date = datetime.strptime(start_date, "%Y-%m-%d").date()
 
     formatted_data = {
         "id": unique_id,
@@ -777,12 +834,14 @@ def format_uncertainty_output(
         "end_date": payload["end_date"],
         "time_steps": payload["time_steps"],
         "interventions": transform_interventions(intervention_dict or {}),
+        "intervention_results": create_date_based_intervention_results(
+            intervention_dict or {}, base_date, n_timesteps
+        ),
         "admin_zones": [],
         "compartment_deltas": compartment_deltas,
         "parent_admin_total": [],
     }
 
-    base_date = datetime.strptime(start_date, "%Y-%m-%d").date()
     admin_zones_payload = payload["case_file"]["admin_zones"]
 
     # Filter out cumulative (_total) columns from time_series output
