@@ -70,6 +70,8 @@ A local run also produces the same results JSON the Simulator charts, which is w
   - [Create a virtual environment](#create-a-virtual-environment)
   - [Git workflow](#git-workflow)
 - [Add a new model](#add-a-new-model)
+  - [Choose a unique name](#choose-a-unique-name)
+  - [Run the scaffold](#run-the-scaffold)
 - [Writing the model](#writing-the-model)
   - [How the framework uses your class](#how-the-framework-uses-your-class)
   - [model.py](#modelpy)
@@ -279,7 +281,21 @@ git log --oneline         # view your commits
 
 Before integrating your model, verify it runs correctly locally.
 
-The scaffold command creates the directory layout with a working SIR template. Only the directory name is required; the disease name cannot contain spaces.
+The scaffold command creates the directory layout with a working SIR template that the modeler can alter. Start by choosing the name it will live under.
+
+### Choose a unique name
+
+The scaffold appends `_model` to the name you pass, so `example_parameter_uncertainty_declarative` becomes `compartment/models/example_parameter_uncertainty_declarative_model/`. Class names and the code that instantiates them are generated to match.
+
+**That directory name must be unique.** No other directory in `compartment/models/` can already use it. The scaffold will not overwrite an existing directory: it stops before creating anything and prints
+
+```
+Error: 'pandemic-simulator-compartment/compartment/models/example_parameter_uncertainty_declarative_model' already exists.
+```
+
+Neither the model directory name nor the disease type can contain spaces.
+
+### Run the scaffold
 
 ```
 python -m compartment.new_model <model_directory_name>
@@ -288,7 +304,7 @@ python -m compartment.new_model <model_directory_name>
     [--description "<model_description>"]
 ```
 
-Replace the values inside angle brackets (`< >`). Options in square brackets (`[ ]`) are optional — **do not type the square brackets**.
+Replace the values inside angle brackets (`< >`). Only the model directory name is required. Options in square brackets (`[ ]`) are optional — **do not type the square brackets**.
 
 The command that produced the declarative example model:
 
@@ -305,31 +321,21 @@ python -m compartment.new_model example_parameter_uncertainty_declarative \
 python -m compartment.new_model example_parameter_uncertainty_declarative --label "Example Disease with Declarative Parameter Uncertainty" --disease-type example_parameter_uncertainty_declarative --description "A SIR model for an example disease with declarative parameter uncertainty"
 ```
 
-> That directory already exists in the repository, so running the command verbatim exits with `Error: '...' already exists.` Substitute your own model name, or add `--dry-run` to preview the output without writing files:
+> That directory already exists in the repository, so running the command verbatim fails the uniqueness rule above. Substitute your own model name, or add `--dry-run` to preview the output without writing files:
 >
 > ```shell
 > python -m compartment.new_model example_parameter_uncertainty_declarative --dry-run
 > ```
-
-The scaffold appends `_model` to the directory name, so `example_parameter_uncertainty_declarative` becomes `compartment/models/example_parameter_uncertainty_declarative_model/`. Class names and the code that instantiates them are generated to match.
 
 **Files created**
 
 - **`__init__.py`** — leave empty. It marks the directory as a Python package.
 - **`model.py`** — the disease class: parameters, input formatting, and the equation function for a minimal SIR model.
 - **`main.py`** — loads the model and executes the simulation.
-- **`model.md`** — a outline listing the sections to cover; replace the suggested sections with your own write-up. See [model.md](#modelmd).
+- **`model.md`** — an outline listing the sections to cover; replace the suggested sections with your own write-up. See [model.md](#modelmd).
 - **`example-config.json`** — configuration for running the simulation locally.
 
-`label` and `description` are shown to users in the Pandemic Simulator UI. `disease-type` is used only by the back end to identify which model to load, and **must be unique across all models**. If it collides, running the model produces:
-
-```
-RuntimeError: Duplicate DISEASE_TYPE 'MY_DISEASE':
-'MyDisease2JaxModel' and 'MyDiseaseJaxModel'
-both claim the same disease type.
-```
-
-Open `model.py`, change `disease_type` to a unique value, and rerun.
+`label` and `description` are shown to users in the Pandemic Simulator UI. 
 
 **Verification run (optional).** Before changing any code, run the scaffolded model to confirm your environment works. Output files land in `results/`, which is in `.gitignore`.
 
