@@ -788,7 +788,7 @@ A finished model needs three pieces of documentation. Each has a different audie
 | :---- | :---- | :---- |
 | A write-up of how the model behaves | `model.md`, beside `model.py` | Users, in the **"You should know"** panel on the results page. |
 | `schema.set_model_metadata()` | inside `define_parameters()` in `model.py` | Users, on the **Simulation Configuration** page. |
-| Docstrings | throughout your Python source | Other modelers, on the [technical API](#technical-api) site. |
+| Docstrings | throughout your Python code | Other modelers, on the [technical API](#technical-api) site. |
 
 The first two travel with your model into the Pandemic Simulator: both are collected into the artifact JSON the UI reads. The third is published separately, from the source code itself.
 
