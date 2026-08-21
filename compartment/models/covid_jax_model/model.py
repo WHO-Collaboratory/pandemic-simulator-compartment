@@ -221,7 +221,14 @@ class CovidJaxModel(Model):
         schema.add_intervention(
             id="vaccination",
             label="Vaccination",
-            description="Leaky-vaccine campaign: lowers the effective transmission rate, with adherence as vaccination coverage and transmission reduction as vaccine efficacy",
+            description=(
+                "Leaky-vaccine campaign: lowers the effective transmission rate "
+                "while active, with adherence as vaccination coverage and "
+                "transmission reduction as vaccine efficacy. There are no after "
+                "effects. The reduction is applied only while the intervention is "
+                "on; transmission returns to its baseline rate the moment it is "
+                "turned off, and no immunity is carried forward from the campaign."
+            ),
             target_rates=["beta"],
             adherence=60.0,
             transmission_reduction=80.0,
@@ -237,7 +244,8 @@ class CovidJaxModel(Model):
                 "Percentage of each region's population away from home on a given "
                 "day. Trips are distributed across destinations by an inverse-square "
                 "gravity model weighted by population and distance. 0 disables "
-                "inter-regional travel."
+                "inter-regional travel. Note that if an admin 2 zone is selected, "
+                "no travel takes place regardless of this value."
             ),
             value_type=ValueType.PERCENTAGE,
             default=20.0,

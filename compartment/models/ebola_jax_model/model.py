@@ -255,7 +255,9 @@ class EbolaJaxModel(Model):
                 "Percentage of each zone's population away from home on a given day. "
                 "Trips are distributed across destinations by an inverse-square "
                 "gravity model weighted by population and distance, driving the "
-                "spatial FOI mixing. 0 disables inter-zone travel."
+                "spatial FOI mixing. 0 disables inter-zone travel. Note that if an "
+                "admin 2 zone is selected, no travel takes place regardless of this "
+                "value."
             ),
             value_type=ValueType.PERCENTAGE,
             default=5.0,

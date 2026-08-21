@@ -87,6 +87,14 @@ A local run also produces the same results JSON the Simulator charts, which is w
   - [Visualize model results](#visualize-model-results)
 - [Run tests](#run-tests)
 - [Submit a pull request](#submit-a-pull-request)
+- [Approve a model](#approve-a-model)
+  - [Review the pull request](#1-review-the-pull-request)
+  - [Tag a release](#2-tag-a-release)
+  - [Watch the pipeline](#3-watch-the-pipeline)
+  - [Review the model in Model Approvals](#4-review-the-model-in-model-approvals)
+  - [Simulate before publishing](#5-simulate-before-publishing)
+  - [Publish](#6-publish)
+  - [Unpublishing and archiving](#unpublishing-and-archiving)
 
 ---
 
@@ -1083,3 +1091,108 @@ Once your model runs and passes tests, open a pull request so WHO Collaboratory 
 6. **Request review** from the appropriate reviewer or team. Respond to comments and push additional commits if changes are requested.
 
 7. **Merge after approval**, once checks pass, following the project's standard process.
+
+---
+
+## Approve a model
+
+Everything above is the modeler's job. This section is the **approver's** — the reviewer who takes a submitted model from an open pull request to a model users can actually pick in the simulator.
+
+Models are published to UAT, at <https://uat.pandemic-simulator.com/>. Every step below happens there.
+
+The short version: review the PR, merge it, tag a release, then publish the model from the **Model Approvals** dashboard. Merging alone puts nothing in front of users — the tag is what builds and ships the model, and the Publish button is what reveals it.
+
+### 1. Review the pull request
+
+Read the diff the way a user will meet the model: **anything declared on the `schema` becomes UI.**
+
+- **The schema is a contract.** Every `add_parameter()`, `add_transmission_edge()`, and `add_intervention()` turns into a control on the Simulation Configuration page. Check that labels read plainly, descriptions say what the number actually does, units are right, and `min_value` / `max_value` bound the parameter to a physically sensible range. A slider is only as safe as its limits, and widening one later widens it for every existing user.
+- **The defaults have to run.** `example-config.json` is what the smoke test executes and what seeds a user's first simulation. Confirm the defaults produce a plausible epidemic curve rather than a flat line or a blow-up.
+- **The model documents itself.** `model.md` and the `schema.set_model_metadata()` block — authors, license, citations, key assumptions, applicability, `not_for`, known biases, validation — are rendered verbatim in the approvals preview and on the model's page. Missing provenance is a legitimate reason to request changes.
+- **CI is green.** `smoke-tests` runs each model's integration smoke test plus `tests/test_<model>.py` where one exists. Don't approve on a red or skipped matrix leg.
+- **Run it yourself** when the diff touches `equation()`, mobility, or interventions:
+
+  ```shell
+  python -m compartment.models.<their_model>.main \
+      --mode local \
+      --config_file compartment/models/<their_model>/example-config.json \
+      --output_file results/<their_model>-review.json
+
+  python tools/view_results.py results/<their_model>-review.json
+  ```
+
+Approve, or request changes with specifics. Then merge to `main`.
+
+### 2. Tag a release
+
+Merging builds nothing. The `disease-pipeline` workflow fires on a semver tag, and you create that tag from GitHub — no terminal needed.
+
+1. **Open Releases.** From the repository's **Code** tab, click **Releases** in the right-hand sidebar (or go to the repository URL with `/releases` on the end).
+
+2. **Click "Draft a new release."**
+
+3. **Create the tag.** Click the **Choose a tag** dropdown, type the new version — `v1.4.0` — and click **"+ Create new tag: v1.4.0 on publish."** The tag must start with `v` and be three numbers separated by dots, or the pipeline will not fire.
+
+4. **Confirm the target is `main`.** The **Target** dropdown sits next to the tag dropdown and defaults to `main`. If it shows a branch or commit, set it back to `main` — the tag is cut from whatever is selected here.
+
+5. **Add a title and notes.** Use the version as the title. Click **Generate release notes** to pull in the merged pull requests since the last release, then add a line naming the model that changed and what changed about it.
+
+6. **Click "Publish release."** This is the step that creates and pushes the tag, which is what starts the build. **Saving a draft does nothing** — a draft release holds no tag, so the pipeline never runs. If you tick **Set as a pre-release**, the tag is still created and the pipeline still runs; the label is cosmetic.
+
+The tag covers **every** model in `compartment/models/` that ships an `example-config.json`, not just the one that changed — the pipeline auto-discovers them and fans out. Re-publishing unchanged models is harmless (identical artifacts are content-hashed and skipped), but the version number applies repo-wide, so pick it accordingly.
+
+**Troubleshooting**
+
+- **Nothing happens after publishing** — check the tag's spelling on the **Releases** page. `1.4.0`, `v1.4`, and `release-1.4.0` all fail to match the workflow's tag pattern and are silently ignored.
+- **The tag already exists** — GitHub will not let you reuse one. Cut the next patch version rather than deleting and recreating a tag; deleting a published tag breaks the artifact-to-version mapping for anything already provisioned from it.
+
+### 3. Watch the pipeline
+
+Open the **Actions** tab and follow the `disease-pipeline` run for your tag. In order, it:
+
+1. Runs the smoke tests.
+2. Builds and pushes a container image per model to ECR, tagged `{model_directory}-{tag}`.
+3. Generates each model's artifact JSON, uploads it to S3 under its SHA-256, and records the image-to-artifact mapping.
+4. Emits a `ModelVersionPublished` event per artifact.
+
+That event is what provisions the model's Lambda and registers the artifact with the API. Downstream, the artifact processor seeds the model's transmission edges, interventions, custom fields, and demographic groups so the UI has something to render.
+
+**Troubleshooting**
+
+- **Job fails at "Stage datasets"** — a file declared in the model's `datasets.yaml` is missing from the bucket. Fix the dataset, then tag again; the pipeline deliberately fails here rather than letting the simulation fail later with no data.
+- **Pipeline is green but nothing appears in Model Approvals** — provisioning is asynchronous and takes a few minutes. If the artifact still hasn't landed, check the provisioner's dead-letter queue.
+- **Never move or delete a tag to "redo" a release.** Cut the next patch version instead.
+
+### 4. Review the model in Model Approvals
+
+Go to **Model Approvals** (<https://uat.pandemic-simulator.com/model-approvals>). The dashboard is visible to admins, super admins, and disease modelers; **only a super admin can change a model's status.**
+
+The new version arrives with status **NEW** and is invisible to ordinary users. Find it by name, disease type, or version, and select it to open the preview panel on the right. Read the preview as the user-facing surface it is: compartments, transmission edges, interventions, custom fields, demographic groups, contact-matrix overrides, and the model's authorship and assumptions. Anything that reads wrong here reads wrong to the user.
+
+Statuses run **NEW → PREPUBLISH → PUBLISHED → ARCHIVED**. Only `PUBLISHED` models reach the disease-model dropdown on the simulation page.
+
+### 5. Simulate before publishing
+
+Click **Simulate**. This opens the simulation form preloaded with the model even though it isn't published yet, which is the point: a real run against the deployed Lambda, in UAT, before any user can reach it.
+
+Confirm that:
+
+- The configuration form renders every parameter with the labels, units, and bounds you reviewed in the PR.
+- The run completes rather than erroring or timing out.
+- Results are plausible, and the intervention and control curves differ in the direction the intervention claims.
+- Interventions and admin-zone selection behave as documented.
+
+If anything is wrong, leave the model unpublished and go back to the modeler. An unpublished model costs nothing; a published broken one is in front of every user.
+
+### 6. Publish
+
+With the model selected in the preview panel, click **Publish** (super admin only). Status flips to `PUBLISHED` and the model appears in the disease-model dropdown for all UAT users.
+
+Verify the result: open the simulation page as a normal user would, confirm the model is listed under the right name and version, and run it once from a clean form.
+
+### Unpublishing and archiving
+
+- **Unpublish** returns a published model to `PREPUBLISH`. It disappears from the dropdown immediately while staying available in Model Approvals — this is the fast lever if a problem surfaces after release.
+- **Archive** retires a model version for good. Use it for superseded versions, not for a model you intend to fix and re-publish.
+
+Neither action deletes anything, and neither touches simulations users have already run.
