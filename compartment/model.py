@@ -870,7 +870,7 @@ class Model(ABC):
         constructed model (whose ``__init__`` may have already baked params
         into derived constants like ``1/latent_period``), the runner rebuilds
         the model from an overridden config so every value declared via
-        ``add_transmission_edge`` / ``add_parameter`` /
+        ``add_transmission_parameter`` / ``add_parameter`` /
         ``add_intervention`` is re-derived from scratch.
 
         Override keys are routed by kind, using the schema to disambiguate:
@@ -933,7 +933,7 @@ class Model(ABC):
 
         For migrated models this is derived automatically from the
         parameter schema — no need to override.  The tuple order matches
-        the ``add_transmission_edge()`` call order in
+        the ``add_transmission_parameter()`` call order in
         ``define_parameters()``, which must match the positional unpack
         in ``equation()``.
 

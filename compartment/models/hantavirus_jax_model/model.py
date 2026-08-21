@@ -207,7 +207,7 @@ class HantavirusJaxModel(Model):
             ("M_ff", "rural-empty (home)"),
             ("M_af", "rural-empty visiting populated"),
         ):
-            schema.add_transmission_edge(
+            schema.add_transmission_parameter(
                 source=f"{prefix}E", target=f"{prefix}I",
                 variable_name=f"delta_{prefix.split('_')[1]}",
                 label=f"Rodent Incubation ({where})",
@@ -221,7 +221,7 @@ class HantavirusJaxModel(Model):
                 min_value=2.0, max_value=180.0,
                 unit="days", value_type=ValueType.DAYS,
             )
-            schema.add_transmission_edge(
+            schema.add_transmission_parameter(
                 source=f"{prefix}I", target=f"{prefix}R",
                 variable_name=f"gamma_{prefix.split('_')[1]}",
                 label=f"Rodent Infectious Period ({where})",
@@ -524,7 +524,7 @@ class HantavirusJaxModel(Model):
         # skipped in _compute_equations() and only its rate value
         # (modified by the intervention) is read in equation() as a
         # multiplier on the spillover βs.
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="H_uuS", target="H_uuS",
             variable_name="spillover_scale",
             label="Spillover Scaling Factor",

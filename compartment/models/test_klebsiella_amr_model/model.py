@@ -231,7 +231,7 @@ class KlebsiellaAmrModel(Model):
         # All dynamics are computed manually in equation(); these edges
         # expose the key rates to the UI as configurable parameters.
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="Sc_u",
             target="CWc_u",
             variable_name="beta",
@@ -249,7 +249,7 @@ class KlebsiellaAmrModel(Model):
             unit="per day",
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="CWc_u",
             target="Sc_u",
             variable_name="clearance",
@@ -264,7 +264,7 @@ class KlebsiellaAmrModel(Model):
             value_type=ValueType.DAYS,
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="CWh_u",
             target="IW_h",
             variable_name="infection_rate",
@@ -282,7 +282,7 @@ class KlebsiellaAmrModel(Model):
             value_type=ValueType.DAYS,
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="IW_h",
             target="Sh_u",
             variable_name="recovery_rate",

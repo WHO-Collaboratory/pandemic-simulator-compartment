@@ -174,7 +174,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
         )
 
         # --- Transmission edges (simple single-rate flows only) ------------
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="E", target="I",
             variable_name="alpha",
             label="Incubation Period (E->I)",
@@ -185,7 +185,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
             unit="days",
             value_type=ValueType.DAYS,
         )
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="F", target="R",
             variable_name="gamma_f",
             label="Death-to-Burial Period (F->R)",
@@ -245,7 +245,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
         # Raw duration/rate parameters that feed the derived theta1/delta1/
         # delta2/gamma_ih/gamma_dh quantities used to split exits from I and H.
         # NOTE: these three use ValueType.FLOAT rather than ValueType.DAYS.
-        # ValueType.DAYS on add_parameter() (unlike on add_transmission_edge())
+        # ValueType.DAYS on add_parameter() (unlike on add_transmission_parameter())
         # maps to a Pydantic *int* field in the auto-generated disease config
         # (see schema_generator.py's _VALUE_TYPE_TO_PYTHON), which rejects the
         # fractional published estimate gamma_d=9.6 and non-integer bounds.

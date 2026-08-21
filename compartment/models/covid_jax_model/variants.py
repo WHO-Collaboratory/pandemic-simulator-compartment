@@ -52,7 +52,7 @@ class CovidSIHRModel(CovidJaxModel):
         super().define_parameters(schema)
         schema.remove_compartment("E")  # removes beta(S→E), theta(E→I)
         schema.remove_compartment("D")  # removes delta(I→D), epsilon(H→D)
-        schema.add_transmission_edge(**_BETA_SI)
+        schema.add_transmission_parameter(**_BETA_SI)
 
 
 class CovidSIDRModel(CovidJaxModel):
@@ -66,7 +66,7 @@ class CovidSIDRModel(CovidJaxModel):
         super().define_parameters(schema)
         schema.remove_compartment("E")  # removes beta(S→E), theta(E→I)
         schema.remove_compartment("H")  # removes zeta(I→H), epsilon(H→D), eta(H→R)
-        schema.add_transmission_edge(**_BETA_SI)
+        schema.add_transmission_parameter(**_BETA_SI)
 
 
 class CovidSEIHRModel(CovidJaxModel):
@@ -103,7 +103,7 @@ class CovidSIHDRModel(CovidJaxModel):
     def define_parameters(cls, schema):
         super().define_parameters(schema)
         schema.remove_compartment("E")  # removes beta(S→E), theta(E→I)
-        schema.add_transmission_edge(**_BETA_SI)
+        schema.add_transmission_parameter(**_BETA_SI)
 
 
 class CovidSIRModel(CovidJaxModel):
@@ -118,4 +118,4 @@ class CovidSIRModel(CovidJaxModel):
         schema.remove_compartment("E")  # removes beta(S→E), theta(E→I)
         schema.remove_compartment("H")  # removes zeta(I→H), epsilon(H→D), eta(H→R)
         schema.remove_compartment("D")  # removes delta(I→D)
-        schema.add_transmission_edge(**_BETA_SI)
+        schema.add_transmission_parameter(**_BETA_SI)

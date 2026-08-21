@@ -165,7 +165,7 @@ class MyModel(Model):
         #    and _total accumulation for free. Flows that do NOT fit that shape
         #    (multi-rate FOI, demographic births, density-dependent deaths) are
         #    handled manually — see "Flows without an edge" below.
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="susceptible", target="infected",
             variable_name="beta",
             frequency_dependent=True,
@@ -175,7 +175,7 @@ class MyModel(Model):
             min_value=0.01, max_value=2.0,
             unit="per day",
         )
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="infected", target="recovered",
             variable_name="gamma",
             label="Recovery Period (I->R)",

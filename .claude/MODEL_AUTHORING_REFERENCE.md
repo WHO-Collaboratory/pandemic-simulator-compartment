@@ -51,7 +51,7 @@ Pick the closest analog before suggesting from scratch.
    - `model.py`
    - `main.py` (copy from `mpox_jax_model/main.py`, swap the class name)
    - `example-config.json` (generate via CLI after the schema is written)
-2. **Write `define_parameters()`** in this order: `set_model_info` → `add_compartment` (mark `infective=True` on FOI sources) → `add_transmission_edge` → `add_intervention` → mobility params → demographics / contact matrix → `add_admin_zone_field` → `add_parameter`.
+2. **Write `define_parameters()`** in this order: `set_model_info` → `add_compartment` (mark `infective=True` on FOI sources) → `add_transmission_parameter` → `add_intervention` → mobility params → demographics / contact matrix → `add_admin_zone_field` → `add_parameter`.
 3. **Write `__init__(self, config)`**. Default to `super().__init__(config)` then add what's missing (demographics, temperature, model-specific scalars). **Don't set `self.travel_matrix` here** — the framework does it.
 4. **Write `prepare_initial_state(self)`**. Return the `state` array (the population matrix). If the model travels, override `build_travel_matrix(admin_zones)` instead (see *Mobility* below).
 5. **Write `equation(self, y, t, p)`**. Lean on `_compute_equations()` first; only drop to manual flows for spatially-coupled or age-stratified FOI. For stochastic/Euler models the return is a per-step delta rather than a true derivative.
@@ -76,12 +76,12 @@ Pick the closest analog before suggesting from scratch.
 schema.set_model_info(disease_type, label, description)              # required, once
 schema.add_compartment(id, label, description, infective=False)
 schema.remove_compartment(id)                                        # also drops referencing edges
-schema.add_transmission_edge(
+schema.add_transmission_parameter(
     source, target, variable_name, label, description,
     default, min_value, max_value, default_min, default_max, unit,
     frequency_dependent=False, value_type=ValueType.RATE,
 )
-schema.remove_transmission_edge(variable_name)
+schema.remove_transmission_parameter(variable_name)
 schema.add_intervention(id, label, description,
                         target_rates=[...], modifies_travel=False,
                         adherence=..., transmission_reduction=...)
@@ -204,7 +204,7 @@ Distinct from the bundled Prem 2021 contact matrices under `compartment/contact_
 - **`value_type=ValueType.DAYS`** means `default=10.0` is interpreted as a 10-day mean ⇒ rate `0.1`. Do not pre-divide.
 - **Don't build a data-file path by hand.** `Path(__file__).parent / "data" / "contacts.csv"` appears to work and then silently reads stale data the moment `datasets.yaml` bumps the version — and resolves to nothing in the cloud if the file was never declared, since only declared datasets get staged into the image. Use `self.dataset(name)`.
 - **Don't set `self.travel_matrix` by hand.** `_apply_interventions()` reads it, and the framework guarantees it exists by calling `_ensure_travel_matrix()` before `prepare_initial_state()` — including the identity default for models with no mobility. Assigning it in `__init__`/`prepare_initial_state()` will just be overwritten. Override `build_travel_matrix()` instead.
-- **Variants** use `super().define_parameters(schema)` and then mutate. Removing a compartment cascades and removes any edges that reference it. To re-add an edge that the parent referenced via the removed compartment (e.g. an S→I beta after E is gone), call `schema.add_transmission_edge(**_BETA_SI)` — see covid `variants.py` for the canonical pattern.
+- **Variants** use `super().define_parameters(schema)` and then mutate. Removing a compartment cascades and removes any edges that reference it. To re-add an edge that the parent referenced via the removed compartment (e.g. an S→I beta after E is gone), call `schema.add_transmission_parameter(**_BETA_SI)` — see covid `variants.py` for the canonical pattern.
 - **Stochastic / Euler models** must set `STOCHASTIC = True` (or `SOLVER = "euler"`) and have `equation()` return the **per-step delta**, not the rate. Multiplying by `dt` happens inside `_euler_integrate`.
 - **The "short form" config loader** wraps top-level `admin_zones` and `demographics` into `case_file` automatically. Don't double-nest when writing example configs by hand.
 - **`schema.remove_compartment("X")` cascades to edges**, but only by `source_id`/`target_id`. If a manual flow inside `equation()` still indexes `states["X"]`, that branch must be guarded with `if "X" in states:`.

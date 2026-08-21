@@ -100,7 +100,7 @@ class CLASS_NAME(Model):
         # --- Transmission edges ---
         # The framework auto-generates I_total, R_total cumulative compartments
         # for the targets of these edges — do not declare them by hand.
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="susceptible",
             target="infected",
             variable_name="beta",
@@ -114,7 +114,7 @@ class CLASS_NAME(Model):
             max_value=2.0,
             unit="per day",
         )
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="infected",
             target="recovered",
             variable_name="gamma",

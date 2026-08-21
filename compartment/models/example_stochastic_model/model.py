@@ -109,7 +109,7 @@ class ExampleStochasticModel(Model):
         # _add_total_compartments) and hand-roll the equation, so these edges
         # mainly declare the tunable beta / gamma rates. New infections are split
         # between the asymptomatic and symptomatic compartments in equation().
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="susceptible",
             target="asymptomatic",
             variable_name="beta",
@@ -123,7 +123,7 @@ class ExampleStochasticModel(Model):
             max_value=2.0,
             unit="per day",
         )
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="asymptomatic",
             target="recovered",
             variable_name="gamma",

@@ -3,7 +3,7 @@
 The runner reconstructs the model from an overridden config per LHS sample
 (Model.build_overridden_config + BatchSimulationManager._single_run), so every
 value declared via add_parameter / add_intervention /
-add_transmission_edge actually varies — even when the model bakes it into a
+add_transmission_parameter actually varies — even when the model bakes it into a
 derived constant in __init__ (e.g. 1/latent_period) or a frozen Intervention
 object.
 

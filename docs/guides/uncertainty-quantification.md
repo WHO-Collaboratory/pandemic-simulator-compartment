@@ -146,7 +146,7 @@ Set `has_variance` to `true`. From `[example_parameter_uncertainty_declarative_m
 }
 ```
 
-`disease_param` names the schema variable the edge maps to — `BETA` resolves to the `beta` declared via `variable_name` in `add_transmission_edge()`.
+`disease_param` names the schema variable the edge maps to — `BETA` resolves to the `beta` declared via `variable_name` in `add_transmission_parameter()`.
 
 **Effect:** Each run draws a new `beta` from a uniform distribution over 0.2–0.4. `gamma` stays fixed at 10 days.
 

@@ -67,7 +67,7 @@ class MpoxJaxModel(Model):
             "Cumulative infected population",
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="susceptible",
             target="infected",
             variable_name="beta",
@@ -82,7 +82,7 @@ class MpoxJaxModel(Model):
             unit="per day",
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="infected",
             target="recovered",
             variable_name="gamma",
@@ -97,7 +97,7 @@ class MpoxJaxModel(Model):
             value_type=ValueType.DAYS,
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="recovered",
             target="susceptible",
             variable_name="omega",
