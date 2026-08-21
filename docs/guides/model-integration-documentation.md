@@ -393,14 +393,6 @@ In the example model that is six occurrences across three files. To catch anythi
 grep -rn "ExampleParameterUncertaintyDeclarative\|example_parameter_uncertainty_declarative" compartment/models/my_disease_model
 ```
 
-> **Change the disease type before you run anything.** Two models declaring the same disease type is the one mistake that breaks the model you copied from as well as the copy. The framework treats a disease type claimed by two classes as ambiguous and stops resolving it, so a config asking for it fails validation:
->
-> ```
-> ValueError: Invalid disease type: example_parameter_uncertainty_declarative
-> ```
->
-> A local run reports this only as `Halting due to validation failure. See S3 logs for details.` — and there are no S3 logs in local mode. A validation failure immediately after copying a directory is almost always this.
-
 Finally, confirm the registry picked up the copy as its own model. Both disease types should be listed, the old one unchanged:
 
 ```shell
