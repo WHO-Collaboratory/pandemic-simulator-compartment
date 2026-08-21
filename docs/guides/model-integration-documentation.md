@@ -73,6 +73,7 @@ A local run also produces the same results JSON the Simulator charts, which is w
 - [Add a new model](#add-a-new-model)
   - [Choose a unique name](#choose-a-unique-name)
   - [Run the scaffold](#run-the-scaffold)
+  - [Copy an existing model instead](#copy-an-existing-model-instead)
 - [Writing the model](#writing-the-model)
   - [How the framework uses your class](#how-the-framework-uses-your-class)
   - [model.py](#modelpy)
@@ -285,7 +286,7 @@ git log --oneline         # view your commits
 
 Before integrating your model, verify it runs correctly locally.
 
-The scaffold command creates the directory layout with a working SIR template that the modeler can alter. Start by choosing the name it will live under.
+There are two ways to start. The scaffold command creates the directory layout with a working SIR template that the modeler can alter, or you can [copy an existing model](#copy-an-existing-model-instead) and rename it. Either way, start by choosing the name the model will live under.
 
 ### Choose a unique name
 
@@ -355,6 +356,58 @@ python -m compartment.models.example_parameter_uncertainty_declarative_model.mai
 ```shell
 python -m compartment.models.example_parameter_uncertainty_declarative_model.main --mode local --config_file compartment\models\example_parameter_uncertainty_declarative_model\example-config.json --output_file results\example-declarative-test.json
 ```
+
+### Copy an existing model instead
+
+Scaffolding always produces the same minimal SIR template. When an existing model is already close to what you want — the same compartment structure with different parameters, or a variation on a model you have written before — copying its directory is often less work. The trade-off is that a copy comes with the original's names baked into it, and until you change all of them the copy identifies itself as the model you copied.
+
+Copy the directory first:
+
+**macOS / Linux**
+```shell
+cp -r compartment/models/example_parameter_uncertainty_declarative_model \
+    compartment/models/my_disease_model
+```
+
+**Windows Command Prompt**
+```shell
+xcopy /E /I compartment\models\example_parameter_uncertainty_declarative_model compartment\models\my_disease_model
+```
+
+The new directory name follows the same rule as scaffolding: it must be unique within `compartment/models/`, and the `_model` suffix is the convention. Then work through every name the copy inherited.
+
+| Where | What to change |
+| :---- | :---- |
+| Directory name | Your new, unique name. Nothing detects a duplicate for you here — you chose the name when you copied. |
+| `model.py` | The class name (`ExampleParameterUncertaintyDeclarativeModel`), and the `disease_type`, `label`, and `description` passed to `set_model_info()`. Update the class docstring too — it becomes your model's description on the API reference site. |
+| `main.py` | Three places: the module path **and** class name in the `import` line, `model_class=` inside `lambda_handler()`, and `model_class=` in the `drive_simulation()` call at the bottom. |
+| `example-config.json` | `Disease.disease_type`, which has to match the value in `set_model_info()`. |
+| `model.md` | The title and the whole write-up, which still describes the original model. |
+| `artifacts/` | Delete the copied JSON. It is named after the old disease type and describes the old schema; regenerate it once your changes are in place. |
+| `__pycache__` | Safe to delete. It is compiled output from the original and is rebuilt on the next run. |
+| `__init__.py` | Nothing. It stays empty. |
+
+In the example model that is six occurrences across three files. To catch anything missed, search the new directory for the old names:
+
+```shell
+grep -rn "ExampleParameterUncertaintyDeclarative\|example_parameter_uncertainty_declarative" compartment/models/my_disease_model
+```
+
+> **Change the disease type before you run anything.** Two models declaring the same disease type is the one mistake that breaks the model you copied from as well as the copy. The framework treats a disease type claimed by two classes as ambiguous and stops resolving it, so a config asking for it fails validation:
+>
+> ```
+> ValueError: Invalid disease type: example_parameter_uncertainty_declarative
+> ```
+>
+> A local run reports this only as `Halting due to validation failure. See S3 logs for details.` — and there are no S3 logs in local mode. A validation failure immediately after copying a directory is almost always this.
+
+Finally, confirm the registry picked up the copy as its own model. Both disease types should be listed, the old one unchanged:
+
+```shell
+python -m compartment.generate_artifact --list
+```
+
+Then run it locally, the same way as a scaffolded model.
 
 ---
 
