@@ -129,7 +129,8 @@ class MpoxJaxModel(Model):
             label="Travel Rate (σ)",
             description=(
                 "Percentage of each zone's population away from home on a given day. "
-                "0 disables inter-zone travel."
+                "0 disables inter-zone travel. Note that if an admin 2 zone is "
+                "selected, no travel takes place regardless of this value."
             ),
             value_type=ValueType.PERCENTAGE,
             default=20.0,

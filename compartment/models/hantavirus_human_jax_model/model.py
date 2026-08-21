@@ -469,7 +469,9 @@ class HantavirusHumanJaxModel(Model):
             description=(
                 "Percentage of each zone's population away from home on a given day. "
                 "Couples person-to-person transmission across zones; spillover from "
-                "rodents always stays local. 0 disables inter-zone travel."
+                "rodents always stays local. 0 disables inter-zone travel. Note that "
+                "if an admin 2 zone is selected, no travel takes place regardless of "
+                "this value."
             ),
             value_type=ValueType.PERCENTAGE,
             default=5.0,

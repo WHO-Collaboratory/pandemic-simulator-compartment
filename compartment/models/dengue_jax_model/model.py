@@ -358,7 +358,8 @@ class DengueJaxModel(Model):
                 "Percentage of each region's population away from home on a given "
                 "day. Trips are distributed across destinations by an inverse-square "
                 "gravity model weighted by population and distance. 0 disables "
-                "inter-regional travel."
+                "inter-regional travel. Note that if an admin 2 zone is selected, "
+                "no travel takes place regardless of this value."
             ),
             value_type=ValueType.PERCENTAGE,
             default=20.0,
