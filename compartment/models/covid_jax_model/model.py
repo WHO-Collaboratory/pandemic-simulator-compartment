@@ -86,7 +86,7 @@ class CovidJaxModel(Model):
         schema.add_compartment("R", "Recovered", "Recovered and immune population")
 
         # ---- Transmission edges ----
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="susceptible",
             target="exposed",
             variable_name="beta",
@@ -101,7 +101,7 @@ class CovidJaxModel(Model):
             unit="per day",
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="exposed",
             target="infected",
             variable_name="theta",
@@ -116,7 +116,7 @@ class CovidJaxModel(Model):
             value_type=ValueType.DAYS,
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="infected",
             target="hospitalized",
             variable_name="zeta",
@@ -131,7 +131,7 @@ class CovidJaxModel(Model):
             value_type=ValueType.PERCENTAGE,
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="infected",
             target="deceased",
             variable_name="delta",
@@ -145,7 +145,7 @@ class CovidJaxModel(Model):
             unit="per day",
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="hospitalized",
             target="deceased",
             variable_name="epsilon",
@@ -159,7 +159,7 @@ class CovidJaxModel(Model):
             unit="per day",
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="infected",
             target="recovered",
             variable_name="gamma",
@@ -174,7 +174,7 @@ class CovidJaxModel(Model):
             value_type=ValueType.DAYS,
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="hospitalized",
             target="recovered",
             variable_name="eta",

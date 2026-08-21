@@ -1091,7 +1091,7 @@ class ParameterSchemaBuilder:
             schema.add_compartment("I", "Infected", "Currently infected population")
             schema.add_compartment("R", "Recovered", "Recovered and immune population")
 
-            schema.add_transmission_edge(
+            schema.add_transmission_parameter(
                 source="susceptible", target="infected", variable_name="beta",
                 label="Transmission Rate (S->I)",
                 description="Rate of new infections from contact",
@@ -1252,8 +1252,8 @@ class ParameterSchemaBuilder:
             if e.source_id != id and e.target_id != id
         ]
 
-    def remove_transmission_edge(self, variable_name: str) -> None:
-        """Remove a transmission edge by its variable name."""
+    def remove_transmission_parameter(self, variable_name: str) -> None:
+        """Remove a transmission parameter by its variable name."""
         self._transmission_edges = [
             e for e in self._transmission_edges if e.variable_name != variable_name
         ]
@@ -1282,7 +1282,7 @@ class ParameterSchemaBuilder:
         display = [f"{c.id} ({c.label})" for c in self._compartments]
         raise ValueError(f"Unknown compartment '{name}'. Available: {sorted(display)}")
 
-    def add_transmission_edge(
+    def add_transmission_parameter(
         self,
         source: str,
         target: str,
@@ -1299,11 +1299,11 @@ class ParameterSchemaBuilder:
         value_type: ValueType = ValueType.RATE,
     ) -> None:
         """
-        Add a directed transmission edge between two compartments.
+        Add a directed transmission parameter between two compartments.
 
         The ``source`` and ``target`` are matched against previously added
         compartment IDs or labels (case-insensitive).  The resolved short
-        IDs are stored as ``source_id`` and ``target_id`` on the edge for
+        IDs are stored as ``source_id`` and ``target_id`` on the parameter for
         direct use in equation computations.
 
         All numeric arguments (``default``, ``min_value``, ``max_value``,

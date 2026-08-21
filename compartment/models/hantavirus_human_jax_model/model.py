@@ -138,7 +138,7 @@ class HantavirusHumanJaxModel(Model):
         # Pure rate * source flows for E -> I and I -> R (humans + rodents).
         # Force-of-infection terms (S -> E) are multi-rate and applied
         # manually in equation().
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="E_h", target="I_h",
             variable_name="delta_h",
             label="Human Incubation Period (E_h -> I_h)",
@@ -151,7 +151,7 @@ class HantavirusHumanJaxModel(Model):
             min_value=1.0, max_value=120.0,
             unit="days", value_type=ValueType.DAYS,
         )
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="I_h", target="R_h",
             variable_name="gamma_h",
             label="Human Infectious Period (I_h -> R_h)",
@@ -164,7 +164,7 @@ class HantavirusHumanJaxModel(Model):
             min_value=1.0, max_value=60.0,
             unit="days", value_type=ValueType.DAYS,
         )
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="E_m", target="I_m",
             variable_name="delta_m",
             label="Rodent Incubation Period (E_m -> I_m)",
@@ -177,7 +177,7 @@ class HantavirusHumanJaxModel(Model):
             min_value=1.0, max_value=90.0,
             unit="days", value_type=ValueType.DAYS,
         )
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="I_m", target="R_m",
             variable_name="gamma_m",
             label="Rodent Infectious Period (I_m -> R_m)",
@@ -511,7 +511,7 @@ class HantavirusHumanJaxModel(Model):
             adherence=70.0,
             transmission_reduction=55.0,
         )
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="S_h", target="S_h",
             variable_name="transmission_scale",
             label="Transmission Scaling Factor",

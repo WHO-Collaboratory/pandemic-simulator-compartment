@@ -154,7 +154,7 @@ class EbolaJaxModel(Model):
             "Cumulative number of individuals removed (recovered or safely buried)",
         )
 
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="susceptible", target="E1",
             variable_name="beta",
             label="Transmission Rate (S->E)",
@@ -167,7 +167,7 @@ class EbolaJaxModel(Model):
             min_value=0.001, max_value=2.0,
             unit="days",
         )
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="E1", target="I1",
             variable_name="sigma",
             label="Incubation Period (E->I)",
@@ -178,7 +178,7 @@ class EbolaJaxModel(Model):
             unit="days",
             value_type=ValueType.DAYS,
         )
-        schema.add_transmission_edge(
+        schema.add_transmission_parameter(
             source="I1", target="Funeral",
             variable_name="gamma",
             label="Infectious / Hospitalised Period (I->Funeral, H->R)",
@@ -247,7 +247,7 @@ class EbolaJaxModel(Model):
 
         # ---- Mobility ----
         # NOTE: deliberately named travel_sigma, not sigma — sigma is already
-        # this model's E1->I1 incubation edge (see add_transmission_edge above).
+        # this model's E1->I1 incubation edge (see add_transmission_parameter above).
         schema.add_parameter(
             name="travel_sigma",
             label="Travel Rate (σ)",
