@@ -4,7 +4,9 @@
 
 This documentation describes the steps required to integrate a compartmental model into the Pandemic Simulator. Once integrated, users can run the model in the Pandemic Simulator and modify the parameters you define to explore different scenarios through the user interface.
 
-The Pandemic Simulator supports **deterministic** compartmental models, models with **parameter uncertainty** (Latin Hypercube Sampling), and **stochastic** models. After running a simulation, users can compare results across models, evaluate intervention scenarios alongside control (no-intervention) simulations, and view AI-generated interpretations of the results.
+Two roles recur throughout this document: a **user** runs a model from the Pandemic Simulator's front end, choosing location, parameter values, and interventions through the interface, while a **modeler** writes the model code that runs in the backend so that users can run it. One person can be both; this guide is written for modelers.
+
+The Pandemic Simulator supports **deterministic** compartmental models, models with **parameter uncertainty** (Latin Hypercube Sampling), and **stochastic** models. After running a simulation, users can compare results across all models, evaluate intervention scenarios alongside control (no-intervention) simulations, and view AI-generated interpretations of the results.
 
 ### How to read the commands in this guide
 
@@ -23,9 +25,9 @@ example --with --everything-on-one-line
 
 The only routine differences are line continuations (`\` on macOS/Linux, not supported in Command Prompt) and path separators (`/` vs `\`).
 
-### The example models
+### Example models
 
-This guide follows three models that ship with the repository. Read the one closest to what you are building.
+This guide follows three models that ship with the repository.
 
 | Directory | `disease_type` | What it demonstrates |
 | :---- | :---- | :---- |
@@ -39,22 +41,21 @@ Your model code is identical whether it runs locally on your own machine or remo
 
 Running locally, you hand the model a JSON file. In the Simulator, the frontend collects the user's choices and the backend supplies the population and geography — then passes them to your model in that same shape. So `example-config.json` is a stand-in for a filled-in UI form plus the backend data behind it, and a model that runs locally will run in the Simulator.
 
-Think of your model directory as having two halves: what the user can touch, and what only you control.
+Think of your model directory as having two halves: what the user can touch, and what only you control. The rule of thumb: **anything you declare on the `schema` becomes something a user can see or change. Anything you write in `equation()` is yours alone.** For example, if the modeler changes a default value when adding a transmission edge via `schema.add_transmission_parameter()` this shows that new default value in the UI for every future user; rewriting `equation()` changes the model's behavior without changing the UI at all.
 
-| In your model | What it becomes in the UI |
-| :---- | :---- |
-| `example-config.json` | The user's form selections, plus backend data — populations from WorldPop, admin zone coordinates from OpenStreetMap. Editing it locally is you standing in for the user. |
-| `schema.set_model_info()` | Your model's name and description in the model picker. |
-| `schema.add_compartment()` | The compartments offered for the model, which users can select or deselect. |
-| `schema.add_transmission_edge()` | The arrows between compartments, each with a control whose default, minimum, and maximum are the ones you declared. |
-| `schema.add_parameter()` | An extra input field, for anything that isn't a flow between compartments. |
-| `schema.add_intervention()` | An intervention the user can switch on and give dates, adherence, and a transmission reduction. |
-| `schema.add_demographic_group()` | The age breakdown available for the run. |
-| `model.md` | The "You should know" panel on the results page. |
-| `main.py` | The file that starts a run. Locally you launch it yourself from the terminal; in the Simulator the platform launches it for you when a user starts a simulation. |
-| `equation()` | **Nothing.** It runs only in the backend. No UI user can see or change it. |
-
-The rule of thumb: **anything you declare on the `schema` becomes something a user can see or change. Anything you write in `equation()` is yours alone.** Widening a parameter's `min_value` widens a slider for every future user; rewriting `equation()` changes the model's behavior without changing the UI at all.
+| Model component | Location | Representation in the UI |
+| :---- | :---- | :---- |
+| `schema.set_model_info()` | `model.py` | Your model's name and description in the model picker. |
+| `schema.set_model_metadata()` | `model.py` | Authorship, license, assumptions, and similar context on the Simulation Configuration page. |
+| `schema.add_compartment()` | `model.py` | The compartments offered for the model, which users can select or deselect. |
+| `schema.add_transmission_parameter()` | `model.py` | The arrows between compartments, each with a control whose default, minimum, and maximum are the ones you declared. |
+| `schema.add_parameter()` | `model.py` | An extra input field, for anything that isn't a flow between compartments. |
+| `schema.add_intervention()` | `model.py` | An intervention the user can switch on and give dates, adherence, and a transmission reduction. |
+| `schema.add_demographic_group()` | `model.py` | The age breakdown available for the run. |
+| `equation()` | `model.py` | **Nothing.** It runs only in the backend. No UI user can see or change it. |
+| `example-config.json` | standalone file | The user's form selections, plus backend data — populations from WorldPop, admin zone coordinates from OpenStreetMap. Editing it locally is you standing in for the user. |
+| `model.md` | standalone file | The "You should know" panel on the results page. |
+| `main.py` | standalone file | The file that starts a run. Locally you launch it yourself from the terminal; in the Simulator the platform launches it for you when a user starts a simulation. |
 
 A local run also produces the same results JSON the Simulator charts, which is why the [results viewer](#visualize-model-results) looks like the results page.
 
@@ -66,20 +67,27 @@ A local run also produces the same results JSON the Simulator charts, which is w
 - [Initial environment setup](#initial-environment-setup)
   - [Cloning the repository](#cloning-the-repository)
   - [Installing Python](#installing-python)
+  - [Installing uv](#installing-uv)
   - [Create a virtual environment](#create-a-virtual-environment)
   - [Git workflow](#git-workflow)
 - [Add a new model](#add-a-new-model)
+  - [Choose a unique name](#choose-a-unique-name)
+  - [Run the scaffold](#run-the-scaffold)
+  - [Copy an existing model instead](#copy-an-existing-model-instead)
 - [Writing the model](#writing-the-model)
   - [How the framework uses your class](#how-the-framework-uses-your-class)
   - [model.py](#modelpy)
-  - [Automated vs. manual equations](#automated-vs-manual-equations)
-  - [Optional functions to override](#optional-functions-to-override)
-  - [Built-in base class functions](#built-in-base-class-functions)
-  - [Stochastic models](#stochastic-models)
-  - [Parameter uncertainty](#parameter-uncertainty)
+    - [Automated vs. manual equations](#automated-vs-manual-equations)
+    - [Optional functions to override](#optional-functions-to-override)
+    - [Built-in base class functions](#built-in-base-class-functions)
+    - [Stochastic models](#stochastic-models)
+    - [Parameter uncertainty](#parameter-uncertainty)
   - [main.py](#mainpy)
+  - [Additional files](#additional-files)
+- [Documenting your model](#documenting-your-model)
   - [model.md](#modelmd)
-  - [Documentation for your model](#documentation-for-your-model)
+  - [Model metadata](#model-metadata)
+  - [Docstrings for the technical API](#docstrings-for-the-technical-api)
 - [example-config.json](#example-configjson)
   - [Generating artifacts](#generating-artifacts)
 - [Install additional packages](#install-additional-packages)
@@ -100,6 +108,8 @@ A local run also produces the same results JSON the Simulator charts, which is w
 
 ## Technical API
 
+The API reference site is generated from the source code itself, so it lists every argument, default, and return value of the framework's classes and methods, along with a page for each model already in the repository. This guide walks you through integrating a model from start to finish; the technical API is the lookup you reach for while writing the code, when you need the exact signature of a call.
+
 <https://who-collaboratory.github.io/pandemic-simulator-compartment/>
 
 ---
@@ -119,6 +129,8 @@ git --version
 ```
 
 Move to where you want the repository stored, then clone it. HTTPS is easiest for new users; SSH avoids repeated authentication prompts.
+
+The examples below clone into the Desktop, which this guide uses as its example location throughout. The repository can live in any directory you like — substitute your own path wherever you see `~/Desktop` (macOS/Linux) or `%USERPROFILE%\Desktop` (Windows).
 
 **macOS / Linux**
 ```shell
@@ -146,11 +158,13 @@ git remote -v
 Useful commands after cloning (`git branch -a` opens a pager — type `q` to exit):
 
 ```shell
-git branch -a                      # list branches
-git pull                           # download latest changes
-git checkout -b my-feature-branch  # create a branch
-git log --oneline                  # view commit history
+git branch -a                              # list branches
+git pull                                   # download latest changes
+git checkout -b add-example-disease-model  # create a branch
+git log --oneline                          # view commit history
 ```
+
+> This guide uses `add-example-disease-model` as the working branch, matching the example model it builds. Name your branch after the model you are adding, and use that name wherever this guide shows `add-example-disease-model`.
 
 **Troubleshooting**
 
@@ -187,28 +201,62 @@ python --version
 
 **Optional but recommended:** install [Visual Studio Code](https://code.visualstudio.com/) and its **Python** extension.
 
-### Create a virtual environment
+### Installing uv
 
-`uv` is the recommended environment manager for this project: it installs dependencies faster and matches the project's development workflow.
-
-From the repository root:
-
-```shell
-uv venv
-uv sync
-```
-
-Activate the environment. **Do this every time you open a new terminal.**
+`uv` is the environment and dependency manager for this project: it installs dependencies faster and matches the project's development workflow. It is a separate tool, so install it once before setting up the environment.
 
 **macOS / Linux**
 ```shell
-source .venv/bin/activate
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 **Windows Command Prompt**
 ```shell
-.venv\Scripts\activate.bat
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
+
+If you would rather use a package manager you already have, `pip install uv`, `brew install uv` (macOS), and `winget install --id=astral-sh.uv -e` (Windows) all work too.
+
+Open a new terminal so the updated PATH takes effect, then verify:
+
+```shell
+uv --version
+```
+
+**Troubleshooting**
+
+- `uv is not recognized as a command` — the installer updated your PATH, but the terminal you ran it in still has the old one. Close it and open a new one.
+- Installed with `pip` while a virtual environment was active — `uv` then exists only inside that environment. Install it with one of the commands above instead, outside any environment.
+
+Reference: [uv installation docs](https://docs.astral.sh/uv/getting-started/installation/)
+
+### Create a virtual environment
+
+Run these three steps from the repository root the first time you set up a clone: create the environment, activate it, then install the project's dependencies into it.
+
+1. **Create the environment.** This makes a `.venv/` folder in the repository, isolated from your system Python.
+
+   ```shell
+   uv venv
+   ```
+
+2. **Activate it. Do this every time you open a new terminal**, not just the first time.
+
+   **macOS / Linux**
+   ```shell
+   source .venv/bin/activate
+   ```
+
+   **Windows Command Prompt**
+   ```shell
+   .venv\Scripts\activate.bat
+   ```
+
+3. **Install the dependencies** into the activated environment. Re-run this whenever the project's dependencies change.
+
+   ```shell
+   uv sync
+   ```
 
 Confirm the right environment is active:
 
@@ -246,7 +294,21 @@ git log --oneline         # view your commits
 
 Before integrating your model, verify it runs correctly locally.
 
-The scaffold command creates the directory layout with a working SIR template. Only the directory name is required; the disease name cannot contain spaces.
+There are two ways to start. The scaffold command creates the directory layout with a working SIR template that the modeler can alter, or you can [copy an existing model](#copy-an-existing-model-instead) and rename it. Either way, start by choosing the name the model will live under.
+
+### Choose a unique name
+
+The scaffold appends `_model` to the name you pass, so `example_parameter_uncertainty_declarative` becomes `compartment/models/example_parameter_uncertainty_declarative_model/`. Class names and the code that instantiates them are generated to match.
+
+**That directory name must be unique.** No other directory in `compartment/models/` can already use it. The scaffold will not overwrite an existing directory: it stops before creating anything and prints
+
+```
+Error: 'pandemic-simulator-compartment/compartment/models/example_parameter_uncertainty_declarative_model' already exists.
+```
+
+Neither the model directory name nor the disease type can contain spaces.
+
+### Run the scaffold
 
 ```
 python -m compartment.new_model <model_directory_name>
@@ -255,7 +317,7 @@ python -m compartment.new_model <model_directory_name>
     [--description "<model_description>"]
 ```
 
-Replace the values inside angle brackets (`< >`). Options in square brackets (`[ ]`) are optional — **do not type the square brackets**.
+Replace the values inside angle brackets (`< >`). Only the model directory name is required. Options in square brackets (`[ ]`) are optional — **do not type the square brackets**.
 
 The command that produced the declarative example model:
 
@@ -272,31 +334,21 @@ python -m compartment.new_model example_parameter_uncertainty_declarative \
 python -m compartment.new_model example_parameter_uncertainty_declarative --label "Example Disease with Declarative Parameter Uncertainty" --disease-type example_parameter_uncertainty_declarative --description "A SIR model for an example disease with declarative parameter uncertainty"
 ```
 
-> That directory already exists in the repository, so running the command verbatim exits with `Error: '...' already exists.` Substitute your own model name, or add `--dry-run` to preview the output without writing files:
+> That directory already exists in the repository, so running the command verbatim fails the uniqueness rule above. Substitute your own model name, or add `--dry-run` to preview the output without writing files:
 >
 > ```shell
-> python -m compartment.new_model my_disease --dry-run
+> python -m compartment.new_model example_parameter_uncertainty_declarative --dry-run
 > ```
-
-The scaffold appends `_model` to the directory name, so `example_parameter_uncertainty_declarative` becomes `compartment/models/example_parameter_uncertainty_declarative_model/`. Class names and the code that instantiates them are generated to match.
 
 **Files created**
 
 - **`__init__.py`** — leave empty. It marks the directory as a Python package.
 - **`model.py`** — the disease class: parameters, input formatting, and the equation function for a minimal SIR model.
 - **`main.py`** — loads the model and executes the simulation.
-- **`model.md`** — a skeleton listing the sections to cover; replace the suggested sections with your own write-up. See [model.md](#modelmd).
+- **`model.md`** — a template for the write-up users see in the "You should know" section of the results page. See [Documenting your model](#documenting-your-model).
 - **`example-config.json`** — configuration for running the simulation locally.
 
-`label` and `description` are shown to users in the Pandemic Simulator UI. `disease-type` is used only by the back end to identify which model to load, and **must be unique across all models**. If it collides, running the model produces:
-
-```
-RuntimeError: Duplicate DISEASE_TYPE 'MY_DISEASE':
-'MyDisease2JaxModel' and 'MyDiseaseJaxModel'
-both claim the same disease type.
-```
-
-Open `model.py`, change `disease_type` to a unique value, and rerun.
+`label` and `description` are shown to users in the Pandemic Simulator UI. 
 
 **Verification run (optional).** Before changing any code, run the scaffolded model to confirm your environment works. Output files land in `results/`, which is in `.gitignore`.
 
@@ -312,6 +364,50 @@ python -m compartment.models.example_parameter_uncertainty_declarative_model.mai
 ```shell
 python -m compartment.models.example_parameter_uncertainty_declarative_model.main --mode local --config_file compartment\models\example_parameter_uncertainty_declarative_model\example-config.json --output_file results\example-declarative-test.json
 ```
+
+### Copy an existing model instead
+
+Scaffolding always produces the same minimal SIR template. When an existing model is already close to what you want — the same compartment structure with different parameters, or a variation on a model you have written before — copying its directory is often less work. The trade-off is that a copy comes with the original's names baked into it, and until you change all of them the copy identifies itself as the model you copied.
+
+Copy the directory first:
+
+**macOS / Linux**
+```shell
+cp -r compartment/models/example_parameter_uncertainty_declarative_model \
+    compartment/models/my_disease_model
+```
+
+**Windows Command Prompt**
+```shell
+xcopy /E /I compartment\models\example_parameter_uncertainty_declarative_model compartment\models\my_disease_model
+```
+
+The new directory name follows the same rule as scaffolding: it must be unique within `compartment/models/`, and the `_model` suffix is the convention. Then work through every name the copy inherited.
+
+| Where | What to change |
+| :---- | :---- |
+| Directory name | Your new, unique name. Nothing detects a duplicate for you here — you chose the name when you copied. |
+| `model.py` | The class name (`ExampleParameterUncertaintyDeclarativeModel`), and the `disease_type`, `label`, and `description` passed to `set_model_info()`. Update the class docstring too — it becomes your model's description on the API reference site. |
+| `main.py` | Three places: the module path **and** class name in the `import` line, `model_class=` inside `lambda_handler()`, and `model_class=` in the `drive_simulation()` call at the bottom. |
+| `example-config.json` | `Disease.disease_type`, which has to match the value in `set_model_info()`. |
+| `model.md` | The title and the whole write-up, which still describes the original model. |
+| `artifacts/` | Delete the copied JSON. It is named after the old disease type and describes the old schema; regenerate it once your changes are in place. |
+| `__pycache__` | Safe to delete. It is compiled output from the original and is rebuilt on the next run. |
+| `__init__.py` | Nothing. It stays empty. |
+
+In the example model that is six occurrences across three files. To catch anything missed, search the new directory for the old names:
+
+```shell
+grep -rn "ExampleParameterUncertaintyDeclarative\|example_parameter_uncertainty_declarative" compartment/models/my_disease_model
+```
+
+Finally, confirm the registry picked up the copy as its own model. Both disease types should be listed, the old one unchanged:
+
+```shell
+python -m compartment.generate_artifact --list
+```
+
+Then run it locally, the same way as a scaffolded model.
 
 ---
 
@@ -449,7 +545,7 @@ schema.add_compartment("R", "Recovered", "Recovered and immune")
 
 # The framework auto-generates the I_total / R_total cumulative compartments
 # for these edge targets — do not declare them by hand.
-schema.add_transmission_edge(
+schema.add_transmission_parameter(
     source="susceptible",
     target="infected",
     variable_name="beta",
@@ -463,7 +559,7 @@ schema.add_transmission_edge(
     max_value=2.0,
     unit="per day",
 )
-schema.add_transmission_edge(
+schema.add_transmission_parameter(
     source="infected",
     target="recovered",
     variable_name="gamma",
@@ -492,7 +588,18 @@ schema.add_demographic_group("age_65_plus", "Seniors",        default_weight=17.
 
 > `value_type=ValueType.DAYS` means `default=10.0` is a 10-day mean, converted to a `0.1/day` rate at load. Do not pre-divide.
 
-### Automated vs. manual equations
+> **`ValueType.DAYS` is whole days on `add_parameter()`.** On a transmission parameter, as above, the value is stored as a float and fractions are fine. On `add_parameter()` it becomes an integer field in the generated config, so a fractional value is rejected outright:
+>
+> ```
+> Input should be a valid integer, got a number with a fractional part
+>   [type=int_from_float, input_value=5.9, input_type=float]
+> ```
+>
+> Published estimates are rarely whole numbers, so for a duration that needs decimals, declare it as `ValueType.FLOAT` with `unit="days"` and convert it yourself with `self._to_rate(value, ValueType.DAYS)` in `equation()`. `ebola_seihfr_burial_legrand_model` does this for three durations, one of which is 9.6 days.
+>
+> A plain parameter's value reaches your model unconverted whichever type you give it — only transmission parameters get the automatic days-to-rate conversion — so `ValueType.DAYS` buys nothing there beyond the integer restriction. Prefer `ValueType.FLOAT` for durations and `ValueType.INTEGER` for values that really are whole numbers; both state plainly what the field accepts.
+
+#### Automated vs. manual equations
 
 There are two ways to write `equation()`.
 
@@ -566,7 +673,7 @@ def equation(self, y, t, p):
 
 Anything ramped, time-varying, or otherwise conditional on `t` must stay JAX-traceable — use `jnp.clip` and `jnp.where` rather than Python `if` statements on traced values, as `custom_intervention()` does.
 
-### Optional functions to override
+#### Optional functions to override
 
 **`__init__(self, config)`**
 
@@ -613,7 +720,7 @@ for i, zone in enumerate(admin_zones):
 
 **Mobility matrix.** The framework defaults to a gravity model. To use a different model — or none, via an identity matrix — override `build_travel_matrix(self, admin_zones)`. The framework calls it before `prepare_initial_state()` and stores the result on `self.travel_matrix`.
 
-### Built-in base class functions
+#### Built-in base class functions
 
 - **`_add_total_compartments`** — by default the framework creates a cumulative `<target>_total` compartment for every transmission edge target (for example `I_total`). These track cumulative inflow and are used when computing summary results; you do not declare them, and they are not included in model outputs. To use a different aggregation strategy — for example one `_total` shared across several compartments — override it with `pass` and declare your own totals. `example_stochastic_model` does this because its two infectious compartments share a single `I_total`:
 
@@ -625,7 +732,7 @@ for i, zone in enumerate(admin_zones):
 
 - **`_apply_interventions`** — applies intervention effects by updating transmission rates and the mobility matrix during the simulation. Call it inside `equation()` to enable interventions. Override it, or write your own function as `example_parameter_uncertainty_custom_model` does, for custom logic.
 
-### Stochastic models
+#### Stochastic models
 
 Models are deterministic by default. Declare a stochastic model with a class variable:
 
@@ -662,14 +769,14 @@ COMPARTMENT_DELTA_GROUPING = {
 }
 ```
 
-### Parameter uncertainty
+#### Parameter uncertainty
 
 There is no flag for parameter uncertainty. The framework detects it automatically when a config assigns a value **range** to a parameter, then draws Latin Hypercube samples and emits a median with a 95% simulation-based interval.
 
 Give the parameter a `default_min` / `default_max` in `define_parameters()`:
 
 ```python
-schema.add_transmission_edge(
+schema.add_transmission_parameter(
     source="susceptible",
     target="infected",
     variable_name="beta",
@@ -731,11 +838,49 @@ if __name__ == "__main__":
     )
 ```
 
+### Additional files
+
+To organize your code further, put extra functions in separate files inside your model directory and import them into `model.py`.
+
+---
+
+## Documenting your model
+
+A finished model needs three pieces of documentation. Each has a different audience and a different home:
+
+| What you write | Where it lives | Who reads it, and where |
+| :---- | :---- | :---- |
+| A write-up of how the model behaves | `model.md`, beside `model.py` | Users, in the **"You should know"** panel on the results page. |
+| `schema.set_model_metadata()` | inside `define_parameters()` in `model.py` | Users, on the **Simulation Configuration** page. |
+| Docstrings | throughout your Python code | Other modelers, on the [technical API](#technical-api) site. |
+
+The first two travel with your model into the Pandemic Simulator: both are collected into the artifact JSON the UI reads. The third is published separately, from the source code itself.
+
 ### model.md
 
-Created by the scaffold as a skeleton listing suggested sections — replace those with your own write-up. Use [Markdown syntax](https://www.markdownguide.org/basic-syntax/). Its contents appear in the **"You should know"** section of the results page; delete the file and that section is omitted.
+Created by the scaffold as a template listing suggested sections — replace those with your own write-up. Use [Markdown syntax](https://www.markdownguide.org/basic-syntax/). Delete the file and the "You should know" panel is omitted.
 
-Cover anything users should be aware of: limitations, data sources, assumptions, intended use. All three example models include one. From `example_stochastic_model/model.md`:
+Cover anything users should be aware of. The suggestions in the template are:
+
+- **Model overview** — Brief plain-language description of how the model works.
+- **Compartment and state definitions** — Meaning of each compartment, state,
+  or population group.
+- **Inputs and parameters** — Required inputs, definitions, units, valid ranges,
+  and defaults.
+- **Initial conditions** — How the starting population is distributed and any
+  required initialization rules.
+- **Outputs** — Available results, units, aggregation levels, and how each
+  output should be interpreted.
+- **Model nuances** — Subtle behaviors, implementation details, special
+  conventions, or interpretation considerations that users should understand
+  when configuring the model or evaluating its results.
+- **Known edge cases** — Inputs or scenarios that may produce unstable,
+  unrealistic, or invalid results.
+- **Differences from the source model** — Any deliberate implementation changes
+  or numerical approximations.
+- **Related models** — When users might choose another model in the repository.
+
+All three example models include one. From `example_stochastic_model/model.md`:
 
 ```markdown
 # Example Disease (Stochastic) — Model Summary
@@ -750,7 +895,9 @@ population into **asymptomatic** and **symptomatic** compartments and uses
   infectious), `R`, plus a cumulative `I_total` tracker and `R_total`.
 ```
 
-You can also record structured metadata in `define_parameters()` with `schema.set_model_metadata()`, as `example_stochastic_model` does. This will appear on the Simulation Configuration page of the UI.
+### Model metadata
+
+Where `model.md` is prose, `schema.set_model_metadata()` records provenance and scope — who wrote the model, what it assumes, what it is for — as structured fields the UI can lay out on its own. Call it in `define_parameters()`, as `example_stochastic_model` does:
 
 ```python
 schema.set_model_metadata(
@@ -764,31 +911,33 @@ schema.set_model_metadata(
 )
 ```
 
-### Documentation for your model
+Every field is optional, and none of them affect how the simulation runs. Beyond those shown above you can also set `citations`, `applicability`, `not_for`, `constraints`, `biases`, and `validation` — see [`set_model_metadata`](https://who-collaboratory.github.io/pandemic-simulator-compartment/api/parameters/#compartment.parameters.ParameterSchemaBuilder.set_model_metadata) for what each one expects.
 
-The [technical API](https://who-collaboratory.github.io/pandemic-simulator-compartment/) rebuilds automatically whenever code is merged to `main`. Model pages are generated automatically — no extra files or configuration needed.
+### Docstrings for the technical API
 
-The only requirement is that docstrings follow [Google style](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods), using section headers like `Args:`, `Returns:`, and `Raises:` with indented descriptions:
+The [technical API](#technical-api) rebuilds whenever code is merged to `main`, and your model gets a page there with no extra files or configuration. The only requirement is that docstrings follow [Google style](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods), using section headers like `Args:`, `Returns:`, and `Raises:` with indented descriptions:
 
 ```python
 def equation(self, y, t, p):
     """Compute the compartment derivatives for one integration step.
 
     Args:
-        y: Current compartment values, ordered by ``compartment_list``.
-        t: Current time in days since the simulation start date.
-        p: Packed parameter tuple, unpacked via ``_unpack_params``.
+        y (jnp.ndarray): Current compartment values, ordered by ``compartment_list``.
+        t (float): Current time in days since the simulation start date.
+        p (tuple): Packed parameter tuple, unpacked via ``_unpack_params``.
 
     Returns:
-        The stacked per-compartment derivatives (dy/dt).
+        jnp.ndarray: The stacked per-compartment derivatives (dy/dt).
     """
 ```
 
-Any public class or method without a docstring is omitted from the docs.
+Give each argument a type in parentheses and start the `Returns:` line with the type followed by a colon. Because these signatures carry no type annotations, the types you write in the docstring are the only thing that fills the **Type** column in the rendered tables.
 
-### Additional files
+To see the result, compare the docstring above with the published page for [`ExampleStochasticModel.equation`][equation-rendered]: the summary becomes the description, the arguments become a Parameters table, and the return line becomes a Returns table.
 
-To organize your code further, put extra functions in separate files inside your model directory and import them into `model.py`.
+[equation-rendered]: https://who-collaboratory.github.io/pandemic-simulator-compartment/models/example-stochastic/#compartment.models.example_stochastic_model.model.ExampleStochasticModel.equation
+
+Any public class or method without a docstring is omitted from the site.
 
 ---
 
@@ -800,7 +949,7 @@ Running a model locally requires the information the Pandemic Simulator would no
 
 - **`Disease.disease_type`** — must match `set_model_info(disease_type=...)`. Determines which model is loaded.
 - **`start_date`** and **`end_date`** — `YYYY-MM-DD`.
-- **`admin_zones`** (or `case_file.admin_zones`) — each zone needs `name`, `population`, `center_lat`, `center_lon`, `infected_population`, and any fields declared with `add_admin_zone_field()`.
+- **`admin_zones`** (or `case_file.admin_zones`) — each zone needs `name`, `population`, `center_lat`, `center_lon`, `infected_population` (a percentage — see below), and any fields declared with `add_admin_zone_field()`.
 - **`TransmissionEdges.items`** — one entry per transmission edge declared in `define_parameters()`.
 
 Optional: `Interventions`, `travel_volume`, `demographics`, `contact_matrix_overrides`, `demographic_rate_overrides`, and any additional disease parameters declared in the schema.
@@ -855,6 +1004,10 @@ If a required field is missing, the framework raises a `ValidationError`, logs w
 }
 ```
 
+> **`infected_population` is a percentage, not a case count.** The framework seeds the initial infected as `infected_population / 100 * population`, so the `0.01` above is 0.01% of 1,000,000 — 100 people, not 1 person and not 1%. Valid values run from 0 to 100.
+>
+> To start from a known number of cases, you must convert it: `cases / population * 100`. To seed 25 cases in the zone above, use `25 / 1000000 * 100 = 0.0025`. Entering `25` instead would start the run with 25% of the zone infected — 250,000 cases.
+
 Model-specific parameters declared with `add_parameter()` go in the `Disease` block. `example_parameter_uncertainty_custom_model` passes its ramp settings this way:
 
 ```json
@@ -897,28 +1050,6 @@ python -m compartment.generate_artifact example_stochastic
 # Write the artifact to a file
 python -m compartment.generate_artifact example_stochastic --output artifact.json
 ```
-
-To generate an artifact for every model registered in a model directory, writing each to its own file:
-
-**macOS / Linux**
-```shell
-python -m compartment.generate_artifact \
-    --model-dir compartment/models/example_parameter_uncertainty_declarative_model \
-    --output-dir compartment/models/example_parameter_uncertainty_declarative_model/artifacts
-```
-
-**Windows Command Prompt**
-```shell
-python -m compartment.generate_artifact --model-dir compartment\models\example_parameter_uncertainty_declarative_model --output-dir compartment\models\example_parameter_uncertainty_declarative_model\artifacts
-```
-
-Each file is named after the disease type it was generated from:
-
-```
-Artifact written to .../artifacts/example_parameter_uncertainty_declarative.json
-```
-
-**Note:** `compartment/models/*/artifacts/` is in `.gitignore`, so generated artifacts stay local and are not committed.
 
 ---
 
@@ -1081,7 +1212,7 @@ Once your model runs and passes tests, open a pull request so WHO Collaboratory 
 3. **Push your branch**
 
    ```shell
-   git push origin my-feature-name
+   git push origin add-example-disease-model
    ```
 
 4. **Open the pull request.** After `git push`, the terminal output usually includes a `Create a pull request` link (a GitHub URL for your branch) — Cmd-click (or Ctrl-click) it to open the PR form directly in your browser. Otherwise go to the repository on GitHub, where a yellow banner reading **"Compare & pull request"** usually appears at the top of the page just after pushing — click it to jump straight to the PR form. If neither shows up, open the **Pull requests** tab, click **New pull request**, and pick your branch manually. Either way, confirm **base** is set to `main` and **compare** is set to your feature branch, then click **Create pull request**.

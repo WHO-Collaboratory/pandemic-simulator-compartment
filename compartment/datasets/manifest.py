@@ -95,7 +95,7 @@ def load_manifest(manifest_path: Path) -> list[DatasetEntry]:
         raise ManifestError(f"No manifest at {manifest_path}.")
 
     try:
-        document = yaml.safe_load(manifest_path.read_text()) or {}
+        document = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as exc:
         raise ManifestError(f"{manifest_path} is not valid YAML: {exc}") from exc
 

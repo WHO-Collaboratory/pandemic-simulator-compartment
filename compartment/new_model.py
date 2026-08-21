@@ -429,7 +429,10 @@ def scaffold(
 
     dest.mkdir(parents=True, exist_ok=False)
     for name, content in files.items():
-        (dest / name).write_text(content)
+        # Explicit UTF-8: the templates contain non-ASCII characters (the σ in
+        # the travel_sigma block, em dashes) that raise UnicodeEncodeError
+        # under the legacy code page Windows still defaults to.
+        (dest / name).write_text(content, encoding="utf-8")
 
     return dest
 

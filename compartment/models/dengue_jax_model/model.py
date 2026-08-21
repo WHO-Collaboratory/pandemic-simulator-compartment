@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class DengueJaxModel(Model):
     """4-serotype dengue vector-borne model with temperature-driven dynamics.
 
-    Compartments are hardcoded (56 core + 8 cumulative) because the
+    Compartments are hardcoded (58 core + 8 cumulative) because the
     4-serotype × 2-infection structure is fixed.  Users configure
     transmission edges, interventions, and the immunity period.
     """
@@ -524,9 +524,14 @@ class DengueJaxModel(Model):
 
         ``seroprevalence`` and ``infected_population`` are percentages spread
         evenly across the four serotypes, seeding ``Snot1``-``Snot4`` and
-        ``I1``-``I4``; the remainder is fully susceptible (``S0``). Mosquito
-        compartments start at zero and are grown by the temperature-driven
-        vector dynamics in ``equation``.
+        ``I1``-``I4``; the remainder is fully susceptible (``S0``).
+
+        Mosquito compartments start at zero deliberately. Vector abundance is a
+        derived quantity here, not an input: the recruitment term in
+        ``equation`` drives the mosquito population to a carrying capacity set
+        by temperature and the local human population, reaching it within about
+        two simulated days from any starting value. Seeding a count would only
+        ask for a number no data source provides and then overwrite it.
 
         Args:
             admin_zones (list[dict]): Admin-zone dicts with ``population``,
@@ -620,6 +625,16 @@ class DengueJaxModel(Model):
         interventions rescale the biting rate (``b_V_T``) and vector survival
         (``s_V_T``).
 
+        The ``error_val`` constant added to the population totals guards
+        against division by zero on the host side, but on the vector side it is
+        load-bearing. Mosquito recruitment is proportional to ``NV``, so an
+        all-zero mosquito state would otherwise be a fixed point and the
+        population could never establish from the zero start in
+        ``get_initial_population`` — nor recover after a seasonal collapse. The
+        constant keeps ``NV`` marginally positive, and logistic growth (roughly
+        24 per day at 27 C) takes it to carrying capacity in about a day and a
+        half.
+
         Args:
             y (jnp.ndarray): Current compartment values of shape
                 ``(n_compartments, n_zones)``, ordered by ``compartment_list``.
@@ -646,6 +661,8 @@ class DengueJaxModel(Model):
 
 
         # Unpack all compartments AFTER enforcing the I-threshold
+        # error_val seeds NV below: mosquito recruitment scales with NV, so
+        # without it the zero-vector start would be a fixed point.
         error_val = 1e-6
         (
             SV, EV1, EV2, EV3, EV4, IV1, IV2, IV3, IV4,
