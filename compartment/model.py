@@ -422,7 +422,7 @@ class Model(ABC):
                 description="Type of simulation engine",
                 value_type=ValueType.SELECT,
                 default="COMPARTMENTAL",
-                options=["COMPARTMENTAL", "AGENT_BASED"],
+                options=["COMPARTMENTAL"],
             ),
         ]
 
