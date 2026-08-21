@@ -77,11 +77,11 @@ A local run also produces the same results JSON the Simulator charts, which is w
 - [Writing the model](#writing-the-model)
   - [How the framework uses your class](#how-the-framework-uses-your-class)
   - [model.py](#modelpy)
-  - [Automated vs. manual equations](#automated-vs-manual-equations)
-  - [Optional functions to override](#optional-functions-to-override)
-  - [Built-in base class functions](#built-in-base-class-functions)
-  - [Stochastic models](#stochastic-models)
-  - [Parameter uncertainty](#parameter-uncertainty)
+    - [Automated vs. manual equations](#automated-vs-manual-equations)
+    - [Optional functions to override](#optional-functions-to-override)
+    - [Built-in base class functions](#built-in-base-class-functions)
+    - [Stochastic models](#stochastic-models)
+    - [Parameter uncertainty](#parameter-uncertainty)
   - [main.py](#mainpy)
   - [Additional files](#additional-files)
 - [Documenting your model](#documenting-your-model)
@@ -588,7 +588,18 @@ schema.add_demographic_group("age_65_plus", "Seniors",        default_weight=17.
 
 > `value_type=ValueType.DAYS` means `default=10.0` is a 10-day mean, converted to a `0.1/day` rate at load. Do not pre-divide.
 
-### Automated vs. manual equations
+> **`ValueType.DAYS` is whole days on `add_parameter()`.** On a transmission parameter, as above, the value is stored as a float and fractions are fine. On `add_parameter()` it becomes an integer field in the generated config, so a fractional value is rejected outright:
+>
+> ```
+> Input should be a valid integer, got a number with a fractional part
+>   [type=int_from_float, input_value=5.9, input_type=float]
+> ```
+>
+> Published estimates are rarely whole numbers, so for a duration that needs decimals, declare it as `ValueType.FLOAT` with `unit="days"` and convert it yourself with `self._to_rate(value, ValueType.DAYS)` in `equation()`. `ebola_seihfr_burial_legrand_model` does this for three durations, one of which is 9.6 days.
+>
+> A plain parameter's value reaches your model unconverted whichever type you give it — only transmission parameters get the automatic days-to-rate conversion — so `ValueType.DAYS` buys nothing there beyond the integer restriction. Prefer `ValueType.FLOAT` for durations and `ValueType.INTEGER` for values that really are whole numbers; both state plainly what the field accepts.
+
+#### Automated vs. manual equations
 
 There are two ways to write `equation()`.
 
@@ -662,7 +673,7 @@ def equation(self, y, t, p):
 
 Anything ramped, time-varying, or otherwise conditional on `t` must stay JAX-traceable — use `jnp.clip` and `jnp.where` rather than Python `if` statements on traced values, as `custom_intervention()` does.
 
-### Optional functions to override
+#### Optional functions to override
 
 **`__init__(self, config)`**
 
@@ -709,7 +720,7 @@ for i, zone in enumerate(admin_zones):
 
 **Mobility matrix.** The framework defaults to a gravity model. To use a different model — or none, via an identity matrix — override `build_travel_matrix(self, admin_zones)`. The framework calls it before `prepare_initial_state()` and stores the result on `self.travel_matrix`.
 
-### Built-in base class functions
+#### Built-in base class functions
 
 - **`_add_total_compartments`** — by default the framework creates a cumulative `<target>_total` compartment for every transmission edge target (for example `I_total`). These track cumulative inflow and are used when computing summary results; you do not declare them, and they are not included in model outputs. To use a different aggregation strategy — for example one `_total` shared across several compartments — override it with `pass` and declare your own totals. `example_stochastic_model` does this because its two infectious compartments share a single `I_total`:
 
@@ -721,7 +732,7 @@ for i, zone in enumerate(admin_zones):
 
 - **`_apply_interventions`** — applies intervention effects by updating transmission rates and the mobility matrix during the simulation. Call it inside `equation()` to enable interventions. Override it, or write your own function as `example_parameter_uncertainty_custom_model` does, for custom logic.
 
-### Stochastic models
+#### Stochastic models
 
 Models are deterministic by default. Declare a stochastic model with a class variable:
 
@@ -758,7 +769,7 @@ COMPARTMENT_DELTA_GROUPING = {
 }
 ```
 
-### Parameter uncertainty
+#### Parameter uncertainty
 
 There is no flag for parameter uncertainty. The framework detects it automatically when a config assigns a value **range** to a parameter, then draws Latin Hypercube samples and emits a median with a 95% simulation-based interval.
 
@@ -938,7 +949,7 @@ Running a model locally requires the information the Pandemic Simulator would no
 
 - **`Disease.disease_type`** — must match `set_model_info(disease_type=...)`. Determines which model is loaded.
 - **`start_date`** and **`end_date`** — `YYYY-MM-DD`.
-- **`admin_zones`** (or `case_file.admin_zones`) — each zone needs `name`, `population`, `center_lat`, `center_lon`, `infected_population`, and any fields declared with `add_admin_zone_field()`.
+- **`admin_zones`** (or `case_file.admin_zones`) — each zone needs `name`, `population`, `center_lat`, `center_lon`, `infected_population` (a percentage — see below), and any fields declared with `add_admin_zone_field()`.
 - **`TransmissionEdges.items`** — one entry per transmission edge declared in `define_parameters()`.
 
 Optional: `Interventions`, `travel_volume`, `demographics`, `contact_matrix_overrides`, `demographic_rate_overrides`, and any additional disease parameters declared in the schema.
@@ -992,6 +1003,10 @@ If a required field is missing, the framework raises a `ValidationError`, logs w
     ]
 }
 ```
+
+> **`infected_population` is a percentage, not a case count.** The framework seeds the initial infected as `infected_population / 100 * population`, so the `0.01` above is 0.01% of 1,000,000 — 100 people, not 1 person and not 1%. Valid values run from 0 to 100.
+>
+> To start from a known number of cases, you must convert it: `cases / population * 100`. To seed 25 cases in the zone above, use `25 / 1000000 * 100 = 0.0025`. Entering `25` instead would start the run with 25% of the zone infected — 250,000 cases.
 
 Model-specific parameters declared with `add_parameter()` go in the `Disease` block. `example_parameter_uncertainty_custom_model` passes its ramp settings this way:
 
