@@ -197,7 +197,7 @@ class MyModel(Model):
 
         # 5. (optional) Travel — declare your mobility parameters as custom
         # fields, then override build_travel_matrix() to turn them into a
-        # matrix. See gravity-model.md for the full treatment.
+        # matrix. See mobility.md for the full treatment.
         schema.add_parameter(
             name="travel_sigma", label="Travel Rate (σ)",
             description="Percentage of each zone's population away from home on a given day.",
@@ -367,7 +367,7 @@ If a model declares demographic groups but supplies neither `age_range` nor any 
 
 Multi-region models use **gravity models** to generate travel matrices describing population flows between administrative zones. The travel matrix `T[i,j]` represents the fraction of region i's population present in region j.
 
-> **📚 For comprehensive documentation on gravity models**, see **[gravity-model.md](./gravity-model.md)** — detailed explanation of spatial mobility, distance-decay functions, and how travel matrices work in disease models.
+> **📚 For comprehensive documentation on mobility**, see **[mobility.md](./mobility.md)** — detailed explanation of spatial mobility, distance-decay functions, and how travel matrices work in disease models.
 
 **Quick overview:**
 
@@ -413,7 +413,7 @@ omega = contact_matrix @ BETA  # (R, A)
 foi = S * omega
 ```
 
-See [gravity-model.md](./gravity-model.md) for detailed mathematical explanation and usage patterns.
+See [mobility.md](./mobility.md) for detailed mathematical explanation and usage patterns.
 
 ### Compartment delta grouping
 

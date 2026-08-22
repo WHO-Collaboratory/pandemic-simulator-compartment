@@ -24,7 +24,7 @@ This file is for me (Claude) when the user asks for help adding or modifying a d
 | Smoke test sweep that auto-discovers new models | [tests/test_smoke.py](../tests/test_smoke.py) + [tests/helpers.py](../tests/helpers.py) |
 | **Contact matrices: loading, aggregation, and usage** | [docs/guides/contact-matrices.md](../docs/guides/contact-matrices.md) — comprehensive guide |
 | Contact matrix implementation code | [compartment/contact_matrices/](../compartment/contact_matrices/) — loader, aggregator, Prem data |
-| **Spatial mobility and travel matrices** | [docs/guides/gravity-model.md](../docs/guides/gravity-model.md) — comprehensive guide |
+| **Spatial mobility and travel matrices** | [docs/guides/mobility.md](../docs/guides/mobility.md) — comprehensive guide |
 | Mobility implementation code | [compartment/model.py](../compartment/model.py) `build_travel_matrix()` / `_ensure_travel_matrix()`; kernels in [compartment/helpers.py](../compartment/helpers.py) `get_gravity_model_travel_matrix()` and per-model (mpox, hantavirus_human) |
 | **Interventions: declaration, configuration, and application** | [docs/guides/interventions.md](../docs/guides/interventions.md) — comprehensive guide |
 | Intervention implementation code | [compartment/runtime.py](../compartment/runtime.py) `Intervention` class, [compartment/model.py](../compartment/model.py) `_apply_interventions()` |
