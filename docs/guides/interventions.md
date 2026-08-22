@@ -716,7 +716,7 @@ Set `end_threshold` significantly below `start_threshold` to create a buffer zon
 
 - **[DEVELOPING_MODELS.md](./developing-models.md)** — General model development guide
 - **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; draws intervention start/stop lines on the compartment time series
-- **[GRAVITY_MODEL.md](./gravity-model.md)** — How travel matrices work (relevant for lockdowns)
+- **[mobility.md](./mobility.md)** — How travel matrices work (relevant for lockdowns)
 - **[CONTACT_MATRICES.md](./contact-matrices.md)** — Age-specific mixing (interventions can target by age)
 - **[compartment/interventions.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/interventions.py)** — Legacy implementation (being replaced by runtime.py)
 - **[compartment/runtime.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/runtime.py)** — New `Intervention` class with JAX-compatible logic

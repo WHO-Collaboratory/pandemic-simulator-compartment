@@ -702,7 +702,7 @@ A few models (such as dengue) initialize manually instead of calling `super().__
 
 **`prepare_initial_state(self)`**
 
-Builds the starting population matrix from each administrative region's population (WorldPop) and the initial infected percentage from the config or UI. **Do not rename it.** Override it if your model needs a custom mobility matrix.
+Builds the starting population matrix from each administrative region's population (WorldPop) and the initial infected percentage from the config or UI. **Do not rename it.** Override it if your model needs a different starting state — for a custom mobility matrix, override `build_travel_matrix()` instead (see below).
 
 The population matrix is **(K, R)**: K compartments × R regions. With demographic groups declared via `schema.add_demographic_group()`, it should end up as **(K, A, R)** — call `_prepare_demographic_state()` rather than building it by hand. That method expands the default (K, R) matrix, appends zero-valued rows for `_total` compartments, updates `self.population_matrix` and `self.compartment_list` in place, and returns `None`. Models without demographic groups can ignore it.
 
@@ -718,7 +718,7 @@ for i, zone in enumerate(admin_zones):
     initial_population[i, col["Sym"]] = infected * (1.0 - asymp_frac)
 ```
 
-**Mobility matrix.** The framework defaults to a gravity model. To use a different model — or none, via an identity matrix — override `build_travel_matrix(self, admin_zones)`. The framework calls it before `prepare_initial_state()` and stores the result on `self.travel_matrix`.
+**Mobility matrix.** The framework's default is the **identity matrix** — no inter-zone travel. There is no default gravity model: a model that travels declares its own mobility parameters and overrides `build_travel_matrix(self, admin_zones)`. The framework calls it before `prepare_initial_state()` and stores the result on `self.travel_matrix`, so don't assign that attribute yourself. Building the matrix isn't enough on its own — it only has an effect if `equation()` uses it in the force of infection. See [mobility.md](./mobility.md).
 
 #### Built-in base class functions
 
