@@ -43,7 +43,9 @@ Intervention (`my_intervention`), which targets `beta`:
 |---|---|---|---|
 | `adherence_min` | % | `50` | `40` – `60` |
 | `transmission_percentage` | % | `50` | `45` – `55` |
-| `start_date` / `end_date` | date | — | — |
+| `start_threshold` / `end_threshold` | % | — | — |
+
+The example config activates the intervention by **prevalence threshold** rather than by date: it switches on once 2% of the population is infectious and releases at 1%. Both thresholds are percentages of the population, not fractions — `2.0` means 2%, and `0.02` would mean 0.02%. Swap them for `start_date` and `end_date` to drive it from the calendar instead. See [interventions.md](../../../docs/guides/interventions.md).
 
 Per-zone inputs under `admin_zones`: `name`, `population` (count), `infected_population` (**percentage** of that zone infected at day 0, `0` – `100`, default `0.05`), `center_lat`, and `center_lon`.
 
@@ -93,7 +95,7 @@ To plot a local result file: `python tools/view_results.py results/<file>.json`.
 
 - **Run mode is inferred, not configured.** Any field with `"has_variance": true` — on an edge, an intervention, or a disease parameter — switches the whole simulation to an uncertainty run with `n_simulations` Latin Hypercube draws. Remove every variance flag and the same model runs deterministically.
 - **The intervention's two percentages multiply.** The effect while active is `beta × (1 − adherence × transmission_reduction)`. The defaults of 50% and 50% give a **25%** reduction in transmission, not 50%.
-- **The example config's intervention starts after the peak.** With the default parameters the unmitigated epidemic peaks in mid-February, but the intervention window runs 1 March to 1 June. Both runs therefore share an identical peak, and the intervention only trims the tail — around 917,000 cumulative infections against 939,000 for the control. Move the window earlier to see it bite.
+- **The intervention is triggered by prevalence, not by date.** It switches on when 2% of the population is infectious, which the default parameters reach around day 28 — while the epidemic is still growing. Peak prevalence falls from about 25% to 19% and arrives ten days later, and cumulative infections drop from roughly 939,000 to 865,000.
 - **The contact matrix is loaded for you.** Because all five groups declare an `age_range` and the model sets no overrides, the framework loads a synthetic contact matrix for the ISO3 code parsed from the config's `admin_unit_id`, falling back to that country's income-group average and then to a global average. The example config sets no `admin_unit_id`, so it gets the global-average matrix. Supply a real `admin_unit_id` to get country-specific mixing.
 - **Zones do not interact.** No mobility parameters are declared, so the travel matrix is the identity and each zone evolves independently. The `travel_sigma` parameter and `build_travel_matrix()` override are stubbed out in `model.py` if you want to change that.
 - **`_total` compartments are excluded from the population.** `equation()` sums only non-`_total` compartments when computing the infectious proportion. Including them would double-count.

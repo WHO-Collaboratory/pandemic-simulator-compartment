@@ -987,8 +987,8 @@ If a required field is missing, the framework raises a `ValidationError`, logs w
                 "Intervention": { "name": "MY_INTERVENTION", "display_name": "My intervention" },
                 "adherence_min": 50.0,
                 "transmission_percentage": 50.0,
-                "start_date": "2026-03-01",
-                "end_date": "2026-06-01"
+                "start_threshold": 2.0,
+                "end_threshold": 1.0
             }
         ]
     },
