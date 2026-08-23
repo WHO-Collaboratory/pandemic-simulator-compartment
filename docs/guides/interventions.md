@@ -83,7 +83,7 @@ rates, self.travel_matrix = self._apply_interventions(
 )
 ```
 
-It returns the scaled rates and the updated travel matrix. The third argument is the current proportion of the population that is infectious, needed for threshold activation. When no interventions are configured — as in the control run — the call is a no-op. Models without mobility can discard the travel matrix, as `ebola_jax_model` does with `rates, _ = self._apply_interventions(...)`.
+It returns the scaled rates and the updated travel matrix. The third argument is the current proportion of the population that is infectious, needed for threshold activation. When no interventions are configured — as in the control run — it keeps the rates and travel matrix exactly as it received them, leaving the run unchanged. Models without mobility can discard the travel matrix, as `ebola_jax_model` does with `rates, _ = self._apply_interventions(...)`.
 
 ### How much transmission drops
 
