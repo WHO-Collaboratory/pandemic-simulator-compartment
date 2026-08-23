@@ -1,6 +1,6 @@
 # Interventions in the Pandemic Simulator
 
-This document explains how interventions (public health measures) are defined, configured, and applied in the Pandemic Simulator's compartmental modeling framework.
+This document explains how interventions are defined, configured, and applied in the Pandemic Simulator's compartmental modeling framework.
 
 ## Overview
 
