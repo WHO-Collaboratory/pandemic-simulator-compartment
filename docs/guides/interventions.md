@@ -1,15 +1,15 @@
 # Interventions
 
-An intervention is a control measure that changes the course of a simulated outbreak — distancing, masks, vaccination, case isolation, vector control, a lockdown. This guide covers how a model offers them and how you configure them in a run.
+An intervention is a control measure that can change the course of a simulated outbreak — distancing, masks, vaccination, case isolation, vector control, a lockdown. This guide covers how a model integrates them and how you configure them in a run.
 
-There are two kinds. A **built-in intervention** is declared in one call and the framework handles the rest; this covers most needs. A **custom intervention** is logic you write yourself, for effects the built-in intervention cannot express.
+There are two kinds. A **built-in intervention** is declared in one call and the framework handles the rest. A **custom intervention** is logic you write yourself, for effects the built-in intervention does not express.
 
 ## Contents
 
 - [What an intervention can change](#what-an-intervention-can-change)
 - [Built-in interventions](#built-in-interventions)
-  - [Declaring one](#declaring-one)
-  - [Wiring it into `equation()`](#wiring-it-into-equation)
+  - [Declaring interventions](#declaring-interventions)
+  - [Writing it into `equation()`](#writing-it-into-equation)
   - [How much transmission drops](#how-much-transmission-drops)
   - [Switching it on: date window](#switching-it-on-date-window)
   - [Switching it on: prevalence threshold](#switching-it-on-prevalence-threshold)
@@ -24,18 +24,18 @@ There are two kinds. A **built-in intervention** is declared in one call and the
 
 A built-in intervention has two levers:
 
-1. **It scales one or more transmission rates.** Whatever rates the model author lists in `target_rates` are multiplied down while the intervention is active. This is how masks, distancing, vaccination, and vector control are represented.
-2. **It stops movement between zones.** With `modifies_travel=True`, the travel matrix is replaced by the identity matrix while the intervention is active, so nobody moves between administrative zones. This only does something if the model actually has mobility — see [Restricting travel](#restricting-travel).
+1. **It scales one or more transmission rates.** Whatever rates the model author lists in `target_rates` are scaled down while the intervention is active. This is how masks, distancing, vaccination, and vector control are represented.
+2. **It stops movement between zones.** With `modifies_travel=True`, the travel matrix is replaced by the identity matrix while the intervention is active, so nobody moves between administrative zones. This is only effective if the model has mobility — see [Restricting travel](#restricting-travel).
 
-An intervention never adds a compartment, moves people directly, or changes a recovery period. If you need any of those, write a [custom intervention](#custom-interventions).
+An intervention never adds a compartment or moves people directly. If you need any of those, write a [custom intervention](#custom-interventions).
 
-Every simulation runs **twice**: once with your interventions and once without. The second is the control run, tagged `"control_run": true` in the output, and it is what makes "how much did this measure buy us?" answerable.
+Every simulation runs **twice**: once with your interventions and once without. The second is the control run, tagged `"control_run": true` in the output.
 
 ## Built-in interventions
 
 ### Declaring interventions
 
-The model author declares each available intervention in `define_parameters()`. `example_parameter_uncertainty_declarative_model/model.py` is the minimal case:
+The model author declares each available intervention in `define_parameters()`. `example_parameter_uncertainty_declarative_model/model.py` shows the minimal case:
 
 ```python
 schema.add_intervention(
@@ -58,13 +58,22 @@ schema.add_intervention(
 | `adherence` | no | `50.0` | Starting value for the adherence control, in percent. |
 | `transmission_reduction` | no | `5.0` | Starting value for the reduction control, in percent. |
 
-`adherence` and `transmission_reduction` only set the **defaults** a user sees; a value in the config will take precedence.
+`adherence` and `transmission_reduction` set only the **starting values of the two controls**, not the values the model runs with. Running locally, the numbers in your config file take precedence; in the Pandemic Simulator UI they are the initial position of the sliders on the Simulation Configuration page, and whatever the user selects there takes precedence instead.
+
+So against the declaration above, this config gives a 30% reduction in `beta` rather than the declared 25%:
+
+```json
+"adherence_min": 60.0,
+"transmission_percentage": 50.0
+```
+
+One catch: an omitted field does **not** fall back to the declared default. Leave `adherence_min` out and adherence is read as zero, which leaves the intervention active but completely ineffective, so the run comes out identical to the control.
 
 Each name in `target_rates` must match the `variable_name` of a transmission parameter *and* be passed into `_apply_interventions()` by the model. A name that matches nothing is skipped silently, so a typo gives you an intervention that does nothing without any error. Declaring an intervention with an empty `target_rates` is only sensible when it is travel-only.
 
 An intervention can target several rates at once. `example_stochastic_model` scales both the asymptomatic and symptomatic transmission rates with `target_rates=["beta", "beta_sym"]`, and `ebola_seihfr_burial_legrand_model` declares three separate interventions — community, hospital, and funeral — each aimed at its own route.
 
-### Wiring it into `equation()`
+### Writing it into `equation()`
 
 Interventions only take effect if the model calls `_apply_interventions()`, passing the rates that may be modified:
 
