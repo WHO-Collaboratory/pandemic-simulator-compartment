@@ -450,11 +450,19 @@ The new directory name follows the same rule as scaffolding: it must be unique w
 | `__pycache__` | Safe to delete. It is compiled output from the original and is rebuilt on the next run. |
 | `__init__.py` | Nothing. It stays empty. |
 
-In the example model that is six occurrences across three files. To catch anything missed, search the new directory for the old names:
+In the example model that is six occurrences across three files. To find anything missed, search the new directory for the old names. Fix each occurrence yourself, or use your editor's find-and-replace scoped to the copied folder.
 
+**macOS / Linux**
 ```shell
 grep -rn "ExampleParameterUncertaintyDeclarative\|example_parameter_uncertainty_declarative" compartment/models/my_disease_model
 ```
+
+**Windows Command Prompt**
+```shell
+findstr /s /n "ExampleParameterUncertaintyDeclarative example_parameter_uncertainty_declarative" compartment\models\my_disease_model\*
+```
+
+The quoted terms stay exactly as written — they are the old names you are hunting for. **The path at the end is the part you change:** replace `my_disease_model` with your own directory name. On Windows, keep the trailing `\*`; without it `findstr` has no files to search and prints nothing.
 
 Finally, confirm the registry picked up the copy as its own model. Both disease types should be listed, the old one unchanged:
 
