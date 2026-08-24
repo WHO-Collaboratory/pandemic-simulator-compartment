@@ -83,6 +83,8 @@ This guide covers building a model end to end. The others go deeper on one topic
   - [Installing uv](#installing-uv)
   - [Create a virtual environment](#create-a-virtual-environment)
   - [Git workflow](#git-workflow)
+    - [Create a branch](#create-a-branch)
+    - [Commit your work](#commit-your-work)
 - [Add a new model](#add-a-new-model)
   - [Choose a unique name](#choose-a-unique-name)
   - [Run the scaffold](#run-the-scaffold)
@@ -285,6 +287,29 @@ where python
 ```
 
 ### Git workflow
+
+#### Create a branch
+
+Work on a branch, not on `main`. A branch is your own copy of the repository's files, so your in-progress model cannot break anyone else's work, and `main` stays clean until reviewers approve your changes. A pull request is a request to merge one branch into another, so a branch is also what makes a pull request possible.
+
+Start from an up-to-date `main`, then create the branch:
+
+```shell
+git checkout main                          # switch to main
+git pull                                   # download latest changes
+git checkout -b add-example-disease-model  # create the branch and switch to it
+```
+
+Name the branch after the model you are adding. Check which branch you are on at any time:
+
+```shell
+git branch          # current branch is marked with *
+git checkout main   # switch back to an existing branch (no -b)
+```
+
+> `-b` means "create". Use `git checkout -b <name>` once to create the branch, then plain `git checkout <name>` to return to it later.
+
+#### Commit your work
 
 Commit regularly as you work. A commit is a checkpoint you can return to.
 
