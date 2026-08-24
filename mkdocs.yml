@@ -59,6 +59,7 @@ nav:
   - Home: index.md
   - Guides:
     - Model Integration: guides/model-integration-documentation.md
+    - Model Conversion: guides/model-conversion.md
     - Adding Your Own Data: guides/adding-datasets.md
     - Interventions Guide: guides/interventions.md
     - Contact Matrices: guides/contact-matrices.md
