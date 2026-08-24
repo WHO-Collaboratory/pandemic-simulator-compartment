@@ -1,0 +1,113 @@
+{
+    "n_simulations": 20,
+    "Disease": {
+        "disease_type": "example_parameter_uncertainty_declarative2",
+        "travel_sigma": 20.0
+    },
+    "start_date": "2026-01-01",
+    "end_date": "2026-12-31",
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": {
+                    "source": "susceptible",
+                    "target": "infected",
+                    "value_type": "RATE"
+                },
+                "value": 0.3,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": true,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "BETA",
+                            "default": 0.3,
+                            "min": 0.2,
+                            "max": 0.4
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "infected",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 10.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": true,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA",
+                            "default": 10.0,
+                            "min": 7.0,
+                            "max": 14.0
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": {
+                    "name": "my_intervention",
+                    "display_name": "My Intervention"
+                },
+                "adherence_min": 100.0,
+                "transmission_percentage": 100.0,
+                "start_date": "2026-01-15",
+                "end_date": "2026-12-31",
+                "start_threshold": null,
+                "end_threshold": null,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "adherence_min",
+                            "has_variance": true,
+                            "distribution_type": "UNIFORM",
+                            "default": 100.0,
+                            "min": 99.0,
+                            "max": 100.0
+                        },
+                        {
+                            "field_key": "transmission_percentage",
+                            "has_variance": true,
+                            "distribution_type": "UNIFORM",
+                            "default": 100.0,
+                            "min": 99.0,
+                            "max": 100.0
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "admin_unit_id": "MDG",
+    "demographics": {
+        "age_0_17": 30.0,
+        "age_18_55": 50.0,
+        "age_56_plus": 20.0
+    },
+    "admin_zones": [
+        {
+            "name": "Antananarivo",
+            "center_lat": -18.93585290187204,
+            "center_lon": 46.80467692606311,
+            "population": 1275000,
+            "infected_population": 0.05
+        },
+        {
+            "name": "Toamasina",
+            "center_lat": -17.82287275056714,
+            "center_lon": 48.7510838190036,
+            "population": 274000,
+            "infected_population": 0.001
+        }
+    ]
+}

@@ -1,91 +1,45 @@
 {
-    "n_simulations": 20,
+    "start_date": "2026-08-18",
+    "end_date": "2026-11-16",
     "Disease": {
-        "disease_type": "example_parameter_uncertainty_declarative"
-    },
-    "start_date": "2026-01-01",
-    "end_date": "2026-12-31",
-    "TransmissionEdges": {
-        "items": [
+        "disease_type": "example_parameter_uncertainty_declarative",
+        "transmission_edges": [
             {
-                "transmission_edge": {
-                    "source": "susceptible",
-                    "target": "infected",
-                    "value_type": "RATE"
-                },
-                "value": 0.3,
-                "FieldConfigs": {
-                    "items": [
-                        {
-                            "field_key": "value",
-                            "has_variance": true,
-                            "distribution_type": "UNIFORM",
-                            "disease_param": "BETA",
-                            "default": 0.3,
-                            "min": 0.2,
-                            "max": 0.4
-                        }
-                    ]
+                "source": "susceptible",
+                "target": "infected",
+                "data": {
+                    "transmission_rate": 0.3
                 }
             },
             {
-                "transmission_edge": {
-                    "source": "infected",
-                    "target": "recovered",
-                    "value_type": "DAYS"
-                },
-                "value": 10.0,
-                "FieldConfigs": {
-                    "items": [
-                        {
-                            "field_key": "value",
-                            "has_variance": false,
-                            "distribution_type": "UNIFORM",
-                            "disease_param": "GAMMA"
-                        }
-                    ]
+                "source": "infected",
+                "target": "recovered",
+                "data": {
+                    "transmission_rate": 10.0
                 }
             }
         ]
     },
-    "Interventions": {
-        "items": [
-            {
-                "Intervention": { "name": "MY_INTERVENTION", "display_name": "My intervention" },
-                "adherence_min": 50.0,
-                "transmission_percentage": 50.0,
-                "start_date": "2026-03-01",
-                "end_date": "2026-06-01",
-                "FieldConfigs": {
-                    "items": [
-                        {
-                            "field_key": "adherence_min",
-                            "has_variance": true,
-                            "distribution_type": "UNIFORM",
-                            "default": 50.0,
-                            "min": 40.0,
-                            "max": 60.0
-                        },
-                        {
-                            "field_key": "transmission_percentage",
-                            "has_variance": true,
-                            "distribution_type": "UNIFORM",
-                            "default": 50.0,
-                            "min": 45.0,
-                            "max": 55.0
-                        }
-                    ]
-                }
-            }
-        ]
-    },
-    "admin_zones": [
+    "interventions": [
         {
-            "name": "Example Zone",
-            "center_lat": 40.7128,
-            "center_lon": -74.006,
-            "population": 1000000,
-            "infected_population": 0.01
+            "id": "my_intervention",
+            "adherence_min": 50.0,
+            "transmission_percentage": 50.0,
+            "start_date": null,
+            "end_date": null,
+            "start_threshold": null,
+            "end_threshold": null
         }
-    ]
+    ],
+    "case_file": {
+        "admin_zones": [
+            {
+                "center_lat": 40.7128,
+                "center_lon": -74.006,
+                "name": "Example Zone",
+                "population": 1000000,
+                "infected_population": 1
+            }
+        ]
+    }
 }

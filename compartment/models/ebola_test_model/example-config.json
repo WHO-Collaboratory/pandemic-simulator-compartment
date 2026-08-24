@@ -1,0 +1,76 @@
+{
+    "start_date": "1995-01-06",
+    "end_date": "1995-06-30",
+    "Disease": {
+        "disease_type": "ebola_test",
+        "betaI": 0.084,
+        "betaH": 0.1134286,
+        "betaF": 1.0932857,
+        "gamma_h": 5.0,
+        "gamma_i": 10.0,
+        "gamma_d": 9.6,
+        "theta_target": 80.0,
+        "delta_target": 81.0,
+        "variance_params": [
+            { "param": "betaI", "dist": "uniform", "min": 0.060,  "max": 0.313 },
+            { "param": "betaH", "dist": "uniform", "min": 0.0001, "max": 0.584 },
+            { "param": "betaF", "dist": "uniform", "min": 0.0001, "max": 1.428 }
+        ]
+    },
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": { "source": "E", "target": "I", "value_type": "DAYS" },
+                "value": 7.0,
+                "FieldConfigs": {
+                    "items": [
+                        { "field_key": "value", "has_variance": false, "disease_param": "ALPHA" }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": { "source": "F", "target": "R", "value_type": "DAYS" },
+                "value": 2.0,
+                "FieldConfigs": {
+                    "items": [
+                        { "field_key": "value", "has_variance": false, "disease_param": "GAMMA_F" }
+                    ]
+                }
+            }
+        ]
+    },
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": { "name": "COMMUNITY_INTERVENTION", "display_name": "Community Transmission Control" },
+                "adherence_min": 100.0,
+                "transmission_percentage": 50.0,
+                "start_date": "1995-02-24",
+                "end_date": null
+            },
+            {
+                "Intervention": { "name": "HOSPITAL_INTERVENTION", "display_name": "Hospital Isolation / Barrier Nursing" },
+                "adherence_min": 100.0,
+                "transmission_percentage": 100.0,
+                "start_date": "1995-02-03",
+                "end_date": null
+            },
+            {
+                "Intervention": { "name": "FUNERAL_INTERVENTION", "display_name": "Safe Burial Practices" },
+                "adherence_min": 100.0,
+                "transmission_percentage": 100.0,
+                "start_date": "1995-02-10",
+                "end_date": null
+            }
+        ]
+    },
+    "admin_zones": [
+        {
+            "name": "Kikwit, DRC (1995)",
+            "center_lat": -5.039,
+            "center_lon": 18.815,
+            "population": 200000,
+            "infected_population": 0.0015
+        }
+    ]
+}
