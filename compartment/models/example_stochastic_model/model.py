@@ -56,9 +56,9 @@ class ExampleStochasticModel(Model):
         schema.set_model_metadata(
             authors=[
                 {
-                    "name": "Jenny Blase",
-                    "email": "jblase@ruvos.com",
-                    "affiliation": "Ruvos",
+                    "name": "Example Author",
+                    "email": "example@example.com",
+                    "affiliation": "Example LLC",
                 }
             ],
             license="MIT",
@@ -73,8 +73,8 @@ class ExampleStochasticModel(Model):
             key_assumptions=[
                 "Closed population — no births or deaths.",
                 "Tau-leaping: infection and recovery events are Poisson draws around the deterministic rates.",
-                "Two infectious compartments (asymptomatic and symptomatic), both equally infectious.",
-                "A fixed fraction of new infections are asymptomatic.",
+                "Two infectious compartments (asymptomatic and symptomatic), each with its own transmission rate and its own recovery period.",
+                "A fixed fraction of new infections are asymptomatic, regardless of which compartment infected them.",
                 "Frequency-dependent transmission (force of infection scales with the proportion infectious).",
                 "Recovered individuals are fully immune with no waning (no R→S transition).",
             ],
