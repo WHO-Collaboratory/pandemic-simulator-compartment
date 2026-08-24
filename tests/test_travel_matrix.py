@@ -72,9 +72,10 @@ def _build_model(model_dir):
     config_path = MODEL_CONFIGS[model_dir][2]
 
     raw = load_config_from_json(str(config_path))
-    disease_type = model_class.DISEASE_TYPE
-    raw["data"]["getSimulationJob"]["Disease"]["disease_type"] = disease_type
-    processed = load_simulation_config(raw, disease_type)
+    raw["data"]["getSimulationJob"]["Disease"]["disease_type"] = (
+        model_class.DISEASE_TYPE
+    )
+    processed = load_simulation_config(raw, model_class.MODEL_KEY)
     return model_class(processed)
 
 
