@@ -74,7 +74,7 @@ class MpoxJaxModel(Model):
             frequency_dependent=True,
             label="Transmission Rate (S->I)",
             description="Rate at which susceptible individuals become infected through contact with infected individuals",
-            default=0.3,
+            default=0.27,
             default_min=0.1,
             default_max=0.5,
             min_value=0.01,
