@@ -1307,6 +1307,10 @@ Read the diff the way a user will meet the model: **everything the schema declar
 
 Approve, or request changes with specifics. Then merge to `main`.
 
+#### If changes are required
+
+The approver should put comments on the **pull request**, using line comments where possible, and submit the review as **Request changes**. The modeler should make the fixes on the same branch, rerun the relevant tests, commit and push the changes, respond to or resolve each comment, and re-request review. The approver then reviews the updated pull request before approving it.
+
 ### 2. Tag a release
 
 Merging builds nothing. The `disease-pipeline` workflow fires on a semver tag, which you create from GitHub — no terminal needed.
