@@ -257,9 +257,7 @@ def define_parameters(cls, schema):
 ```
 
 
-
 ## Using Contact Matrices in Your Model
-
 
 
 ### In `define_parameters()`
@@ -332,81 +330,12 @@ If demographics are provided but:
 - No schema overrides are present, AND  
 - No config overrides are present
 
-Then the matrix defaults to **identity** (each group only contacts itself), and a warning is logged. This is almost always a bug — real populations have cross-group mixing.
-
+Then the matrix defaults to **identity** (each group only contacts itself), and a warning is logged.
 
 
 ### Warning: Zero-Overlap Bands
 
 If a target age range has **no overlap** with the Prem source bands (0-120), the aggregator logs a warning. The corresponding rows/columns will be zero.
-
-## Best Practices
-
-
-
-### ✅ Do
-
-- **Declare** `age_range` **on all demographic groups** to enable country-specific Prem auto-loading
-- **Use inclusive (low, high) tuples** for age ranges, e.g., `(0, 17)` includes ages 0 through 17
-- **Test your model with different countries** to ensure mixing patterns are realistic
-- **Use config overrides for sensitivity analyses** rather than modifying the model code
-- **Check the logs** during model runs — the framework reports which matrix source was used
-
-
-
-### ❌ Don't
-
-- **Don't declare age ranges inconsistently** — either all groups have them or none do
-- **Don't mix schema overrides and age ranges** — schema overrides suppress Prem loading entirely
-- **Don't assume symmetric matrices** — contact patterns are asymmetric by population size
-- **Don't declare age ranges outside [0, 120]** — the Prem bands cap at 120 for the open-ended "75+" group
-
-
-
-## Troubleshooting
-
-
-
-### "Contact matrix defaults to identity" warning
-
-**Cause:** Model has demographic groups but no way to determine cross-group mixing.
-
-**Fix:** Add `age_range=(low, high)` to every demographic group in your schema, or provide explicit `set_contact_override()` calls.
-
-### Country not found in Prem bundle
-
-**Cause:** The `admin_unit_id` ISO3 code is not in the 177-country dataset.
-
-**Effect:** The framework applies the three-tier lookup and logs an info message at each step. The model still runs.
-
-- If the ISO has a World Bank income classification in `contact_matrices_economics.csv`, the framework uses the precomputed average matrix for that income group.
-- If no income group is available, the framework uses the global average across all 177 countries.
-
-**Fix (if needed):**
-
-- Check the list of countries with synthetic matrices: `from compartment.contact_matrices import available_countries; print(available_countries())`
-- Check which income group an ISO falls into: `from compartment.contact_matrices import iso_income_group; print(iso_income_group("ASM"))`
-- To assign an income group to a new ISO, add a row to `contact_matrices_economics.csv` and re-run `python tools/build_income_matrices.py`
-
-
-
-### Force of infection seems wrong
-
-**Check:**
-
-1. Is `self.contact_matrix` being applied correctly in `equation()`?
-2. Are you using the right matrix dimensions (A×A, not R×A)?
-3. Is the matrix multiplication `contact_matrix @ prevalence.T` producing the expected shape?
-4. Are you scaling by `beta` (transmission rate per contact)?
-
-**Debug snippet:**
-
-```python
-print("Contact matrix shape:", self.contact_matrix.shape)
-print("Contact matrix:\n", self.contact_matrix)
-print("Prevalence shape:", prevalence.shape)
-```
-
 
 
 ## Related Documentation
