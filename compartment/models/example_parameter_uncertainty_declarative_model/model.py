@@ -2,6 +2,7 @@ import jax.numpy as jnp
 import numpy as np
 import logging
 from compartment.model import Model, ValueType
+# from compartment.helpers import get_gravity_model_travel_matrix
 
 logger = logging.getLogger(__name__)
 

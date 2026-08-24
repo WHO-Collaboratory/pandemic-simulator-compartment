@@ -83,6 +83,8 @@ This guide covers building a model end to end. The others go deeper on one topic
   - [Installing uv](#installing-uv)
   - [Create a virtual environment](#create-a-virtual-environment)
   - [Git workflow](#git-workflow)
+    - [Create a branch](#create-a-branch)
+    - [Commit your work](#commit-your-work)
 - [Add a new model](#add-a-new-model)
   - [Choose a unique name](#choose-a-unique-name)
   - [Run the scaffold](#run-the-scaffold)
@@ -286,6 +288,29 @@ where python
 
 ### Git workflow
 
+#### Create a branch
+
+Work on a branch, not on `main`. A branch is your own copy of the repository's files, so your in-progress model cannot break anyone else's work, and `main` stays clean until reviewers approve your changes. A pull request is a request to merge one branch into another, so a branch is also what makes a pull request possible.
+
+Start from an up-to-date `main`, then create the branch:
+
+```shell
+git checkout main                          # switch to main
+git pull                                   # download latest changes
+git checkout -b add-example-disease-model  # create the branch and switch to it
+```
+
+Name the branch after the model you are adding. Check which branch you are on at any time:
+
+```shell
+git branch          # current branch is marked with *
+git checkout main   # switch back to an existing branch (no -b)
+```
+
+> `-b` means "create". Use `git checkout -b <name>` once to create the branch, then plain `git checkout <name>` to return to it later.
+
+#### Commit your work
+
 Commit regularly as you work. A commit is a checkpoint you can return to.
 
 ```shell
@@ -425,11 +450,19 @@ The new directory name follows the same rule as scaffolding: it must be unique w
 | `__pycache__` | Safe to delete. It is compiled output from the original and is rebuilt on the next run. |
 | `__init__.py` | Nothing. It stays empty. |
 
-In the example model that is six occurrences across three files. To catch anything missed, search the new directory for the old names:
+In the example model that is six occurrences across three files. To find anything missed, search the new directory for the old names. Fix each occurrence yourself, or use your editor's find-and-replace scoped to the copied folder.
 
+**macOS / Linux**
 ```shell
 grep -rn "ExampleParameterUncertaintyDeclarative\|example_parameter_uncertainty_declarative" compartment/models/my_disease_model
 ```
+
+**Windows Command Prompt**
+```shell
+findstr /s /n "ExampleParameterUncertaintyDeclarative example_parameter_uncertainty_declarative" compartment\models\my_disease_model\*
+```
+
+The quoted terms stay exactly as written — they are the old names you are hunting for. **The path at the end is the part you change:** replace `my_disease_model` with your own directory name. On Windows, keep the trailing `\*`; without it `findstr` has no files to search and prints nothing.
 
 Finally, confirm the registry picked up the copy as its own model. Both disease types should be listed, the old one unchanged:
 
