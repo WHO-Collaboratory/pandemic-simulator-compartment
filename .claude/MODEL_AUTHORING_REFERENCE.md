@@ -1,6 +1,6 @@
 # Claude reference: authoring a new compartmental model
 
-This file is for me (Claude) when the user asks for help adding or modifying a disease model. The companion user-facing doc is [docs/guides/developing-models.md](../docs/guides/developing-models.md). Use this file as the *authoring playbook*: concrete patterns, file paths, and pitfalls. Keep this terse and pattern-focused.
+This file is for me (Claude) when the user asks for help adding or modifying a disease model. The companion user-facing doc is [docs/guides/model-integration-documentation.md](../docs/guides/model-integration-documentation.md). Use this file as the *authoring playbook*: concrete patterns, file paths, and pitfalls. Keep this terse and pattern-focused.
 
 ## Mental model in three sentences
 
