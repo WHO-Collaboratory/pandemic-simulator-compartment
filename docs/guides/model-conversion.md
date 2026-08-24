@@ -1,12 +1,8 @@
 # Converting a Model with AI
 
-You can use an AI coding assistant to convert a model written in another
-language — or described only in a paper — into this repository's Python/JAX
-framework.
+You can use an AI coding assistant to convert a model written in another language — or described only in a paper — into this repository's Python/JAX framework.
 
-A human still has to check the result. This guide gives you a three-step
-process that puts two or three independent reviews between the AI's first draft
-and your own final review.
+A human still has to check the result. This guide gives you a three-step process that puts two or three independent reviews between the AI's first draft and your own final review.
 
 ---
 
@@ -14,18 +10,11 @@ and your own final review.
 
 ### Expect small numerical differences
 
-If you are converting an existing model and comparing outputs, the numbers will
-not match exactly. This repository uses a different numerical solver than most
-other modeling tools, so small differences are normal. Look for the same
-qualitative behavior: peak timing, peak size, final epidemic size, and growth
-rate.
+If you are converting an existing model and comparing outputs, the numbers will not match exactly. This repository uses a different numerical solver than most other modeling tools, so small differences are normal. Look for the same qualitative behavior: peak timing, peak size, final epidemic size, and growth rate.
 
 ### `print()` does not work the way you expect
 
-JAX runs your equations in two stages. First it reads through your code to
-learn its shape, and only later does it plug in real numbers. A normal
-`print()` runs during that first stage, so it prints a placeholder instead of
-the value you wanted.
+JAX runs your equations in two stages. First it reads through your code to learn its shape, and only later does it plug in real numbers. A normal `print()` runs during that first stage, so it prints a placeholder instead of the value you wanted.
 
 Use JAX's own print instead. It waits until the real numbers are there:
 
@@ -43,8 +32,7 @@ jax.debug.print("infected = {x}", x=infected)
 | **2** | Audit that draft with a **second** AI in a **fresh chat**. You can run this audit once, or run it twice with two different AIs | Catches errors the first AI cannot see in its own work |
 | **3** | *(Optional)* If you ran the audit twice, have a third AI compare the two results | Resolves disagreements between reviewers |
 
-This approach is described in the Wall Street Journal article
-[Yes, AI Can Make Mistakes. AI Can Find Them, Too.](https://www.wsj.com/tech/ai/yes-ai-can-make-mistakes-ai-can-find-them-too-6d1ad2c1)
+This approach is described in the Wall Street Journal article [Yes, AI Can Make Mistakes. AI Can Find Them, Too.](https://www.wsj.com/tech/ai/yes-ai-can-make-mistakes-ai-can-find-them-too-6d1ad2c1)
 
 ---
 
@@ -55,28 +43,20 @@ This approach is described in the Wall Street Journal article
 Choose one:
 
 - Use an AI built into your code editor, with this repository open, **or**
-- Point the AI at the public repository so it can read the docs and example
-  models:
-  <https://github.com/WHO-Collaboratory/pandemic-simulator-compartment>
+- Point the AI at the public repository so it can read the docs and example models: <https://github.com/WHO-Collaboratory/pandemic-simulator-compartment>
 
 ### Fill in your own details
 
-The prompt below is a template. Replace every `[BRACKETED]` placeholder before
-you send it:
+The prompt below is a template. Replace every `[BRACKETED]` placeholder before you send it:
 
 | Placeholder | What to put there |
 | --- | --- |
 | `[SOURCE]` | A link to your paper, or a description of where your model lives (a file path, a GitHub repo, an attached PDF, a set of equations) |
 | `[MODEL_NAME]` | A short lowercase name for your model directory, words separated by underscores — for example `ebola_seihfr_burial` |
 
-If your model has no published code, say so in the prompt. Ask the AI to write
-code that matches the framework and represents the paper's equations faithfully.
+If your model has no published code, say so in the prompt. Ask the AI to write code that matches the framework and represents the paper's equations faithfully.
 
-> **Example.** The walkthrough in this guide converts the model in
-> [Understanding the dynamics of Ebola epidemics](https://pmc.ncbi.nlm.nih.gov/articles/PMC2870608/).
-> That paper publishes no code, so the AI was asked to derive the
-> implementation from the equations. The result is in
-> [compartment/models/ebola_seihfr_burial_legrand_model/](../../compartment/models/ebola_seihfr_burial_legrand_model/).
+> **Example.** The walkthrough in this guide converts the model in [Understanding the dynamics of Ebola epidemics](https://pmc.ncbi.nlm.nih.gov/articles/PMC2870608/). That paper publishes no code, so the AI was asked to derive the implementation from the equations. The result is in [compartment/models/ebola_seihfr_burial_legrand_model/](../../compartment/models/ebola_seihfr_burial_legrand_model/).
 
 ### The prompt
 
@@ -200,9 +180,7 @@ Give me a short summary covering:
 
 ## Step 2 — Audit the code with a second AI
 
-Open a **new chat window** with no history from Step 1. An AI that just wrote
-the code cannot review it with fresh eyes. You can use the same tool or a
-different one, as long as the context is empty.
+Open a **new chat window** with no history from Step 1. An AI that just wrote the code cannot review it with fresh eyes. You can use the same tool or a different one, as long as the context is empty.
 
 ### Fill in your own details
 
@@ -214,11 +192,8 @@ different one, as long as the context is empty.
 
 Examples of decisions worth listing under `[YOUR_DECISIONS]`:
 
-- *"This is a deterministic ODE, not the paper's stochastic Gillespie
-  simulation. This is the standard mean-field limit used by most secondary
-  literature reproducing this paper."*
-- *"The example config uses the DRC 1995 parameter values. The Uganda 2000
-  values are documented in the code but not wired into the config."*
+- *"This is a deterministic ODE, not the paper's stochastic Gillespie simulation. This is the standard mean-field limit used by most secondary literature reproducing this paper."*
+- *"The example config uses the DRC 1995 parameter values. The Uganda 2000 values are documented in the code but not wired into the config."*
 
 ### The prompt
 
@@ -302,8 +277,7 @@ scientific model was implemented correctly.
 
 ## Step 3 (optional) — Compare two audits
 
-Run Step 2 twice, each time in a fresh chat, ideally with two different AI
-tools. Then give both audit reports to a third AI:
+Run Step 2 twice, each time in a fresh chat, ideally with two different AI tools. Then give both audit reports to a third AI:
 
 ````text
 Below are two independent audits of the same model implementation. The source
@@ -324,20 +298,11 @@ Audit B:
 
 ## After the audits — update your model
 
-The audits give you a list of findings. They do not fix anything. Read through
-the findings and make the changes to your model by hand.
+The audits give you a list of findings. They do not fix anything. Read through the findings and make the changes to your model by hand.
 
-1. **Fix the real errors.** Anything marked `false` — an equation that
-   does not match your source, a wrong unit, a parameter wired to the wrong
-   compartment.
-2. **Resolve the `ambiguous` items.** These are usually places where your source
-   was unclear. You are the modeler, so this is your call to make.
-3. **Decide on the `unsupported` items.** Either implement the missing feature,
-   or write down why you left it out.
-4. **Ignore findings that describe a choice you made on purpose** — but check
-   that the choice is documented in the model directory so the next reader does
-   not have to rediscover it.
+1. **Fix the real errors.** Anything marked `false` — an equation that does not match your source, a wrong unit, a parameter wired to the wrong compartment.
+2. **Resolve the `ambiguous` items.** These are usually places where your source was unclear. You are the modeler, so this is your call to make.
+3. **Decide on the `unsupported` items.** Either implement the missing feature, or write down why you left it out.
+4. **Ignore findings that describe a choice you made on purpose** — but check that the choice is documented in the model directory so the next reader does not have to rediscover it.
 
-You are the last reviewer. Once your model is complete, continue with the next
-steps to test it, documented in
-[model-integration-documentation.md](./model-integration-documentation.md).
+You are the last reviewer. Once your model is complete, continue with the next steps to test it, documented in [model-integration-documentation.md](./model-integration-documentation.md).
