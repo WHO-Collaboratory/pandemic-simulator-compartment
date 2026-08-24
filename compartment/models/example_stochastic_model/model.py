@@ -56,9 +56,9 @@ class ExampleStochasticModel(Model):
         schema.set_model_metadata(
             authors=[
                 {
-                    "name": "Jenny Blase",
-                    "email": "jblase@ruvos.com",
-                    "affiliation": "Ruvos",
+                    "name": "Example Author",
+                    "email": "example@example.com",
+                    "affiliation": "Example LLC",
                 }
             ],
             license="MIT",
@@ -73,8 +73,8 @@ class ExampleStochasticModel(Model):
             key_assumptions=[
                 "Closed population — no births or deaths.",
                 "Tau-leaping: infection and recovery events are Poisson draws around the deterministic rates.",
-                "Two infectious compartments (asymptomatic and symptomatic), both equally infectious.",
-                "A fixed fraction of new infections are asymptomatic.",
+                "Two infectious compartments (asymptomatic and symptomatic), each with its own transmission rate and its own recovery period.",
+                "A fixed fraction of new infections are asymptomatic, regardless of which compartment infected them.",
                 "Frequency-dependent transmission (force of infection scales with the proportion infectious).",
                 "Recovered individuals are fully immune with no waning (no R→S transition).",
             ],
@@ -107,28 +107,62 @@ class ExampleStochasticModel(Model):
         # --- Transmission edges ---
         # We suppress the framework's per-target _total compartments (see
         # _add_total_compartments) and hand-roll the equation, so these edges
-        # mainly declare the tunable beta / gamma rates. New infections are split
-        # between the asymptomatic and symptomatic compartments in equation().
+        # declare the tunable rates. The two beta rates are the *infectiousness*
+        # of the two infectious classes: each contributes to the force of
+        # infection in proportion to its own prevalence. Which compartment a new
+        # case lands in is decided separately by asymptomatic_fraction.
         schema.add_transmission_parameter(
-            source="susceptible",
-            target="asymptomatic",
+            source="Susceptible",
+            target="Asymptomatic",
             variable_name="beta",
             frequency_dependent=True,
-            label="Transmission Rate (S->I)",
-            description="Rate at which susceptibles become infected through contact",
-            default=0.3,
-            default_min=0.1,
-            default_max=0.5,
+            label="Transmission Rate (Asymptomatic Infectors)",
+            description="Rate at which asymptomatic cases infect susceptibles they contact",
+            default=0.12,
+            default_min=0.04,
+            default_max=0.20,
             min_value=0.01,
             max_value=2.0,
             unit="per day",
         )
         schema.add_transmission_parameter(
-            source="asymptomatic",
-            target="recovered",
+            source="Susceptible",
+            target="Symptomatic",
+            variable_name="beta_sym",
+            frequency_dependent=True,
+            label="Transmission Rate (Symptomatic Infectors)",
+            description="Rate at which symptomatic cases infect susceptibles they contact",
+            default=0.18,
+            default_min=0.06,
+            default_max=0.30,
+            min_value=0.01,
+            max_value=2.0,
+            unit="per day",
+        )
+        # Each infectious compartment recovers on its own clock, so the two
+        # gamma rates are independent. Both default to 10 days, which reproduces
+        # the single shared recovery period; lengthen gamma_sym if symptomatic
+        # cases should stay infectious longer.
+        schema.add_transmission_parameter(
+            source="Asymptomatic",
+            target="Recovered",
             variable_name="gamma",
-            label="Recovery Period (I->R)",
-            description="Average number of days to recover (applies to both infectious compartments)",
+            label="Recovery Period (Asymptomatic)",
+            description="Average number of days for an asymptomatic case to recover",
+            default=10.0,
+            default_min=5.0,
+            default_max=20.0,
+            min_value=1.0,
+            max_value=100.0,
+            value_type=ValueType.DAYS,
+            unit="days",
+        )
+        schema.add_transmission_parameter(
+            source="Symptomatic",
+            target="Recovered",
+            variable_name="gamma_sym",
+            label="Recovery Period (Symptomatic)",
+            description="Average number of days for a symptomatic case to recover",
             default=10.0,
             default_min=5.0,
             default_max=20.0,
@@ -139,7 +173,8 @@ class ExampleStochasticModel(Model):
         )
 
         # Fraction of new infections that are asymptomatic; the rest are
-        # symptomatic. Read as self.asymptomatic_fraction (a percentage).
+        # symptomatic. Read as self.asymptomatic_fraction (a percentage). Also
+        # splits the day-0 seeding in get_initial_population().
         schema.add_parameter(
             name="asymptomatic_fraction",
             label="Asymptomatic Fraction",
@@ -186,7 +221,7 @@ class ExampleStochasticModel(Model):
             id="my_intervention",
             label="My Intervention",
             description="Reduces transmission while active",
-            target_rates=["beta"],
+            target_rates=["beta", "beta_sym"],
             adherence=50.0,
             transmission_reduction=50.0,
         )
@@ -298,10 +333,13 @@ class ExampleStochasticModel(Model):
 
         Returns the per-step change (delta); the Euler integrator applies
         ``y_{t+1} = y_t + dt * equation(...)``. Infection and recovery counts are
-        Poisson draws around the deterministic rates, and new infections are
-        split between the asymptomatic (``A``) and symptomatic (``Sym``)
-        compartments, which are combined into one "Infected" curve for graphing
-        via ``COMPARTMENT_DELTA_GROUPING``.
+        Poisson draws around the deterministic rates. Asymptomatic (``A``) and
+        symptomatic (``Sym``) cases transmit at their own rates (``beta`` and
+        ``beta_sym``) and both feed a single force of infection; new cases are
+        then split by ``asymptomatic_fraction``. Each compartment also recovers
+        on its own clock (``gamma`` and ``gamma_sym``). The two compartments are
+        combined into one "Infected" curve for graphing via
+        ``COMPARTMENT_DELTA_GROUPING``.
 
         Args:
             y (jnp.ndarray): Current compartment values, ordered by
@@ -320,26 +358,35 @@ class ExampleStochasticModel(Model):
         A = states[C.A]
         Sym = states[C.Sym]
 
-        # Both infectious compartments drive the force of infection.
+        # Both infectious compartments drive the force of infection, but at their
+        # own rates, so track their proportions separately as well as combined.
+        # prop_infective is what threshold-triggered interventions watch.
         non_total = [c for c in C if not c.endswith("_total")]
         N_total = sum(states[c] for c in non_total)
-        infective = A + Sym
-        prop_infective = infective.sum() / (N_total.sum() + 1e-10)
+        denom = N_total.sum() + 1e-10
+        prop_A = A.sum() / denom
+        prop_Sym = Sym.sum() / denom
+        prop_infective = prop_A + prop_Sym
 
         # _apply_interventions scales target_rates and returns the updated travel
-        # matrix. It is a no-op when no interventions are configured.
+        # matrix. With no interventions configured it returns both unchanged.
         rates, self.travel_matrix = self._apply_interventions(
-            t, {"beta": params["beta"]}, prop_infective
+            t, {"beta": params["beta"], "beta_sym": params["beta_sym"]}, prop_infective
         )
         beta = rates["beta"]
+        beta_sym = rates["beta_sym"]
         gamma = params["gamma"]
+        gamma_sym = params["gamma_sym"]
         # PERCENTAGE params arrive as e.g. 40.0 — convert to a 0-1 fraction.
         asymp_frac = self._to_rate(self.asymptomatic_fraction, ValueType.PERCENTAGE)
 
-        # Expected events per day (frequency-dependent force of infection).
-        expected_infections = beta * S * prop_infective
+        # Expected events per day. Asymptomatic and symptomatic cases transmit at
+        # different rates, so each contributes to the force of infection in
+        # proportion to its own prevalence.
+        foi = beta * prop_A + beta_sym * prop_Sym
+        expected_infections = S * foi
         expected_recoveries_A = gamma * A
-        expected_recoveries_Sym = gamma * Sym
+        expected_recoveries_Sym = gamma_sym * Sym
 
         # Draw the actual event counts from Poisson distributions. Split the key
         # each step so successive draws are independent; Euler runs this in a
@@ -348,7 +395,8 @@ class ExampleStochasticModel(Model):
         new_infections = jax.random.poisson(k_inf, expected_infections).astype(S.dtype)
         new_infections = jnp.minimum(new_infections, S)
 
-        # Split total new infections between asymptomatic and symptomatic.
+        # Whether a new case is asymptomatic is independent of who infected it,
+        # so split the total by asymptomatic_fraction rather than by source.
         new_asymp = new_infections * asymp_frac
         new_sym = new_infections - new_asymp
 

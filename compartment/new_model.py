@@ -205,7 +205,7 @@ class CLASS_NAME(Model):
         prop_infective = I.sum() / (N_total.sum() + 1e-10)
 
         # _apply_interventions scales target_rates and returns the updated travel
-        # matrix. It is a no-op when no interventions are configured.
+        # matrix. With no interventions configured it returns both unchanged.
         rates, self.travel_matrix = self._apply_interventions(
             t, {"beta": params["beta"]}, prop_infective
         )

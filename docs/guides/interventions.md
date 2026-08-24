@@ -1,749 +1,308 @@
-# Interventions in the Pandemic Simulator
+# Interventions
 
-This document explains how interventions (public health measures) are defined, configured, and applied in the Pandemic Simulator's compartmental modeling framework.
+An intervention is a control measure that can change the course of a simulated outbreak — distancing, masks, vaccination, case isolation, vector control, a lockdown. This guide covers how a model integrates them and how you configure them in a run.
 
-## Overview
+There are two kinds. A **built-in intervention** is declared in one call and the framework handles the rest. A **custom intervention** is logic you write yourself, for effects the built-in intervention does not express.
 
-**Interventions** represent public health measures that modify disease transmission or population behavior during a simulation. Examples include:
+## Contents
 
-- **Social distancing** / physical distancing
-- **Mask wearing**
-- **Vaccination campaigns**
-- **Lockdowns** (travel restrictions)
-- **Case isolation**
-- **Vector control** (for vector-borne diseases)
+- [What an intervention can change](#what-an-intervention-can-change)
+- [Built-in interventions](#built-in-interventions)
+  - [Declaring interventions](#declaring-interventions)
+  - [Writing it into `equation()`](#writing-it-into-equation)
+  - [Formula](#formula)
+  - [Activating by date window](#activating-by-date-window)
+  - [Activating by prevalence threshold](#activating-by-prevalence-threshold)
+  - [Config field reference](#config-field-reference)
+  - [Multiple interventions at once](#multiple-interventions-at-once)
+  - [Restricting travel](#restricting-travel)
+  - [Uncertainty on intervention settings](#uncertainty-on-intervention-settings)
+- [Custom interventions](#custom-interventions)
+- [Checking that it worked](#checking-that-it-worked)
 
-Interventions can activate based on:
+## What an intervention can change
 
-1. **Calendar dates** ("start on day X, end on day Y")
-2. **Infection thresholds** ("activate when 5% infected, deactivate when below 1%")
-3. **Both** (date window with threshold-based hysteresis)
+A built-in intervention has two levers:
 
-The framework provides a **declarative intervention system**: models declare supported interventions in their schema, and users configure them at runtime via JSON config files. The framework handles activation logic, rate modification, and tracking automatically.
+1. **It scales one or more transmission rates.** Whatever rates the model author lists in `target_rates` are scaled down while the intervention is active. This is how masks, distancing, vaccination, and vector control are represented.
+2. **It stops movement between zones.** With `modifies_travel=True`, the travel matrix is replaced by the identity matrix while the intervention is active, so nobody moves between administrative zones. This is only effective if the model has mobility — see [Restricting travel](#restricting-travel).
 
-## Core Concepts
+An intervention never adds a compartment or moves people directly. If you need any of those, write a [custom intervention](#custom-interventions).
 
-### How Interventions Work
+Every simulation runs **twice**: once with your interventions and once without. The second is the control run, tagged `"control_run": true` in the output.
 
-At each timestep during simulation, the model:
+## Built-in interventions
 
-1. **Checks activation conditions** for each intervention
-   - Date-based: "Are we inside the date window?"
-   - Threshold-based: "Is infection proportion above/below thresholds?"
+### Declaring interventions
 
-2. **Applies rate reduction** to targeted transmission parameters
-   - Formula: `new_rate = rate * (1 - adherence * transmission_reduction)`
-   - Example: 40% adherence × 50% reduction = 20% overall reduction
-
-3. **Modifies travel matrix** (for lockdowns)
-   - Replaces travel matrix with identity (nobody travels)
-
-4. **Tracks status** (active/inactive) for each intervention
-   - Threshold interventions use **hysteresis**: once activated, they stay active until the end threshold is reached (prevents oscillation)
-
-### Two-Pass Application
-
-The framework applies interventions in **two passes** (replicating the original `interventions.py` logic):
-
-**Pass 1: Date-based**
-- Check if current day is inside `[start_date, end_date]` window
-- Apply rate reduction **only while inside window**
-- Rates bounce back once outside the window
-
-**Pass 2: Threshold-based**  
-- Check if `prop_infective >= start_threshold` (turn on)
-- Check if `prop_infective <= end_threshold` (turn off)
-- Apply rate reduction **as long as status is active**
-- Persists even after threshold drops (until end_threshold)
-
-**Important:** A single intervention can reduce rates **twice** if it has both date and threshold parameters configured. This matches the original behavior.
-
-## Declaring Interventions in Models
-
-Models declare supported interventions in `define_parameters()`:
-
-### Basic Declaration
-
-```python
-@classmethod
-def define_parameters(cls, schema):
-    # ... compartments and edges ...
-    
-    # Declare interventions
-    schema.add_intervention(
-        id="social_isolation",
-        label="Social Isolation",
-        description="Reduces contact rates through physical distancing measures",
-        target_rates=["beta"],  # Which transmission rate(s) to modify
-        adherence=40.0,  # Default: 40% population adherence
-        transmission_reduction=50.0,  # Default: 50% transmission reduction
-    )
-    
-    schema.add_intervention(
-        id="mask_wearing",
-        label="Mask Wearing",
-        description="Reduces transmission via respiratory droplet protection",
-        target_rates=["beta"],
-        adherence=60.0,
-        transmission_reduction=30.0,
-    )
-```
-
-### Intervention Parameters
-
-#### Required Parameters
-
-- **`id`** (string): Machine identifier (e.g., `"social_isolation"`, `"vaccination"`)
-    - Used to reference the intervention in config files
-    - Must be unique within a model
-
-- **`label`** (string): Human-readable name displayed in UIs (e.g., `"Social Isolation"`)
-
-- **`description`** (string): Explanation of what the intervention does
-
-#### Optional Parameters
-
-- **`target_rates`** (list[string]): Transmission edge variable names to modify
-    - Example: `["beta"]` for respiratory diseases
-    - Example: `["b_V_T", "s_V_T"]` for vector-borne diseases
-    - Default: `[]` (no rate modification — used for lockdowns that only affect travel)
-
-- **`modifies_travel`** (bool): If `True`, replaces travel matrix with identity when active
-    - Default: `False`
-    - Set to `True` for lockdown interventions
-
-- **`adherence`** (float, 0-100): Default population adherence percentage
-    - Default: `50.0`
-    - What fraction of the population follows the intervention
-
-- **`transmission_reduction`** (float, 0-100): Default transmission reduction percentage
-    - Default: `5.0`
-    - How much transmission is reduced among adherent individuals
-
-### Lockdown Example
+The model author declares each available intervention in `define_parameters()`. `example_parameter_uncertainty_declarative_model/model.py` shows the minimal case:
 
 ```python
 schema.add_intervention(
-    id="lock_down",
-    label="Lockdown",
-    description="Severe movement restrictions — no inter-regional travel",
-    target_rates=["beta"],  # Also reduces beta (less social contact)
-    modifies_travel=True,  # KEY: replaces travel matrix with identity
-    adherence=80.0,
-    transmission_reduction=70.0,
-)
-```
-
-### Vector Control Example (Dengue)
-
-```python
-schema.add_intervention(
-    id="physical",
-    label="Physical Vector Control",
-    description="Remove standing water and breeding sites",
-    target_rates=["b_V_T"],  # Targets vector birth rate
+    id="my_intervention",
+    label="My Intervention",
+    description="Reduces transmission while active",
+    target_rates=["beta"],
     adherence=50.0,
-    transmission_reduction=30.0,
-)
-
-schema.add_intervention(
-    id="chemical",
-    label="Chemical Vector Control",  
-    description="Insecticide fogging and larvicides",
-    target_rates=["s_V_T"],  # Targets vector survival rate
-    adherence=60.0,
-    transmission_reduction=40.0,
+    transmission_reduction=50.0,
 )
 ```
 
-## Configuring Interventions at Runtime
+| Argument | Required | Default | Meaning |
+|---|---|---|---|
+| `id` | yes | — | Machine name. Config entries are matched to it, case-insensitively. |
+| `label` | yes | — | Name shown to the user. |
+| `description` | yes | — | One line explaining what the measure does. |
+| `target_rates` | no | `[]` | Transmission variable names to scale down, e.g. `["beta"]`. |
+| `modifies_travel` | no | `False` | Also switch off inter-zone travel while active. |
+| `adherence` | no | `50.0` | Starting value for the adherence control, in percent. |
+| `transmission_reduction` | no | `5.0` | Starting value for the reduction control, in percent. |
 
-Users configure interventions in the simulation JSON config:
+`adherence` and `transmission_reduction` set only the **starting values of the two controls**, not the values the model runs with. Running locally, the numbers in your config file take precedence; in the Pandemic Simulator UI they are the initial position of the sliders on the Simulation Configuration page, and whatever the user selects there takes precedence instead.
 
-### Date-Based Intervention
-
-Activate during a specific time window:
-
-```json
-{
-  "interventions": [
-    {
-      "id": "social_isolation",
-      "adherence_min": 40.0,
-      "transmission_percentage": 50.0,
-      "start_date": "2025-11-18",
-      "end_date": "2025-12-31"
-    }
-  ]
-}
-```
-
-**Behavior:**
-
-- Activates on `2025-11-18`
-- Remains active through `2025-12-31`
-- Deactivates on `2026-01-01`
-- Rate reduction applies **only during the window**
-
-**Required fields:**
-
-- `id`: Must match a declared intervention
-- `start_date`: ISO date string (YYYY-MM-DD)
-
-**Optional fields:**
-
-- `end_date`: ISO date string (omit for "never ending")
-- `adherence_min`: Override model default
-- `transmission_percentage`: Override model default
-
-### Threshold-Based Intervention
-
-Activate when infection levels cross thresholds:
+So against the declaration above, this config gives a 30% reduction in `beta` rather than the declared 25%:
 
 ```json
-{
-  "interventions": [
-    {
-      "id": "mask_wearing",
-      "adherence_min": 60.0,
-      "transmission_percentage": 35.0,
-      "start_threshold": 0.05,
-      "end_threshold": 0.01
-    }
-  ]
-}
+"adherence_min": 60.0,
+"transmission_percentage": 50.0
 ```
 
-**Behavior:**
+One catch: an omitted field does **not** fall back to the declared default. Leave `adherence_min` out and adherence is read as zero, which leaves the intervention active but completely ineffective, so the run comes out identical to the control.
 
-- Activates when `prop_infective >= 0.05` (5% infected)
-- Remains active until `prop_infective <= 0.01` (1% infected)
-- Uses **hysteresis** to prevent oscillation
-- Rate reduction persists as long as status is active
+Each name in `target_rates` must match the `variable_name` of a transmission parameter *and* be passed into `_apply_interventions()` by the model. A name that matches nothing is skipped silently, so a typo gives you an intervention that does nothing without any error. Declaring an intervention with an empty `target_rates` is only sensible when it is travel-only.
 
-**Required fields:**
+An intervention can target several rates at once. `example_stochastic_model` scales both the asymptomatic and symptomatic transmission rates with `target_rates=["beta", "beta_sym"]`, and `ebola_seihfr_burial_legrand_model` declares three separate interventions — community, hospital, and funeral — each aimed at its own route.
 
-- `id`
-- `start_threshold`: Proportion (0.0-1.0) that triggers activation
+### Writing it into `equation()`
 
-**Optional fields:**
-
-- `end_threshold`: Proportion that triggers deactivation (omit for "never deactivate")
-- `adherence_min`
-- `transmission_percentage`
-
-### Combined Date + Threshold
-
-Use both activation mechanisms:
-
-```json
-{
-  "interventions": [
-    {
-      "id": "vaccination",
-      "adherence_min": 70.0,
-      "transmission_percentage": 80.0,
-      "start_date": "2025-03-01",
-      "end_date": "2025-12-31",
-      "start_threshold": 0.03,
-      "end_threshold": 0.005
-    }
-  ]
-}
-```
-
-**Behavior:**
-
-- **Pass 1 (date):** Reduces rate while inside `[start_date, end_date]`
-- **Pass 2 (threshold):** Reduces rate again if `prop_infective >= start_threshold`
-- Result: Double reduction is possible during the date window when threshold is also active
-- This matches the original two-pass behavior
-
-### Multiple Simultaneous Interventions
-
-Apply several interventions at once:
-
-```json
-{
-  "interventions": [
-    {
-      "id": "social_isolation",
-      "adherence_min": 40.0,
-      "transmission_percentage": 50.0,
-      "start_date": "2025-11-01",
-      "end_date": "2025-12-31"
-    },
-    {
-      "id": "mask_wearing",
-      "adherence_min": 60.0,
-      "transmission_percentage": 30.0,
-      "start_date": "2025-11-15",
-      "end_date": "2026-01-15"
-    },
-    {
-      "id": "lock_down",
-      "adherence_min": 80.0,
-      "transmission_percentage": 70.0,
-      "start_threshold": 0.10,
-      "end_threshold": 0.02
-    }
-  ]
-}
-```
-
-**Interaction:**
-
-- Interventions are applied **sequentially** in the order they appear
-- Each one modifies the rate(s) from the previous step
-- Reductions are **multiplicative**, not additive:
-
-```
-beta_initial = 0.3
-After social_isolation (40% × 50%): beta = 0.3 * (1 - 0.4*0.5) = 0.24
-After mask_wearing (60% × 30%):     beta = 0.24 * (1 - 0.6*0.3) = 0.1968
-```
-
-> **Visualizing interventions:** after a run completes, `python tools/view_results.py results/<output>.json` plots the with- and without-intervention runs side by side and draws a vertical line at each intervention's start (dashed) and stop (dotted) date, so the effect is visible at a glance. Threshold-triggered interventions (no fixed date) are noted on the panel instead. See [tools/README.md](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/README.md).
-
-## Reduction Formula
-
-For each active intervention targeting a rate:
-
-```
-reduced_rate = rate * (1 - adherence * transmission_reduction)
-```
-
-Where:
-
-- **adherence** and **transmission_reduction** are fractions (0.0-1.0), converted from percentages
-- **adherence** = fraction of population following the intervention
-- **transmission_reduction** = fractional reduction in transmission among adherent individuals
-
-### Example Calculation
-
-**Intervention:** Social distancing  
-**adherence_min:** 40.0 (40%)  
-**transmission_percentage:** 50.0 (50%)  
-**Initial beta:** 0.3
-
-```
-adherence_fraction = 0.40
-reduction_fraction = 0.50
-combined_reduction = 0.40 * 0.50 = 0.20  (20% overall)
-
-new_beta = 0.3 * (1 - 0.20) = 0.24
-```
-
-**Interpretation:**
-
-- 40% of the population reduces their contacts by 50%
-- Net effect: 20% reduction in transmission rate
-
-### Multiple Interventions (Multiplicative)
-
-With two active interventions:
-
-```
-beta_0 = 0.3
-
-After intervention 1 (40% adhere, 50% reduction):
-beta_1 = 0.3 * (1 - 0.4*0.5) = 0.3 * 0.8 = 0.24
-
-After intervention 2 (60% adhere, 30% reduction):
-beta_2 = 0.24 * (1 - 0.6*0.3) = 0.24 * 0.82 = 0.1968
-
-Total reduction: 1 - (0.1968 / 0.3) = 34.4%
-```
-
-This is **not** the same as adding 20% + 18% = 38%.
-
-## Implementation in `equation()`
-
-Models typically call `_apply_interventions()` in their `equation()` method:
-
-### Standard Pattern
+Interventions only take effect if the model calls `_apply_interventions()`, passing the rates that may be modified:
 
 ```python
-def equation(self, y, t, p):
-    xp = self._array_module()
-    
-    # Unpack parameters
-    params = self._unpack_params(p)
-    states = {c: y[i] for i, c in enumerate(self.compartment_list)}
-    
-    # Compute proportion infective (for threshold interventions)
-    N_total = sum(states[c] for c in self.compartment_list if not c.endswith("_total"))
-    I = states["I"]  # or sum of multiple infective compartments
-    prop_infective = I.sum() / (N_total.sum() + 1e-10)
-    
-    # Extract rates that interventions might modify
-    rates = {
-        "beta": params["beta"],
-        # ... other rates ...
-    }
-    
-    # Apply interventions — modifies rates and travel_matrix
-    rates, travel_matrix = self._apply_interventions(t, rates, prop_infective)
-    
-    # Use modified rates in force of infection calculation
-    foi = rates["beta"] * I / (N_total + 1e-10)
-    
-    # ... rest of equation logic ...
+rates, self.travel_matrix = self._apply_interventions(
+    t, {"beta": params["beta"]}, prop_infective
+)
 ```
 
-### What `_apply_interventions()` Does
+It returns the scaled rates and the updated travel matrix. The third argument is the current proportion of the population that is infectious, needed for threshold activation. When no interventions are configured — as in the control run — it keeps the rates and travel matrix exactly as it received them, leaving the run unchanged. Models without mobility can discard the travel matrix, as `ebola_jax_model` does with `rates, _ = self._apply_interventions(...)`.
 
-1. Converts `t` (solver time) to ordinal day: `current_ordinal_day = start_date_ordinal + t`
-2. Loops over all interventions present in `intervention_dict`
-3. **Pass 1:** Applies date-based activation and rate reduction
-4. **Pass 2:** Applies threshold-based activation and rate reduction
-5. Returns `(modified_rates, modified_travel_matrix)`
+### Formula
 
-### Custom Intervention Logic
+While an intervention is active, each targeted rate becomes:
 
-Models can implement custom intervention methods alongside the framework interventions:
-
-```python
-def custom_intervention(self, beta, t, prop_infective):
-    """Ring vaccination around detected cases."""
-    cfg = self.intervention_dict.get("ring_vaccination")
-    if cfg is None:
-        return beta
-    
-    # Custom activation logic
-    in_window = (t >= cfg["start_day"]) and (t <= cfg["end_day"])
-    above_threshold = prop_infective >= cfg["detection_threshold"]
-    
-    if in_window and above_threshold:
-        return beta * (1 - cfg["coverage"] * cfg["efficacy"])
-    return beta
-
-def equation(self, y, t, p):
-    # ... setup ...
-    
-    # Framework interventions (social distancing, masks, etc.)
-    rates, travel_matrix = self._apply_interventions(t, rates, prop_infective)
-    
-    # Custom disease-specific intervention
-    rates["beta"] = self.custom_intervention(rates["beta"], t, prop_infective)
-    
-    # ... use modified rates ...
+```
+new_rate = rate * (1 - adherence * transmission_reduction)
 ```
 
-## Uncertainty Quantification with Interventions
+Both percentages are divided by 100 to convert them to a decimal, then **multiplied together**. For example, adherence at 50% with a 50% reduction is a **25%** drop in transmission. Interpret it as "half the population complies, and those who do cut their transmission in half."
 
-Intervention parameters can vary during parameter uncertainty analysis:
+So an original `beta` of 0.3 under that intervention becomes `0.3 × (1 − 0.5 × 0.5) = 0.225`.
 
-### In Config JSON
+### Activating by date window
+
+The intervention runs between two calendar dates:
 
 ```json
-{
-  "interventions": [
-    {
-      "id": "mask_wearing",
-      "adherence_min": 60.0,
-      "transmission_percentage": 35.0,
-      "start_date": "2025-11-18",
-      "end_date": "2025-12-31",
-      "variance_params": [
+"Interventions": {
+    "items": [
         {
-          "has_variance": true,
-          "distribution_type": "UNIFORM",
-          "field_name": "adherence_min",
-          "min": 40.0,
-          "max": 80.0
-        },
-        {
-          "has_variance": true,
-          "distribution_type": "UNIFORM",
-          "field_name": "transmission_percentage",
-          "min": 20.0,
-          "max": 50.0
+            "Intervention": { "name": "MY_INTERVENTION", "display_name": "My intervention" },
+            "adherence_min": 50.0,
+            "transmission_percentage": 50.0,
+            "start_date": "2026-03-01",
+            "end_date": "2026-06-01"
         }
-      ]
-    }
-  ]
+    ]
 }
 ```
 
-**Behavior in `UNCERTAINTY` mode:**
+The rate is reduced from `start_date` through `end_date` and snaps back to baseline outside that window. Omit `end_date` and the intervention runs to the end of the simulation. `covid_jax_model/example-config.json` uses this form for mask wearing and social isolation.
 
-- Latin Hypercube Sampling draws values from specified ranges
-- Each simulation run gets a different `(adherence, transmission_reduction)` pair
-- Output includes median and confidence intervals across runs
 
-**Why vary interventions?**
+### Activating by prevalence threshold
 
-- **Adherence parameter uncertainty:** How many people will actually follow guidelines?
-- **Efficacy parameter uncertainty:** How effective is mask-wearing really?
-- **Policy scenario analysis:** What's the range of possible outcomes?
+The alternative is to let the outbreak trigger the response. Replace the dates with thresholds:
 
-## Intervention Status Tracking
+```json
+{
+    "Intervention": { "name": "MY_INTERVENTION", "display_name": "My intervention" },
+    "adherence_min": 50.0,
+    "transmission_percentage": 50.0,
+    "start_threshold": 2.0,
+    "end_threshold": 1.0
+}
+```
 
-The model maintains an `intervention_statuses` dictionary:
+**Thresholds are percentages of the population currently infectious, not fractions.** `2.0` means 2% and `0.02` means 0.02%.
+
+The intervention switches on once prevalence reaches `start_threshold`. On stochastic models it then stays on until prevalence falls to `end_threshold`, which stops it flickering on and off around the trigger point. Under the default solver for deterministic models, activation status is not carried between solver steps, so the intervention is active whenever prevalence is at or above `start_threshold`.
+
+`example_parameter_uncertainty_declarative_model/example-config.json` is configured this way, with a 2% trigger and a 1% release. Running it shows the effect plainly: peak prevalence falls from about 25% to 19% and arrives ten days later, and cumulative infections drop from roughly 939,000 to 865,000.
+
+### Config field reference
+
+These are the fields you write by hand into a model's `example-config.json` for a local run. Running through the Pandemic Simulator UI, the same values come from the intervention's on-screen controls and you do not edit any of this yourself.
+
+Here is one entry with every field set:
+
+```json
+{
+    "Intervention": { "name": "MY_INTERVENTION", "display_name": "My intervention" },
+    "adherence_min": 50.0,
+    "transmission_percentage": 50.0,
+    "start_date": "2026-03-01",
+    "end_date": "2026-06-01",
+    "start_threshold": 2.0,
+    "end_threshold": 1.0
+}
+```
+
+| Field | Unit | Notes |
+|---|---|---|
+| `Intervention.name` | — | Must match the declared `id` (case-insensitive). |
+| `Intervention.display_name` | — | Label for the run; cosmetic. |
+| `adherence_min` | percent, 0–100 | Share of the population complying. |
+| `transmission_percentage` | percent, 0–100 | Reduction among those complying. Defaults to `5.0` if omitted. |
+| `start_date`, `end_date` | `YYYY-MM-DD` | Date window. |
+| `start_threshold`, `end_threshold` | percent, 0–100 | Prevalence trigger and release. |
+
+If you supply **none** of the four activation fields, `start_date` falls back to the simulation start date, so the intervention is on for the entire run.
+
+You can set both a date window and thresholds on one intervention. At each step the date window is checked first and reduces the rate if the current day falls inside it. The threshold is checked second and reduces the rate only on the steps where the date window did not. So the threshold covers the stretches outside the window, and the reduction is never applied twice in the same step.
+
+> Some older models, such as `ebola_jax_model` and `hantavirus_human_jax_model`, have configs using a flat `"interventions": [{ "id": ..., ... }]` list instead. The loader still accepts it and converts it to the form above, but write new configs the way shown here.
+
+### Multiple interventions at once
+
+Interventions are applied in the order the model declares them, and each one scales the rate the previous one produced, so the reductions **compound rather than add**.
+
+`covid_jax_model/example-config.json` is the worked example: mask wearing at 20% adherence and a 35% reduction, then social isolation at 40% and 50%, both aimed at `beta` over the same two-month window. Against that model's `beta` of 0.25:
+
+```
+new_rate = rate * (1 - adherence * transmission_reduction)
+
+mask wearing      0.25   × (1 - 0.20 × 0.35) = 0.25   × 0.93 = 0.2325
+social isolation  0.2325 × (1 - 0.40 × 0.50) = 0.2325 × 0.80 = 0.186
+```
+
+`beta` therefore runs at 0.186 while both are active. Since `0.186 ÷ 0.25 = 0.744`, 74.4% of the original transmission rate survives and 25.6% has been removed.
+
+
+### Restricting travel
+
+For a measure that confines people to their own zone, add `modifies_travel=True` to the `schema.add_intervention()` call in your model's `model.py` — the same declaration shown in [Declaring interventions](#declaring-interventions), which `example_parameter_uncertainty_declarative_model/model.py` demonstrates. This is a modeling decision rather than a config field, so it cannot be switched on for a model that does not declare it.
+
+While the intervention is active the travel matrix becomes the identity matrix, so people stop traveling outside of their zone and each one runs its own local epidemic. `covid_jax_model` uses both levers in one intervention, cutting `beta` through `target_rates` and halting travel through `modifies_travel`:
 
 ```python
-self.intervention_statuses = {
-    "social_isolation": False,
-    "mask_wearing": False,
-    "lock_down": False,
+schema.add_intervention(
+            id="lock_down",
+            label="Lockdown",
+            description="Severe movement restrictions: halts inter-regional travel and reduces transmission through reduced social contact",
+            target_rates=["beta"],
+            modifies_travel=True,
+            adherence=80.0,
+            transmission_reduction=70.0,
+)
+```
+
+This only matters for models that **have** mobility, meaning they override `build_travel_matrix()` — see [mobility.md](./mobility.md) for how to build one. If your model already uses the identity matrix (there is no travel), `modifies_travel` changes nothing there. Note also that having mobility is not the same as restricting it: `mpox_jax_model` and `ebola_jax_model` both model movement between zones, but neither has an intervention that touches it.
+
+### Uncertainty on intervention settings
+
+Adherence is rarely known in advance, so you can give intervention fields a range instead of a point value and let the simulator sample across it. Add a `FieldConfigs` block to the intervention; [uncertainty-quantification.md](./uncertainty-quantification.md#on-interventions) covers what the sampling does and how to read the resulting bands. This is the complete `Interventions` block from `example_parameter_uncertainty_declarative_model/example-config.json`, which varies both adherence and the reduction:
+
+```json
+"Interventions": {
+    "items": [
+        {
+            "Intervention": { "name": "MY_INTERVENTION", "display_name": "My intervention" },
+            "adherence_min": 50.0,
+            "transmission_percentage": 50.0,
+            "start_threshold": 2.0,
+            "end_threshold": 1.0,
+            "FieldConfigs": {
+                "items": [
+                    {
+                        "field_key": "adherence_min",
+                        "has_variance": true,
+                        "distribution_type": "UNIFORM",
+                        "default": 50.0,
+                        "min": 40.0,
+                        "max": 60.0
+                    },
+                    {
+                        "field_key": "transmission_percentage",
+                        "has_variance": true,
+                        "distribution_type": "UNIFORM",
+                        "default": 50.0,
+                        "min": 45.0,
+                        "max": 55.0
+                    }
+                ]
+            }
+        }
+    ]
 }
 ```
 
-**Updated every timestep:**
+`field_key` names the intervention field to vary and `min`/`max` are in the same percent units as the field itself, so adherence here is drawn between 40% and 60%. The `adherence_min` and `transmission_percentage` values above still matter: they are what the run uses if you turn the variance off. Any `"has_variance": true` anywhere in the config switches the whole run to uncertainty mode, drawing `n_simulations` parameter sets by Latin Hypercube sampling and reporting a median with a 95% simulation-based interval instead of a single trajectory.
 
-- `False` → intervention is inactive
-- `True` → intervention is active
+## Custom interventions
 
-**Used for:**
+Write one when the built-in behaviour cannot express what you need — for example a measure that phases in gradually rather than switching on instantly, coverage that depends on the current state of the outbreak, or an effect on something other than a transmission rate.
 
-- Hysteresis in threshold interventions (prevent oscillation)
-- Logging/debugging intervention activation times
-- Conditional logic in custom interventions
+Still declare the intervention with `schema.add_intervention()`, since that is what creates the user-facing controls and lets the config validate. Then skip `_apply_interventions()` and apply your own logic in `equation()`.
 
-**Access in `equation()`:**
+`example_parameter_uncertainty_custom_model` is the reference example. Its `custom_intervention()` ramps the effect up over `ramp_up_days`, holds it through the window, then releases it over `ramp_down_days`:
+
 ```python
-if self.intervention_statuses.get("lock_down", False):
-    # Lockdown is currently active
-    pass
+def custom_intervention(self, t, beta):
+    intv = next(
+        (
+            i
+            for i in self.interventions
+            if i.id == "my_intervention" and i.id in self.intervention_dict
+        ),
+        None,
+    )
+    if intv is None or intv.start_date_ordinal is None:
+        return beta  # intervention not configured — leave beta unchanged
+
+    current_ordinal_day = self.start_date_ordinal + t
+
+    ramp_in = jnp.clip(
+        (current_ordinal_day - intv.start_date_ordinal) / self.ramp_up_days, 0.0, 1.0
+    )
+    ...
+    full_reduction = intv.adherence * intv.transmission_reduction
+    return beta * (1.0 - ramp * full_reduction)
 ```
 
-## Validation and Edge Cases
+and calls it in place of the helper:
 
-### Missing Intervention
-
-**Config references undeclared intervention:**
-```json
-{
-  "interventions": [
-    {"id": "nonexistent_intervention", ...}
-  ]
-}
+```python
+beta = self.custom_intervention(t, params["beta"])
 ```
 
-**Behavior:** Ignored silently (no error). The framework only applies interventions that are declared in the model schema.
+Three rules to follow:
 
-### No Activation Criteria
+- **Gate on `self.intervention_dict`.** The runner builds the control run by emptying that dictionary, so this check is what makes the "without interventions" run skip yours. In the example above it is the `and i.id in self.intervention_dict` clause, paired with the `if intv is None` early return. `mpox_jax_model` does the same thing more directly, reading the config entry and returning early when it is absent: `cfg = self.intervention_dict.get("ring_vaccination")` then `if cfg is None: return beta, self.intervention_statuses`. Miss this and both runs come out identical, hiding the effect you were trying to measure.
+- **No Python `if` on values that change during the run.** `t`, compartment values, and anything derived from them are traced by JAX, so choose between two values with `jnp.where`, or hold a value inside a range with `jnp.clip`, instead. Plain `if` is fine for config values that are fixed before the run starts, such as the `None` checks above.
+- **`t` is days since the simulation start, not a date.** Convert with `self.start_date_ordinal + t` before comparing against `intv.start_date_ordinal`.
 
-**Intervention with neither dates nor thresholds:**
-```json
-{
-  "id": "mask_wearing",
-  "adherence_min": 60.0,
-  "transmission_percentage": 30.0
-}
+Two more examples worth reading. `mpox_jax_model.ring_vaccination_intervention()` implements date-window and threshold activation by hand for a measure targeted at the contacts of confirmed cases. `test_klebsiella_amr_model._intervention_multiplier()` applies the same reduction formula to parameters that are not transmission rates, which is how its stewardship intervention acts on antibiotic consumption rates.
+
+## Checking that it worked
+
+After running your model locally (see [Run the model locally](./model-integration-documentation.md#run-the-model-locally)), plot the run and compare the two trajectories by replacing `<output>` with the name of the JSON results file you generated:
+
+```bash
+python tools/view_results.py results/<output>.json
 ```
 
-**Behavior:** Never activates (no start_date or start_threshold). This is valid but useless.
 
-### Overlapping Date Windows
-
-**Two interventions with overlapping dates:**
-```json
-[
-  {"id": "social_isolation", "start_date": "2025-11-01", "end_date": "2025-12-31"},
-  {"id": "mask_wearing", "start_date": "2025-11-15", "end_date": "2026-01-15"}
-]
-```
-
-**Behavior:** Both apply during overlap (Nov 15 - Dec 31). Reductions are multiplicative.
-
-### Zero Adherence or Reduction
-
-```json
-{"id": "mask_wearing", "adherence_min": 0.0, "transmission_percentage": 30.0}
-```
-
-**Behavior:** No effect (0% adherence means nobody follows it).
-
-```json
-{"id": "mask_wearing", "adherence_min": 60.0, "transmission_percentage": 0.0}
-```
-
-**Behavior:** No effect (0% reduction means it doesn't reduce transmission).
-
-### Threshold Hysteresis
-
-**Why end_threshold exists:**
-```json
-{"id": "isolation", "start_threshold": 0.05, "end_threshold": 0.01}
-```
-
-Without `end_threshold`, the intervention would:
-1. Activate at 5% infected
-2. Reduce transmission
-3. Infections drop below 5%
-4. Deactivate immediately
-5. Infections rise above 5% again
-6. **Oscillate forever**
-
-With `end_threshold`, it stays active until infections drop to 1%, preventing oscillation.
-
-## Best Practices
-
-### ✅ Do
-
-- **Declare realistic adherence values** (40-80% for most public health measures)
-- **Use threshold interventions** for reactive policies (triggered by outbreak severity)
-- **Use date interventions** for planned campaigns (vaccination rollout with fixed dates)
-- **Set end_threshold < start_threshold** to prevent oscillation
-- **Test without interventions first** to establish a baseline
-- **Use parameter uncertainty quantification** for adherence and efficacy when confidence is low
-- **Verify intervention activation** by checking logs or status tracking
-- **Document intervention assumptions** in your model schema descriptions
-
-### ❌ Don't
-
-- **Don't assume 100% adherence** unless modeling a controlled trial
-- **Don't use 100% transmission reduction** (even perfect interventions have some failure)
-- **Don't set end_threshold = start_threshold** (will oscillate)
-- **Don't omit end_threshold for threshold interventions** (they'll never deactivate)
-- **Don't forget both passes** when debugging — an intervention can reduce twice
-- **Don't modify `target_rates` after schema is built** (affects artifact generation)
-- **Don't assume linear combination** — reductions are multiplicative
-
-## Troubleshooting
-
-### Intervention Not Activating
-
-**Symptoms:**
-
-- Output identical with/without intervention in config
-- No change in transmission rates
-
-**Possible causes:**
-
-1. **Missing activation criteria**
-   ```json
-   {"id": "masks"}  // No start_date or start_threshold!
-   ```
-   **Fix:** Add `start_date` or `start_threshold`
-
-2. **Dates outside simulation window**
-   ```json
-   {"start_date": "2026-06-01"}  // Simulation ends 2026-03-01
-   ```
-   **Fix:** Check simulation `end_date` in config
-
-3. **Threshold never reached**
-   ```json
-   {"start_threshold": 0.15}  // But infections never hit 15%
-   ```
-   **Fix:** Lower threshold or check model dynamics
-
-4. **Intervention ID mismatch**
-   ```json
-   {"id": "social-distancing"}  // Model declares "social_isolation"
-   ```
-   **Fix:** Match exactly the schema ID
-
-### Intervention Too Strong/Weak
-
-**Symptoms:**
-
-- Epidemic completely suppressed (R < 1 immediately)
-- Or no noticeable effect
-
-**Possible causes:**
-
-1. **Unrealistic parameters**
-   ```json
-   {"adherence_min": 95.0, "transmission_percentage": 90.0}  // 85.5% total reduction!
-   ```
-   **Fix:** Use empirically-validated values (typically 20-60% combined)
-
-2. **Multiple interventions stacking**
-   - Two interventions each reducing 50% → 75% total reduction
-   **Fix:** Account for multiplicative effect
-
-3. **Wrong target_rate**
-   ```python
-   target_rates=["gamma"]  # Targeting recovery rate instead of beta!
-   ```
-   **Fix:** Target transmission rates (usually `beta`)
-
-### Intervention Oscillation
-
-**Symptoms:**
-
-- Intervention repeatedly activates/deactivates
-- Unstable output with rapid fluctuations
-
-**Cause:**
-```json
-{
-  "start_threshold": 0.05,
-  "end_threshold": 0.05  // Same threshold!
-}
-```
-
-**Fix:**
-```json
-{
-  "start_threshold": 0.05,
-  "end_threshold": 0.01  // Lower end threshold
-}
-```
-
-Set `end_threshold` significantly below `start_threshold` to create a buffer zone.
-
-### Lockdown Not Stopping Travel
-
-**Symptoms:**
-
-- Spatial spread continues despite lockdown
-
-**Possible causes:**
-
-1. **`modifies_travel` not set**
-   ```python
-   schema.add_intervention(
-       id="lock_down",
-       target_rates=["beta"],
-       modifies_travel=False,  # WRONG
-   )
-   ```
-   **Fix:** Set `modifies_travel=True`
-
-2. **Travel matrix not used in equation**
-   ```python
-   # Missing travel_matrix in FOI calculation
-   foi = beta * I / N  # Should be: (travel_matrix @ I)
-   ```
-   **Fix:** Ensure `travel_matrix` from `_apply_interventions()` is used
-
-## Related Documentation
-
-- **[DEVELOPING_MODELS.md](./developing-models.md)** — General model development guide
-- **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; draws intervention start/stop lines on the compartment time series
-- **[GRAVITY_MODEL.md](./gravity-model.md)** — How travel matrices work (relevant for lockdowns)
-- **[CONTACT_MATRICES.md](./contact-matrices.md)** — Age-specific mixing (interventions can target by age)
-- **[compartment/interventions.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/interventions.py)** — Legacy implementation (being replaced by runtime.py)
-- **[compartment/runtime.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/runtime.py)** — New `Intervention` class with JAX-compatible logic
-- **[compartment/model.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/model.py)** — `_apply_interventions()` implementation
-
-## References
-
-### Intervention Effectiveness Studies
-
-- **Flaxman et al. (2020).** "Estimating the effects of non-pharmaceutical interventions on COVID-19 in Europe." *Nature* 584: 257-261.
-    - Empirical estimates of NPI effectiveness (lockdowns, school closures, etc.)
-
-- **Chu et al. (2020).** "Physical distancing, face masks, and eye protection to prevent person-to-person transmission of SARS-CoV-2." *The Lancet* 395: 1973-1987.
-    - Meta-analysis of mask effectiveness and physical distancing
-
-- **Haug et al. (2020).** "Ranking the effectiveness of worldwide COVID-19 government interventions." *Nature Human Behaviour* 4: 1303-1312.
-    - Comparative effectiveness of 6,000 interventions across 79 countries
-
-### Adherence and Compliance
-
-- **Betsch et al. (2020).** "Social and behavioral consequences of mask policies during the COVID-19 pandemic." *PNAS* 117(36): 21851-21853.
-    - Adherence rates for mask-wearing mandates
-
-- **Huynh (2020).** "The COVID-19 containment in Vietnam: What are we doing?" *Journal of Global Health* 10(1): 010338.
-    - Case study of high-adherence interventions in Vietnam
+If the two runs look identical, check in this order: the config `name` matches the declared `id`; the activation window or threshold is actually reached during the simulated period; `target_rates` names match rates the model passes to `_apply_interventions()`; and `adherence_min × transmission_percentage` is large enough to matter.
 
 ---
 
-**Last Updated:** May 20, 2026  
-**Version:** 0.1.9
+**Last Updated:** August 24, 2026

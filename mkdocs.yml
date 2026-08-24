@@ -58,11 +58,12 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Guides:
-    - Developing Models: guides/developing-models.md
+    - Model Integration: guides/model-integration-documentation.md
+    - Model Conversion: guides/model-conversion.md
     - Adding Your Own Data: guides/adding-datasets.md
     - Interventions Guide: guides/interventions.md
     - Contact Matrices: guides/contact-matrices.md
-    - Gravity Model: guides/gravity-model.md
+    - Mobility: guides/mobility.md
     - Uncertainty Quantification: guides/uncertainty-quantification.md
   - API Reference:
     - Parameter Framework: api/parameters.md
