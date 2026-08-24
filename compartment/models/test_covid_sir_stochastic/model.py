@@ -53,7 +53,7 @@ class CovidSirStochasticModel(Model):
             frequency_dependent=True,
             label="Transmission Rate (S->I)",
             description="Rate at which susceptible individuals become infected",
-            default=0.4,
+            default=0.3,
             default_min=0.2,
             default_max=0.6,
             min_value=0.01,
