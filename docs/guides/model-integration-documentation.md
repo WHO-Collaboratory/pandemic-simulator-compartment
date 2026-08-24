@@ -730,6 +730,27 @@ for i, zone in enumerate(admin_zones):
       pass  # I_total and R_total are declared in define_parameters() instead
   ```
 
+  It then declares those totals itself, alongside its other compartments in `define_parameters()`:
+
+  ```python
+  schema.add_compartment(
+      "I_total",
+      "Infected Total",
+      "Cumulative infections (asymptomatic + symptomatic combined)",
+  )
+  schema.add_compartment("R_total", "Recovered Total", "Cumulative recoveries")
+  ```
+
+  Because two compartments now feed one total, it also maps them onto the aggregate used for summary results:
+
+  ```python
+  COMPARTMENT_DELTA_GROUPING = {
+      "S": ["S"],
+      "I": ["A", "Sym"],
+      "R": ["R"],
+  }
+  ```
+
 - **`_apply_interventions`** — applies intervention effects by updating transmission rates and the mobility matrix during the simulation. Call it inside `equation()` to enable interventions. Override it, or write your own function as `example_parameter_uncertainty_custom_model` does, for custom logic.
 
 #### Stochastic models
