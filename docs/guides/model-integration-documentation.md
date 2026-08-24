@@ -73,6 +73,7 @@ A local run also produces the same results JSON the Simulator charts, which is w
 - [Add a new model](#add-a-new-model)
   - [Choose a unique name](#choose-a-unique-name)
   - [Run the scaffold](#run-the-scaffold)
+  - [Your model is found automatically](#your-model-is-found-automatically)
   - [Copy an existing model instead](#copy-an-existing-model-instead)
 - [Writing the model](#writing-the-model)
   - [How the framework uses your class](#how-the-framework-uses-your-class)
@@ -364,6 +365,22 @@ python -m compartment.models.example_parameter_uncertainty_declarative_model.mai
 ```shell
 python -m compartment.models.example_parameter_uncertainty_declarative_model.main --mode local --config_file compartment\models\example_parameter_uncertainty_declarative_model\example-config.json --output_file results\example-declarative-test.json
 ```
+
+### Your model is found automatically
+
+With the directory created, the framework already knows about your model. There is no list to sign up for and no shared file to edit: each time it starts, it looks inside every folder in `compartment/models/`, reads the `model.py` it finds there, and picks up whatever model is defined inside. Creating the folder is the whole of "registering" it. Because the folder simply being there is all that matters, this works the same however the folder got there — whether the scaffold made it or you copied and pasted an existing model's folder.
+
+Two things make a model recognizable, and you get both from the scaffold or from any model you copy: it builds on the framework's `Model` class, and it gives itself a `disease_type` in `set_model_info()`. Nothing else is needed, and the same automatic discovery happens when your model is published to the Pandemic Simulator.
+
+A copied folder is found quickly, so give it its own `disease_type` right away: a name claimed by two models no longer identifies either one, and configs that ask for it stop working — for the original as well as the copy. [Copy an existing model instead](#copy-an-existing-model-instead) lists everything a copy needs renamed.
+
+To see all models the framework currently knows about:
+
+```shell
+python -m compartment.generate_artifact --list
+```
+
+If your `disease_type` appears in that list, the framework has your model. If it is missing, the cause is nearly always one of two things: no `disease_type` was set, or something in `model.py` stops the file from loading. A model that fails to load is passed over quietly rather than flagged, so it is worth running the command above after your first round of edits.
 
 ### Copy an existing model instead
 
@@ -1291,7 +1308,7 @@ Merging builds nothing. The `disease-pipeline` workflow fires on a semver tag, a
 
 6. **Click "Publish release."** This is the step that creates and pushes the tag, which is what starts the build. **Saving a draft does nothing** — a draft release holds no tag, so the pipeline never runs. If you tick **Set as a pre-release**, the tag is still created and the pipeline still runs; the label is cosmetic.
 
-The tag covers **every** model in `compartment/models/` that ships an `example-config.json`, not just the one that changed — the pipeline auto-discovers them and fans out. Re-publishing unchanged models is harmless (identical artifacts are content-hashed and skipped), but the version number applies repo-wide, so pick it accordingly.
+The tag covers **every** model in `compartment/models/` that contains an `example-config.json`, not just the one that changed — the pipeline auto-discovers them and fans out. Re-publishing unchanged models is harmless (identical artifacts are content-hashed and skipped), but the version number applies repo-wide, so pick it accordingly.
 
 **Troubleshooting**
 
