@@ -1265,20 +1265,18 @@ Once your model runs and passes tests, open a pull request so WHO Collaboratory 
 
 ## Approve a model
 
-Everything above is the modeler's job. This section is the **approver's** — the reviewer who takes a submitted model from an open pull request to a model users can actually pick in the simulator.
+Everything above is written for the modeler. This section is for the **approver** — the reviewer who takes a submitted model from an open pull request to one users can run.
 
 Models are published to UAT, at <https://uat.pandemic-simulator.com/>. Every step below happens there.
 
-The short version: review the PR, merge it, tag a release, then publish the model from the **Model Approvals** dashboard. Merging alone puts nothing in front of users — the tag is what builds and ships the model, and the Publish button is what reveals it.
-
 ### 1. Review the pull request
 
-Read the diff the way a user will meet the model: **anything declared on the `schema` becomes UI.**
+Read the diff the way a user will meet the model: **everything the schema declares turns into something the user sees.**
 
-- **The schema is a contract.** Every `add_parameter()`, `add_transmission_parameter()`, and `add_intervention()` turns into a control on the Simulation Configuration page. Check that labels read plainly, descriptions say what the number actually does, units are right, and `min_value` / `max_value` bound the parameter to a physically sensible range. A slider is only as safe as its limits, and widening one later widens it for every existing user.
-- **The defaults have to run.** `example-config.json` is what the smoke test executes and what seeds a user's first simulation. Confirm the defaults produce a plausible epidemic curve rather than a flat line or a blow-up.
-- **The model documents itself.** `model.md` and the `schema.set_model_metadata()` block — authors, license, citations, key assumptions, applicability, `not_for`, known biases, validation — are rendered verbatim in the approvals preview and on the model's page. Missing provenance is a legitimate reason to request changes.
-- **CI is green.** `smoke-tests` runs each model's integration smoke test plus `tests/test_<model>.py` where one exists. Don't approve on a red or skipped matrix leg.
+- **Every parameter becomes a control.** Each `add_parameter()`, `add_transmission_parameter()`, and `add_intervention()` turns into a control on the Simulation Configuration page. Check that labels read plainly, descriptions say what the number does, units are right, and `min_value` / `max_value` keep the parameter in a physically sensible range. A slider is only as safe as its limits, and widening one later widens it for every existing user.
+- **The defaults have to run.** `example-config.json` is what the smoke test executes and what seeds a user's first simulation. Confirm the defaults give a plausible epidemic curve, not a flat line or a blow-up.
+- **The model documents itself.** `model.md` and the `schema.set_model_metadata()` block — authors, license, citations, key assumptions, applicability, `not_for`, known biases, validation — appear word for word in the approvals preview and on the model's page. Missing provenance is a fair reason to request changes.
+- **CI is green.** `smoke-tests` runs each model's integration smoke test plus `tests/test_<model>.py` where one exists. Don't approve a red or skipped leg.
 - **Run it yourself** when the diff touches `equation()`, mobility, or interventions:
 
   ```shell
@@ -1294,26 +1292,26 @@ Approve, or request changes with specifics. Then merge to `main`.
 
 ### 2. Tag a release
 
-Merging builds nothing. The `disease-pipeline` workflow fires on a semver tag, and you create that tag from GitHub — no terminal needed.
+Merging builds nothing. The `disease-pipeline` workflow fires on a semver tag, which you create from GitHub — no terminal needed.
 
-1. **Open Releases.** From the repository's **Code** tab, click **Releases** in the right-hand sidebar (or go to the repository URL with `/releases` on the end).
+1. **Open Releases.** From the repository's **Code** tab, click **Releases** in the right-hand sidebar (or add `/releases` to the repository URL).
 
 2. **Click "Draft a new release."**
 
 3. **Create the tag.** Click the **Choose a tag** dropdown, type the new version — `v1.4.0` — and click **"+ Create new tag: v1.4.0 on publish."** The tag must start with `v` and be three numbers separated by dots, or the pipeline will not fire.
 
-4. **Confirm the target is `main`.** The **Target** dropdown sits next to the tag dropdown and defaults to `main`. If it shows a branch or commit, set it back to `main` — the tag is cut from whatever is selected here.
+4. **Confirm the target is `main`.** The **Target** dropdown sits next to the tag dropdown and defaults to `main`. The tag is cut from whatever is selected there, so set it back if it shows anything else.
 
 5. **Add a title and notes.** Use the version as the title. Click **Generate release notes** to pull in the merged pull requests since the last release, then add a line naming the model that changed and what changed about it.
 
-6. **Click "Publish release."** This is the step that creates and pushes the tag, which is what starts the build. **Saving a draft does nothing** — a draft release holds no tag, so the pipeline never runs. If you tick **Set as a pre-release**, the tag is still created and the pipeline still runs; the label is cosmetic.
+6. **Click "Publish release."** This creates and pushes the tag, which starts the build. **Saving a draft does nothing** — a draft holds no tag, so the pipeline never runs. Ticking **Set as a pre-release** still creates the tag and still runs the pipeline; the label is cosmetic.
 
-The tag covers **every** model in `compartment/models/` that contains an `example-config.json`, not just the one that changed — the pipeline auto-discovers them and fans out. Re-publishing unchanged models is harmless (identical artifacts are content-hashed and skipped), but the version number applies repo-wide, so pick it accordingly.
+The tag covers **every** model in `compartment/models/` that contains an `example-config.json`, not just the one that changed — the pipeline finds them all and fans out. Re-publishing unchanged models is harmless, but the version number applies repo-wide, so pick it accordingly.
 
 **Troubleshooting**
 
-- **Nothing happens after publishing** — check the tag's spelling on the **Releases** page. `1.4.0`, `v1.4`, and `release-1.4.0` all fail to match the workflow's tag pattern and are silently ignored.
-- **The tag already exists** — GitHub will not let you reuse one. Cut the next patch version rather than deleting and recreating a tag; deleting a published tag breaks the artifact-to-version mapping for anything already provisioned from it.
+- **Nothing happens after publishing** — check the tag's spelling on the **Releases** page. `1.4.0`, `v1.4`, and `release-1.4.0` do not match the workflow's tag pattern and are ignored without warning.
+- **The tag already exists** — GitHub will not create a second `v1.4.0`. Cut the next patch version rather than deleting the old tag and reusing the number. That number is the only label on what was built: it names the model's container image and the record of which artifact that image goes with. Reusing it for different code overwrites both, so users still see `v1.4.0` while the code behind it has changed, and there is no way to tell which build an earlier simulation ran on.
 
 ### 3. Watch the pipeline
 
@@ -1324,19 +1322,19 @@ Open the **Actions** tab and follow the `disease-pipeline` run for your tag. In 
 3. Generates each model's artifact JSON, uploads it to S3 under its SHA-256, and records the image-to-artifact mapping.
 4. Emits a `ModelVersionPublished` event per artifact.
 
-That event is what provisions the model's Lambda and registers the artifact with the API. Downstream, the artifact processor seeds the model's transmission edges, interventions, custom fields, and demographic groups so the UI has something to render.
+That event sets up the model's Lambda and registers the artifact with the API. From there, the model's transmission edges, interventions, custom fields, and demographic groups are loaded so the UI has something to render.
 
 **Troubleshooting**
 
-- **Job fails at "Stage datasets"** — a file declared in the model's `datasets.yaml` is missing from the bucket. Fix the dataset, then tag again; the pipeline deliberately fails here rather than letting the simulation fail later with no data.
-- **Pipeline is green but nothing appears in Model Approvals** — provisioning is asynchronous and takes a few minutes. If the artifact still hasn't landed, check the provisioner's dead-letter queue.
+- **Job fails at "Stage datasets"** — a file declared in the model's `datasets.yaml` is missing from the bucket. Fix the dataset, then tag again. The pipeline fails here on purpose rather than letting the simulation run later with no data.
+- **Pipeline is green but nothing appears in Model Approvals** — setup runs in the background and takes a few minutes. If the artifact still hasn't landed, check the provisioner's dead-letter queue.
 - **Never move or delete a tag to "redo" a release.** Cut the next patch version instead.
 
 ### 4. Review the model in Model Approvals
 
-Go to **Model Approvals** (<https://uat.pandemic-simulator.com/model-approvals>). The dashboard is visible to admins, super admins, and disease modelers; **only a super admin can change a model's status.**
+Go to **Model Approvals** (<https://uat.pandemic-simulator.com/model-approvals>). Admins, super admins, and disease modelers can see the dashboard; **only a super admin can change a model's status.**
 
-The new version arrives with status **NEW** and is invisible to ordinary users. Find it by name, disease type, or version, and select it to open the preview panel on the right. Read the preview as the user-facing surface it is: compartments, transmission edges, interventions, custom fields, demographic groups, contact-matrix overrides, and the model's authorship and assumptions. Anything that reads wrong here reads wrong to the user.
+The new version arrives with status **NEW** and is invisible to ordinary users. Find it by name, disease type, or version, and select it to open the preview panel on the right. The preview is what users will see: compartments, transmission edges, interventions, custom fields, demographic groups, contact-matrix overrides, and the model's authorship and assumptions. Anything that reads wrong here reads wrong to the user.
 
 Statuses run **NEW → PREPUBLISH → PUBLISHED → ARCHIVED**. Only `PUBLISHED` models reach the disease-model dropdown on the simulation page.
 
@@ -1346,8 +1344,8 @@ Click **Simulate**. This opens the simulation form preloaded with the model even
 
 Confirm that:
 
-- The configuration form renders every parameter with the labels, units, and bounds you reviewed in the PR.
-- The run completes rather than erroring or timing out.
+- The form shows every parameter with the labels, units, and bounds you reviewed in the pull request.
+- The run finishes instead of erroring or timing out.
 - Results are plausible, and the intervention and control curves differ in the direction the intervention claims.
 - Interventions and admin-zone selection behave as documented.
 
@@ -1355,13 +1353,13 @@ If anything is wrong, leave the model unpublished and go back to the modeler. An
 
 ### 6. Publish
 
-With the model selected in the preview panel, click **Publish** (super admin only). Status flips to `PUBLISHED` and the model appears in the disease-model dropdown for all UAT users.
+With the model selected in the preview panel, click **Publish** (super admin only). The status flips to `PUBLISHED` and the model appears in the disease-model dropdown for all UAT users.
 
-Verify the result: open the simulation page as a normal user would, confirm the model is listed under the right name and version, and run it once from a clean form.
+Then check it as a user would: open the simulation page, confirm the model is listed under the right name and version, and run it once from a clean form.
 
 ### Unpublishing and archiving
 
-- **Unpublish** returns a published model to `PREPUBLISH`. It disappears from the dropdown immediately while staying available in Model Approvals — this is the fast lever if a problem surfaces after release.
+- **Unpublish** returns a published model to `PREPUBLISH`. It leaves the dropdown immediately but stays available in Model Approvals — the fast lever if a problem surfaces after release.
 - **Archive** retires a model version for good. Use it for superseded versions, not for a model you intend to fix and re-publish.
 
 Neither action deletes anything, and neither touches simulations users have already run.
