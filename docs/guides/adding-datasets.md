@@ -1,6 +1,6 @@
 # Adding Your Own Data
 
-Some models require external data, such as a contact matrix, population table, or time-varying parameter schedule. This guide explains how to add a data file to your model and upload it using your Pandemic Simulator login. Files can use any format, including CSV or JSON, and can be up to 500 MB per dataset. All datasets are visible to all modelers using the Pandemic Simulator, so do not upload confidential information or personal data. See the [MPOX example](#a-complete-example) for a complete implementation. Follow the steps below to upload a dataset and use it in your model.
+Some models require external data, such as a [contact matrix](./contact-matrices.md), population table, or time-varying parameter schedule. This guide explains how to add a data file to your model and upload it using your Pandemic Simulator login. Files can use any format, including CSV or JSON, and can be up to 500 MB per dataset. All datasets are visible to all modelers using the Pandemic Simulator, so do not upload confidential information or personal data. See the [MPOX example](#a-complete-example) for a complete implementation. Follow the steps below to upload a dataset and use it in your model.
 
 ## Contents
 
@@ -193,7 +193,7 @@ class MpoxJaxModel(Model):
         ...
 ```
 
-`self.dataset()` returns the path to the file. Open it with pandas, numpy, `json`, or your package of choice.
+`self.dataset()` returns the path to the file. Open it with pandas, numpy, `json`, or your package of choice. For where this call fits in the rest of a model, see [Writing the model](./model-integration-documentation.md#writing-the-model).
 
 **That one line works everywhere.** Locally it points at the file in your `data/` folder; in the cloud it points at the copy sent along with your model. Never build the path by hand: `Path(__file__).parent / "data" / "transition-rate-multipliers.csv"` appears to work, but it ignores `datasets.yaml`. When you later replace the data — published as a new version, meaning a fresh entry in `datasets.yaml` with `version:` raised and usually a new filename — `self.dataset()` follows that entry, while a hand-written path continues opening the old file.
 
@@ -367,3 +367,7 @@ del %USERPROFILE%\.pansim\dataset-session.json
 | `python -m compartment.datasets pull NAME` | Download the most recently uploaded version. |
 | `python -m compartment.datasets pull NAME@VERSION` | Download a specific version. |
 | `python -m compartment.datasets pull NAME --dest DIR` | Download into a chosen folder. |
+
+---
+
+**Last Updated:** August 24, 2026

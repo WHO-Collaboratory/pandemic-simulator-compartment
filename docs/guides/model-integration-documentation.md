@@ -59,6 +59,19 @@ Think of your model directory as having two halves: what the user can touch, and
 
 A local run also produces the same results JSON the Simulator charts, which is why the [results viewer](#visualize-model-results) looks like the results page.
 
+### Other guides
+
+This guide covers building a model end to end. The others go deeper on one topic each, and you only need them if your model involves that topic:
+
+| Guide | Read it when |
+| :---- | :---- |
+| [Interventions](./interventions.md) | Your model offers a control measure — masks, distancing, vaccination, a lockdown. |
+| [Uncertainty quantification](./uncertainty-quantification.md) | Parameters are known only within a range, or your model is stochastic. |
+| [Contact matrices](./contact-matrices.md) | Your model is age-structured and needs realistic mixing between age groups. |
+| [Mobility](./mobility.md) | People move between administrative zones. |
+| [Adding your own data](./adding-datasets.md) | Your model reads a data file you supply. |
+| [Model conversion](./model-conversion.md) | You are porting a model from a published paper. |
+
 ---
 
 ## Table of Contents
@@ -603,6 +616,8 @@ schema.add_demographic_group("age_50_64",   "Older adults",   default_weight=19.
 schema.add_demographic_group("age_65_plus", "Seniors",        default_weight=17.0, age_range=(65, 120))
 ```
 
+Two of those calls have guides of their own: [interventions.md](./interventions.md) covers what `add_intervention()` can change and how a user configures it, and [contact-matrices.md](./contact-matrices.md) covers the age mixing that `add_demographic_group()` brings with it.
+
 > `value_type=ValueType.DAYS` means `default=10.0` is a 10-day mean, converted to a `0.1/day` rate at load. Do not pre-divide.
 
 > **`ValueType.DAYS` is whole days on `add_parameter()`.** On a transmission parameter, as above, the value is stored as a float and fractions are fine. On `add_parameter()` it becomes an integer field in the generated config, so a fractional value is rejected outright:
@@ -772,7 +787,7 @@ for i, zone in enumerate(admin_zones):
 
 #### Stochastic models
 
-Models are deterministic by default. Declare a stochastic model with a class variable:
+Models are deterministic by default. [uncertainty-quantification.md](./uncertainty-quantification.md) compares the run modes and shows the output each produces; this section covers only what you declare in the model. Declare a stochastic model with a class variable:
 
 ```python
 class ExampleStochasticModel(Model):
@@ -809,7 +824,7 @@ COMPARTMENT_DELTA_GROUPING = {
 
 #### Parameter uncertainty
 
-There is no flag for parameter uncertainty. The framework detects it automatically when a config assigns a value **range** to a parameter, then draws Latin Hypercube samples and emits a median with a 95% simulation-based interval.
+There is no flag for parameter uncertainty. The framework detects it automatically when a config assigns a value **range** to a parameter, then draws Latin Hypercube samples and emits a median with a 95% simulation-based interval. See [Declaring Variance](./uncertainty-quantification.md#declaring-variance) for the config side, including how to put a range on an intervention or a custom parameter.
 
 Give the parameter a `default_min` / `default_max` in `define_parameters()`:
 
@@ -879,6 +894,8 @@ if __name__ == "__main__":
 ### Additional files
 
 To organize your code further, put extra functions in separate files inside your model directory and import them into `model.py`.
+
+If your model needs a data file — a contact matrix, a population table, a schedule of time-varying parameters — do not read it from a hand-built path. Declare it in a `datasets.yaml` beside `model.py` and read it with `self.dataset(name)`, which resolves the same way locally and in the cloud. See [adding-datasets.md](./adding-datasets.md).
 
 ---
 
@@ -1363,3 +1380,7 @@ Then check it as a user would: open the simulation page, confirm the model is li
 - **Archive** retires a model version for good. Use it for superseded versions, not for a model you intend to fix and re-publish.
 
 Neither action deletes anything, and neither touches simulations users have already run.
+
+---
+
+**Last Updated:** August 24, 2026

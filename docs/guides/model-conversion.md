@@ -56,7 +56,7 @@ The prompt below is a template. Replace every `[BRACKETED]` placeholder before y
 
 If your model has no published code, say so in the prompt. Ask the AI to write code that matches the framework and represents the paper's equations faithfully.
 
-> **Example.** The walkthrough in this guide converts the model in [Understanding the dynamics of Ebola epidemics](https://pmc.ncbi.nlm.nih.gov/articles/PMC2870608/). That paper publishes no code, so the AI was asked to derive the implementation from the equations. The result is in [compartment/models/ebola_seihfr_burial_legrand_model/](../../compartment/models/ebola_seihfr_burial_legrand_model/).
+> **Example.** The walkthrough in this guide converts the model in [Understanding the dynamics of Ebola epidemics](https://pmc.ncbi.nlm.nih.gov/articles/PMC2870608/). That paper publishes no code, so the AI was asked to derive the implementation from the equations. The result is in [compartment/models/ebola_seihfr_burial_legrand_model/](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/tree/main/compartment/models/ebola_seihfr_burial_legrand_model).
 
 ### The prompt
 
@@ -306,3 +306,7 @@ The audits give you a list of findings. They do not fix anything. Read through t
 4. **Ignore findings that describe a choice you made on purpose** — but check that the choice is documented in the model directory so the next reader does not have to rediscover it.
 
 You are the last reviewer. Once your model is complete, continue with the next steps to test it, documented in [model-integration-documentation.md](./model-integration-documentation.md).
+
+---
+
+**Last Updated:** August 24, 2026

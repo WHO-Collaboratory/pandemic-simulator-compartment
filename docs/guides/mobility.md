@@ -24,7 +24,7 @@ zone *i* go.
 By default, `build_travel_matrix()` returns an identity matrix, which means there is no travel between zones. There is no default mobility or gravity model. A model with mobility must declare its parameters and override this method — see [Adding mobility to a model](#adding-mobility-to-a-model) below for how to do both.
 
 - **It is built once per run, not once per timestep.** The matrix is fixed for the whole simulation unless an intervention changes it.
-- **It is rebuilt for each uncertainty sample**, so sampled mobility parameters are applied if the modeler or user selects those as parameters to vary.
+- **It is rebuilt for each [uncertainty](./uncertainty-quantification.md) sample**, so sampled mobility parameters are applied if the modeler or user selects those as parameters to vary.
 - **Do not assign `self.travel_matrix` in `__init__` or `prepare_initial_state()`.** The framework will overwrite it. Override `build_travel_matrix()` instead.
 
 ## Using the travel matrix in the model equation
@@ -224,7 +224,7 @@ Using `self.travel_matrix` instead would ignore the intervention. Travel restric
 
 User-configurable mobility parameters belong in the `Disease` block. The mobility function reads each zone's coordinates and population from `case_file.admin_zones`.
 
-The [Ebola example configuration](../../compartment/models/ebola_jax_model/example-config.json) uses this structure (shown here with two of its zones):
+The [Ebola example configuration](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/ebola_jax_model/example-config.json) uses this structure (shown here with two of its zones):
 
 ```json
 {
@@ -271,7 +271,13 @@ The framework does not validate the matrix during a simulation. An invalid matri
 
 ## Related documentation
 
+- [model-integration-documentation.md](./model-integration-documentation.md) — writing the model these hooks belong to
 - [contact-matrices.md](./contact-matrices.md) — age-group mixing, the demographic counterpart to spatial mixing
 - [interventions.md](./interventions.md) — how interventions are declared and applied, including travel restrictions
+- [uncertainty-quantification.md](./uncertainty-quantification.md) — putting a range on a mobility parameter
 - [`compartment/model.py`](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/model.py) — the `build_travel_matrix()` hook and `_ensure_travel_matrix()`
 - [`compartment/helpers.py`](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/helpers.py) — the shared gravity function
+
+---
+
+**Last Updated:** August 24, 2026

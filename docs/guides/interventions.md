@@ -14,7 +14,7 @@ There are two kinds. A **built-in intervention** is declared in one call and the
   - [Activating by date window](#activating-by-date-window)
   - [Activating by prevalence threshold](#activating-by-prevalence-threshold)
   - [Config field reference](#config-field-reference)
-  - [Several interventions at once](#several-interventions-at-once)
+  - [Multiple interventions at once](#multiple-interventions-at-once)
   - [Restricting travel](#restricting-travel)
   - [Uncertainty on intervention settings](#uncertainty-on-intervention-settings)
 - [Custom interventions](#custom-interventions)
@@ -205,11 +205,11 @@ schema.add_intervention(
 )
 ```
 
-This only matters for models that **have** mobility, meaning they override `build_travel_matrix()`. If your model already uses the identity matrix (there is no travel), `modifies_travel` changes nothing there. Note also that having mobility is not the same as restricting it: `mpox_jax_model` and `ebola_jax_model` both model movement between zones, but neither has an intervention that touches it.
+This only matters for models that **have** mobility, meaning they override `build_travel_matrix()` — see [mobility.md](./mobility.md) for how to build one. If your model already uses the identity matrix (there is no travel), `modifies_travel` changes nothing there. Note also that having mobility is not the same as restricting it: `mpox_jax_model` and `ebola_jax_model` both model movement between zones, but neither has an intervention that touches it.
 
 ### Uncertainty on intervention settings
 
-Adherence is rarely known in advance, so you can give intervention fields a range instead of a point value and let the simulator sample across it. Add a `FieldConfigs` block to the intervention. This is the complete `Interventions` block from `example_parameter_uncertainty_declarative_model/example-config.json`, which varies both adherence and the reduction:
+Adherence is rarely known in advance, so you can give intervention fields a range instead of a point value and let the simulator sample across it. Add a `FieldConfigs` block to the intervention; [uncertainty-quantification.md](./uncertainty-quantification.md#on-interventions) covers what the sampling does and how to read the resulting bands. This is the complete `Interventions` block from `example_parameter_uncertainty_declarative_model/example-config.json`, which varies both adherence and the reduction:
 
 ```json
 "Interventions": {
@@ -302,3 +302,7 @@ python tools/view_results.py results/<output>.json
 
 
 If the two runs look identical, check in this order: the config `name` matches the declared `id`; the activation window or threshold is actually reached during the simulated period; `target_rates` names match rates the model passes to `_apply_interventions()`; and `adherence_min × transmission_percentage` is large enough to matter.
+
+---
+
+**Last Updated:** August 24, 2026

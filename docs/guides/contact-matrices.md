@@ -21,8 +21,6 @@ This document explains how contact matrices are created, loaded, aggregated, and
   - [In define_parameters()](#in-define_parameters)
   - [In equation()](#in-equation)
 - [Validation and Warnings](#validation-and-warnings)
-- [Best Practices](#best-practices)
-- [Troubleshooting](#troubleshooting)
 - [Related Documentation](#related-documentation)
 - [References](#references)
 
@@ -340,6 +338,9 @@ If a target age range has **no overlap** with the Prem source bands (0-120), the
 
 ## Related Documentation
 
+- **[model-integration-documentation.md](./model-integration-documentation.md)** — Writing the model that declares these demographic groups
+- **[adding-datasets.md](./adding-datasets.md)** — Supplying your own matrix as a data file instead of using the bundled ones
+- **[uncertainty-quantification.md](./uncertainty-quantification.md)** — How multi-run output reports results per age group
 - **[compartment/contact_matrices/](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/contact_matrices/)** — Source code for loader, aggregator, and bundled data
 - **[tests/test_contact_matrices.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_contact_matrices.py)** — Unit tests demonstrating aggregation behavior
 - **[tests/test_demographics.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_demographics.py)** — Integration tests for `_build_contact_matrix()`
@@ -359,5 +360,4 @@ If a target age range has **no overlap** with the Prem source bands (0-120), the
 
 ---
 
-**Last Updated:** August 10, 2026  
-**Version:** 0.2.0
+**Last Updated:** August 24, 2026
