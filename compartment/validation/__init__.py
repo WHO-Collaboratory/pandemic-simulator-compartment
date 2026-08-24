@@ -118,7 +118,7 @@ def log_pydantic_errors(err: ValidationError, context: str | None = None) -> Non
         logger.error("%s%s -> %s [type=%s]", prefix, loc or "<root>", msg, typ)
 
 
-def _resolve_disease_config(disease_type: str):
+def _resolve_disease_config(disease_type: str, registry: dict | None = None):
     """
     Resolve the Pydantic disease config class for a given disease type.
 
@@ -126,7 +126,7 @@ def _resolve_disease_config(disease_type: str):
     auto-generated from the parameter schema.  Otherwise falls back to the
     hand-written config class.
     """
-    registry = _get_model_registry()
+    registry = registry if registry is not None else _get_model_registry()
     model_class = registry.get(disease_type)
 
     if model_class and has_parameter_schema(model_class):
@@ -159,7 +159,12 @@ def load_simulation_config(config: dict, disease_type: str):
         config = load_simulation_config(data, "RESPIRATORY")
         model = CovidJaxModel(config)
     """
-    disease_cls = _resolve_disease_config(disease_type)
+    # ``disease_type`` is the legacy parameter name. Modern callers pass a
+    # unique model_key so multiple model implementations may intentionally
+    # share the same Disease.disease_type value.
+    registry = _get_model_registry()
+    model_class = registry.get(disease_type)
+    disease_cls = _resolve_disease_config(disease_type, registry=registry)
     context = f"SimulationConfig[{disease_cls.__name__}]"
 
     try:
@@ -168,7 +173,12 @@ def load_simulation_config(config: dict, disease_type: str):
             **config["data"]["getSimulationJob"]
         )
         # Step 2: Post-process
-        processed = ValidationPostProcessor.process(validated_config)
+        # Preserve the exact class selected by model_key. Re-resolving from
+        # validated_config.Disease.disease_type would be ambiguous when two
+        # models cover the same disease.
+        processed = ValidationPostProcessor.process(
+            validated_config, model_class=model_class
+        )
         return processed
     except ValidationError as e:
         log_pydantic_errors(e, context=context)
