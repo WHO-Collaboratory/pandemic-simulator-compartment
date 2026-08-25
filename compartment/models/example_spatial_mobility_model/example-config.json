@@ -3,7 +3,7 @@
     "Disease": {
         "disease_type": "example_spatial_mobility",
         "travel_model": "gravity",
-        "travel_sigma": 0.0,
+        "travel_sigma": 20.0,
         "travel_scale_km": 150.0,
         "travel_alpha": 2.0
     },
