@@ -337,7 +337,14 @@ There are two ways to start. The scaffold command creates the directory layout w
 
 ### Choose a unique name
 
-The scaffold appends `_model` to the name you pass, so `example_parameter_uncertainty_declarative` becomes `compartment/models/example_parameter_uncertainty_declarative_model/`. Class names and the code that instantiates them are generated to match.
+For production models, use the directory naming pattern **`[disease]_[structure]_[feature]_[author]`** — for example, `ebola_seihfr_burial_legrand` for an Ebola SEIHFR model with burial practices, after Legrand et al. The scaffold appends `_model` to the name you pass, so that example becomes `compartment/models/ebola_seihfr_burial_legrand_model/`. Class names and the code that instantiates them are generated to match.
+
+A few rules when choosing the segments:
+
+- **Structure** — use established compartment abbreviations when they remain understandable (`sir`, `seir`, `seihfr`, and similar).
+- **Feature** — include only one or two defining features that distinguish this model from others for the same disease (for example, `burial`, `2strain`, `stochastic`).
+- **Author** — use an organization name or the first-author surname, not the full author list.
+- **Versions** — keep version numbers out of the directory name unless users must choose among versions in the interface.
 
 **That directory name must be unique.** No other directory in `compartment/models/` can already use it. The scaffold will not overwrite an existing directory: it stops before creating anything and prints
 

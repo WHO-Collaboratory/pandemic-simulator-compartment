@@ -107,8 +107,7 @@ with the interventions applied and once without, for comparison.
 ## Sources and deliberate simplifications
 
 The temperature responses follow Huber et al. (2018) and the serotype and
-immunity structure follows García-Carreras et al. (2022); both are listed in the
-repository README. Simplifications made here:
+immunity structure follows García-Carreras et al. (2022). Simplifications made here:
 
 - The serotype count is fixed at 4 and cannot be changed.
 - Mosquito carrying capacity is a straightforward multiple of the human
