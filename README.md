@@ -1,230 +1,80 @@
-# Pandemic Simulator - Compartmental models in Python
+# Pandemic Simulator — Compartmental Disease Modeling Framework
 
-Fast, flexible, and accurate construction of compartmental models to simulate transmission dynamics of respiratory and vector-borne diseases.
+A Python framework for building and running compartmental disease models, developed for the World Health Organization Pandemic Hub's [Pandemic Simulator](https://uat.pandemicsimulator.com/).
 
-## Overview
-This repository builds on code developed for the World Health Organization Pandemic Hub’s Pandemic Simulator project. Its purpose is to extend that work by providing accessible, research-based compartmental modeling tools that enable decision makers, epidemiologists, and modelers to assess public health intervention strategies.
+Its purpose is to provide accessible, research-based modeling tools that help decision makers, epidemiologists, and modelers assess public health intervention strategies. Models written here run locally on your own machine, and once integrated into the Pandemic Simulator, any user can run those models via its interface.
 
-## Using This Repository
-You can run simulations using this repository by either running commands to the compartment module, or using the provided Dockerfile to build a Docker container with your model.
+## Documentation
 
-### To run a command to the compartment module without using Docker
+Begin with the **[Model Integration guide](docs/guides/model-integration-documentation.md)** — it covers the full workflow, from environment setup through a local run to pull request submission. The other guides each go deeper on a single topic:
 
-```
-# Ensure you are at the root of this project. You should be in the "pandemic-simulator-compartment" folder.
-# Initialize a virtual environment using the require packages under uv.
-uv venv
-# Install the project's dependencies into your virtual environment
-uv sync
-# Activate the virtual environment which you've created for this project.
-source .venv/bin/activate
-# Run a covid model using the sample configuration: Madagascar.
-python -m compartment.models.covid_jax_model.main --mode local --config_file compartment/models/covid_jax_model/example-config.json --output_file results/example-run.json
-```
+| Guide | Read it when |
+| :---- | :---- |
+| [Model Integration](docs/guides/model-integration-documentation.md) | **Start here.** Setup, writing a model, config format, running, testing, submitting. |
+| [Model Conversion](docs/guides/model-conversion.md) | You are porting a model from a published paper or code. |
+| [Interventions](docs/guides/interventions.md) | Your model offers a control measure — masks, distancing, vaccination, a lockdown, etc. |
+| [Uncertainty Quantification](docs/guides/uncertainty-quantification.md) | Parameters are known only within a range, or your model is stochastic. |
+| [Contact Matrices](docs/guides/contact-matrices.md) | Your model is age-structured and needs realistic mixing between age groups. |
+| [Mobility](docs/guides/mobility.md) | People move between administrative zones. |
+| [Adding Your Own Data](docs/guides/adding-datasets.md) | Your model reads a data file you supply. |
 
-### To run a command in a container
-```
-# First, build the Dockerfile while in the root of this project.
-docker build . -t compartment 
-# TIP: You can build multiple images using different models by passing different values for MODEL_DIR to the build command.
+The published site also carries the **[API reference](https://who-collaboratory.github.io/pandemic-simulator-compartment/)** — generated from source docstrings, so it is the place to look up an exact signature while writing. Each model in the repository gets a generated page there too.
 
-docker run compartment
-```
-
-### To build a container with a specific model.
-```
-# Pass the build-arg parameter to docker build, with your target directory specified.
-docker build --build-arg MODEL_DIR=compartment/models/dengue_jax_model/ . -t local-dengue
-``` 
-
-### To use your own local config in the reference/ directory and write the output to a custom file in the results/ directory
-```
-# TIP: The filepaths you reference in the environment variables must be the paths inside the Docker container. You also need to mount those directories to your local filesystem in order to save outputs from the container.
-
-docker run \
-  -v $(pwd)/reference:/opt/reference \
-  -v $(pwd)/results:/opt/results \
-  -e CONFIG_FILE=/opt/reference/my-config-file.json \
-  -e OUTPUT_FILE=/opt/results/my-output.json compartment
+## Repository layout
 
 ```
-
-Cloud mode is intended for use in the Pandemic Simulator app, and is not supported for use by the wider community at this time.
-
-## Viewing simulation results
-
-Once a simulation has written its output JSON, you can quickly visualize it with the local results viewer in the `tools/` directory:
-
-```
-# Plot the whole-population (parent_admin_total) compartment time series
-python tools/view_results.py results/example-run.json
-```
-
-The viewer draws the **with-interventions** and **control (no-interventions)** runs side by side on a shared axis, marks each intervention's start and stop date, and shades uncertainty bounds when the run used `UNCERTAINTY` (or a stochastic multi-run) mode. Beneath the chart it lists each run's `compartment_deltas` (cumulative per-compartment totals) as a metric table, using the same compartment names and number formatting as the web app. It reads only the parent admin total, never per-admin-zone series. See [`tools/README.md`](tools/README.md) for the available options (compartment subset, log scale, hiding the deltas table, saving to an image). It only needs `matplotlib`, which is already a core dependency.
-
-## Using Reference Files
-
-Configuration files define the parameters for running simulations. These JSON files specify the disease model, geographic regions, population data, interventions, and simulation settings. Example configuration files are available in the `reference/` directory. We encourage modelers to add their own reference files to this directory when experimenting with models locally.
-
-### Required Fields (covid_jax_model and dengue_jax_model)
-
-All configuration files must include the following shared fields:
-
-- **`admin_unit_id`** (string): Identifier for the selected administrative unit (the deepest level selected, e.g., country code "DEU" or sub-region "DEU.1_1")
-- **`start_date`** (string): Simulation start date in ISO format (YYYY-MM-DD)
-- **`end_date`** (string): Simulation end date in ISO format (YYYY-MM-DD), must be on or after `start_date`
-- **`simulation_type`** (string): Must be `"COMPARTMENTAL"`
-- **`run_mode`** (string): Either `"DETERMINISTIC"` or `"UNCERTAINTY"` for uncertainty quantification
-- **`time_steps`** (integer): Number of time steps to run the simulation (must be > 0)
-- **`AdminUnit`** (object): The selected administrative unit with:
-  - `id` (string): Unit identifier
-  - `center_lat` (float): Latitude of the unit center (-90 to 90). Used for selecting hemisphere for the dengue model.
-  - `admin_level` (integer, optional): The admin level (0=country, 1=state/province, 2=district)
-  - `ParentAdminUnit` (object, optional): Parent administrative unit (same structure, recursive). Used to traverse the admin unit hierarchy.
-- **`Disease`** (object): Disease-specific configuration (see below)
-- **`case_file`** (object): Population and geographic data with:
-  - `admin_zones` (array): List of administrative zones, each containing:
-    - `name` (string): Zone name
-    - `center_lat` (float): Latitude (-90 to 90)
-    - `center_lon` (float): Longitude (-180.0 to 180.0)
-    - `population` (integer): Population count (≥ 0)
-    - `infected_population` (float): Initial infected population percentage (0-100)
-    - Additional optional fields which are used in the Pandemic Simulator app, but not in local simulations: `id` (string), `admin_code`(string), `admin_iso_code`(string), `admin_level`(integer), `viz_name`(string), `osm_id`(string)
-
-### Optional Fields (covid_jax_model and dengue_jax_model)
-
-- **`id`** (string, optional): Simulation identifier, random string used by the web application.
-- **`simulation_name`** (string, default: `""`): Friendly name for the simulation, used by the web application for display.
-- **`owner`** (string, optional): Owner identifier, used by the web application.
-- **`Disease.travel_sigma`** (float, optional): Percentage of each admin zone's population away from home on a given day, causing mixing across admin zones (0-100; `0` disables travel). Mobility is model-owned, so this lives inside the `Disease` block alongside the model's other parameters, and only models that declare it accept it — see [docs/guides/gravity-model.md](docs/guides/gravity-model.md). Some models declare extra mobility parameters next to it (mpox: `travel_scale_km`; hantavirus_human: `travel_alpha`).
-- **`case_file.demographics`** (object, optional): Age structure, used for a social mixing function:
-  - `age_0_17` (float, default: 25.0): Percentage aged 0-17 (0-100)
-  - `age_18_55` (float, default: 50.0): Percentage aged 18-55 (0-100)
-  - `age_56_plus` (float, default: 25.0): Percentage aged 56+ (0-100)
-
-### Respiratory Disease Configuration
-
-For respiratory diseases (e.g., COVID-19), the `Disease` object must include:
-
-- **`disease_type`** (string): Must be `"RESPIRATORY"`
-- **`compartment_list`** (array of strings): List of disease compartments (e.g., `["S", "E", "I", "R", "H", "D"]` for Susceptible, Exposed, Infected, Recovered, Hospitalized, Dead)
-- **`transmission_edges`** (array): List of transitions between compartments used to fill in rates in the jax models, each containing:
-  - `source` (string): Source compartment name (e.g., `"susceptible"`, `"infected"`)
-  - `target` (string): Target compartment name (e.g., `"exposed"`, `"recovered"`)
-  - `data` (object):
-    - `transmission_rate` (float): Rate of transition (> 0) from source to target compartment
-    - `variance_params` (object, optional): For uncertainty quantification:
-      - `has_variance` (boolean): Whether to vary this parameter
-      - `distribution_type` (string): `"UNIFORM"`
-      - `min` (float): Minimum value for distribution
-      - `max` (float): Maximum value for distribution
-      - `field_name` (string, optional): Field to vary
-
-**Example:** See `reference/novel-respiratory-basic-example-config.json` for a simple SIR model, or `reference/novel-respiratory-advanced-example-config.json` for a more complex model with multiple compartments and interventions.
-
-### Vector-Borne Disease Configuration
-
-For vector-borne diseases (e.g., Dengue), the `Disease` object must include:
-
-- **`disease_type`** (string): Must be `"VECTOR_BORNE"`
-- **`immunity_period`** (integer): Duration of temporary cross-protection between first and second infection in days (≥ 0)
-
-Additionally, `admin_zones` in the `case_file` should include:
-- **`seroprevalence`** (float, optional): Percentage of population susceptible to second infection (0-100), defaults to 0
-- **`temp_min`** (float, optional): Minimum annual temperature (default: 15)
-- **`temp_max`** (float, optional): Maximum annual temperature (default: 30)
-- **`temp_mean`** (float, optional): Mean annual temperature (default: 25)
-
-**Example:** See `reference/novel-vector-borne-basic-example-config.json` for a vector-borne disease configuration.
-
-### Interventions
-
-Interventions are optional and can be included for both disease types. Different disease_types have different interventions available.
-
-Interventions can be triggered at a certain date, or when the percentage of population in a particular compartment reaches a certain threshold. If dates and thresholds are both provided, the intervention begins when the first condition which could trigger the intervention is reached, and the other condition trigger is ignored.
-
- The `interventions` array contains objects with:
-
-- **`id`** (string): Intervention type, must be one of:
-  - Respiratory: `"social_isolation"`, `"vaccination"`, `"mask_wearing"`, `"lock_down"`
-  - Vector-borne: `"chemical"`, `"physical"`
-- **`start_date`** (string, optional): Start date in ISO format (YYYY-MM-DD)
-- **`end_date`** (string, optional): End date in ISO format (YYYY-MM-DD)
-- **`adherence_min`** (float, optional): Minimum adherence percentage, sets adherence in deterministic simulations and bounds adherence in stochastic simulations.
-- **`transmission_percentage`** (float, optional): Percentage reduction in transmission caused by adhering to the intervention.
-- **`start_threshold`** (float, optional): Threshold to start intervention
-- **`end_threshold`** (float, optional): Threshold to end intervention
-- **`variance_params`** (array, optional): List of variance parameters for uncertainty quantification:
-  - `has_variance` (boolean): Whether to vary this parameter
-  - `distribution_type` (string): `"UNIFORM"` 
-  - `field_name` (string): Field to vary (e.g., `"adherence_min"`, `"transmission_percentage"`)
-  - `min` (float): Minimum value
-  - `max` (float): Maximum value
-
-### Example Files
-
-The `reference/` directory contains example configuration files:
-
-- **`novel-respiratory-basic-example-config.json`**: Simple SIR model with deterministic run mode
-- **`novel-respiratory-advanced-example-config.json`**: Complex model with multiple compartments, uncertainty quantification, and interventions
-- **`novel-vector-borne-basic-example-config.json`**: Vector-borne disease configuration with temperature parameters and interventions
-
-These files serve as templates for creating your own simulation configurations. All configuration files are validated using Pydantic models defined in `compartment/validation/` to ensure they meet the required structure and constraints.
-
-## Features
-Current:
-
-* Simulate respiratory and vector-borne disease dynamics
-* Incorporate real-world factors including population mobility, age structure, and intervention strategies
-* Run multiple simulations efficiently for uncertainty quantification
-* Leverages [JAX](https://github.com/jax-ml/jax) for high-performance, efficient computation
-
-Planned
-
-* Modular modeling framework supporting extensions and variants for diseases.
-* Separation of models from simulation runs, and built in support for batch runs of simulations.
-* Summary statistics objects.
-
-## Methods
-
-For detail on our methods please refer to our documentation:
-* [Respiratory compartmental documentation](https://drive.google.com/file/d/1Ff4gEKu5gu3MuwTdgzRIH1A7jjzZerCj/view?usp=drive_link)
-* [Vector-borne compartmental documentation](https://drive.google.com/file/d/1g5wkayJ9dUL4WuZjvTCj8OvRrAdq2LxG/view?usp=drive_link)
-
-Reference for the methods:
-* García-Carreras, B., Yang, B., Grabowski, M. K., Sheppard, L. W., et al. (2022). Periodic synchronisation of dengue epidemics in Thailand over the last 5 decades driven by temperature and immunity. PLoS Biology, 20(3), e3001160.: https://pmc.ncbi.nlm.nih.gov/articles/PMC8967062/
-* Huber, J. H., Childs, M. L., Caldwell, J. M., & Mordecai, E. A. (2018). Seasonal temperature variation influences climate suitability for dengue, chikungunya, and Zika transmission. PLoS Neglected Tropical Diseases, 12(5), e0006451.: https://doi.org/10.1371/journal.pntd.0006451
-* Mistry, D., Litvinova, M., Piontti, A., et al. (2021). Inferring high-resolution human mixing patterns for disease modeling. Nature Communications, 12(1), 323.: https://doi.org/10.1038/s41467-020-20544-y
-* Mossong, J., Hens, N., Jit, M., et al. (2008). Social contacts and mixing patterns relevant to the spread of infectious diseases. PLOS Medicine, 5(3), e74.: https://doi.org/10.1371/journal.pmed.0050074
-* Sattenspiel, L., & Dietz, K. (1995). A structured epidemic model incorporating geographic mobility among regions. Mathematical Biosciences, 128(1–2), 71–91.: https://doi.org/10.1016/0025-5564(94)00068-B
-
-
-## Directory Structure
-
-```
-pandemic-simulator-compartment/
-├── compartment/                    # Top level contains helpers and classes used across models and to execute models.
-│   ├── cloud_helpers/              # Helper files used for the pandemic-simulator web application
-│   ├── models/                     # Models which implement the tools in this repository. Likely available in the pandemic-simulator app.
-│   │   |── covid_jax_model/        # Respiratory disease model
-|   |   |── dengue_jax_model/       # Vector-borne disease model
-│   ├── validation/                 # Pydantic syntax models which verify that a config is an acceptable input for a model.
-├── docs/                           # In-depth guides (interventions, uncertainty, contact matrices, gravity model).
-├── reference/                      # Model configurations for running models locally. You can add your own reference configs.
-├── results/                        # Local simulation outputs (gitignored).
-├── tools/                          # Local utilities for modelers, e.g. view_results.py — the simulation results viewer.
+compartment/            # The Python package
+├── model.py            # Base Model class every model extends
+├── parameters.py       # ParameterSchemaBuilder — the schema API you write against
+├── registry.py         # Automatic model discovery
+├── schema_generator.py # Builds config validation from your schema
+├── driver.py           # Runs a simulation
+├── models/             # Every disease model — this is where you work
+├── validation/         # Config validation
+├── contact_matrices/   # Age-mixing data
+├── datasets/           # Modeler-supplied data files
+└── cloud_helpers/      # Pandemic Simulator integration; ignore for local work
+docs/                   # Documentation source (guides + API reference)
+tests/                  # Test suite; smoke tests discover models automatically
+reference/              # Example configs for local runs — add your own
+results/                # Local simulation output (gitignored)
+tools/                  # Local utilities, including the results viewer
 ```
 
-## Caveats/Limitations
-* This repository is currently under development. Some descriptions reflect planned features or the intended final state.
-* Models in this repository may not apply to all scenarios, for example, modeling outbreaks of endemic diseases versus the introduction of a disease into a new region.
+A model directory holds `model.py` (the model), `main.py` (starts a run), `example-config.json` (example inputs), and `model.md` (the write-up users see with their results). Optionally it also holds `datasets.yaml` for a data file and `artifacts/` for the generated file the web app reads.
+
+
+### Example models
+
+Three example models exist in the repository. The Model Integration guide follows all three.
+
+| Directory | What it demonstrates |
+| :---- | :---- |
+| `example_parameter_uncertainty_declarative_model` | The default path — the framework generates the equations from declared transmission edges. Adds age demographics, an intervention, and parameter uncertainty. |
+| `example_parameter_uncertainty_custom_model` | The same SIR model with the equations written by hand, plus an intervention that ramps up and down instead of switching on and off. |
+| `example_stochastic_model` | A stochastic SIR model (tau-leaping, Euler integration, many trajectories) with split asymptomatic and symptomatic compartments. |
+
+Alongside the examples are models for multiple diseases. To list every registered model:
+
+```bash
+python -m compartment.generate_artifact --list
+```
+
+## What the framework supports
+
+- Compartmental models only — dividing a population into compartments and defining the rates that move people between them. Agent-based, network-based, and individual-level models do not fit.
+- Three run modes: a single deterministic run, parameter uncertainty by Latin Hypercube Sampling (uniform distributions), and stochastic models run as many trajectories. The mode is inferred from your configuration rather than set directly.
+- Geography as administrative zones with populations and coordinates, plus age structure, contact matrices, and movement between zones.
+- Interventions with two built-in levers: scaling transmission rates and stopping travel between zones. Anything beyond those involves writing a custom intervention.
+- Simulation forward from parameter values you supply. The framework does not fit or calibrate parameters to data.
+- Every simulation runs twice, once with interventions and once without, so there is always a control to compare against.
 
 ## Contributing
-We welcome contributions via pull request related to the core features or submitting an example model. 
 
-For major changes, please open an issue first to discuss what you would like to change.
-Join our project and provide assistance by:
-Checking out the list of open issues where we need help.
-If you need new features, please open a new issue or start a discussion. 
+Contributions are welcome, both to the core framework and as new models. The [Model Integration guide](docs/guides/model-integration-documentation.md) covers the full workflow, including what a submission needs and how models are reviewed.
 
-Example models submitted to this repository will be reviewed by community subject matter experts. Public release is subject to approval and cannot be guaranteed. Users who contribute models should include example configs for those models.
+Models submitted here are reviewed by community subject matter experts. Public release is subject to approval and cannot be guaranteed. A submitted model must include an example config, which is what the smoke tests run.
+
+## License
+
+Apache License 2.0. Copyright 2025-2026 World Health Organization. See [LICENSE](LICENSE).

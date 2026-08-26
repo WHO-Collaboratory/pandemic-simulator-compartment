@@ -150,6 +150,33 @@ class TestArtifactDiscovery:
         assert "first_only" in first_config.model_fields
         assert "second_only" in second_config.model_fields
 
+    def test_validation_keeps_model_selected_by_unique_key(self, monkeypatch):
+        """Post-processing must not re-resolve an ambiguous disease_type."""
+        import compartment.registry as registry_module
+        import compartment.validation as validation_module
+        from compartment.helpers import load_config_from_json
+        from compartment.models.example_stochastic_model.model import (
+            ExampleStochasticModel,
+        )
+
+        raw = load_config_from_json(
+            "compartment/models/example_stochastic_model/example-config.json"
+        )
+        model_key = ExampleStochasticModel.MODEL_KEY
+
+        # Simulate two models claiming the same disease type: the unique key is
+        # resolvable, but the disease-type shortcut is deliberately unavailable.
+        monkeypatch.setattr(
+            validation_module,
+            "_get_model_registry",
+            lambda: {model_key: ExampleStochasticModel},
+        )
+        monkeypatch.setattr(registry_module, "resolve", lambda _identifier: None)
+
+        processed = validation_module.load_simulation_config(raw, model_key)
+
+        assert processed.compartment_list == ExampleStochasticModel.COMPARTMENT_LIST
+
 
 class TestExampleConfigGeneration:
     """Generated examples use the same normalized shape as the runtime."""

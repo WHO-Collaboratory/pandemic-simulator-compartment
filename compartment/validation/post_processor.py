@@ -83,7 +83,9 @@ class ValidationPostProcessor:
         cls._processors[disease_type] = processor_func
 
     @staticmethod
-    def process(config: SimulationConfig) -> ProcessedSimulation:
+    def process(
+        config: SimulationConfig, model_class: type | None = None
+    ) -> ProcessedSimulation:
         disease_type = config.Disease.disease_type
 
         # Check for custom registered processor (rare - only if you need special logic)
@@ -91,10 +93,14 @@ class ValidationPostProcessor:
             return ValidationPostProcessor._processors[disease_type](config)
 
         # Use smart default processor (works for all diseases automatically!)
-        return ValidationPostProcessor._process_default(config)
+        return ValidationPostProcessor._process_default(
+            config, model_class=model_class
+        )
 
     @staticmethod
-    def _process_default(config: SimulationConfig) -> ProcessedSimulation:
+    def _process_default(
+        config: SimulationConfig, model_class: type | None = None
+    ) -> ProcessedSimulation:
         # Convert to dicts for helper functions
         disease_dict = config.Disease.model_dump()
         disease_type = config.Disease.disease_type
@@ -114,8 +120,13 @@ class ValidationPostProcessor:
                 i.model_dump() for i in config.Interventions.items
             ]
 
-        from compartment.registry import resolve
-        model_class = resolve(disease_type)
+        if model_class is None:
+            # Backward compatibility for callers that invoke the post-processor
+            # directly. This shortcut works only for an unambiguous disease type;
+            # the normal validation path passes the exact model class instead.
+            from compartment.registry import resolve
+
+            model_class = resolve(disease_type)
 
         # === COMPARTMENT LIST ===
         # All models define their compartments via COMPARTMENT_LIST on the class.

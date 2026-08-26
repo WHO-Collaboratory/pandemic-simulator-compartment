@@ -27,6 +27,42 @@ class ExampleParameterUncertaintyCustomModel(Model):
             label="Example Disease with Parameter Uncertainty and Custom Equation",
             description="A SIR model for an example disease with parameter uncertainty, a custom written equation and a ramped intervention",
         )
+        schema.set_model_metadata(
+            authors=[
+                {
+                    "name": "Example Author",
+                    "email": "example@example.com",
+                    "affiliation": "Example LLC",
+                }
+            ],
+            license="MIT",
+            model_type="Compartmental",
+            diseases=["Example disease"],
+            transmission_routes=["Airborne"],
+            questions_answered=[
+                "How does an intervention that phases in gradually compare with one that switches on at full strength?",
+                "How much do the speeds at which adherence builds and decays change outbreak size and timing?",
+                "How wide are the outcome intervals when the transmission rate is only known within a range?",
+            ],
+            key_assumptions=[
+                "Closed population — no births or deaths.",
+                "Frequency-dependent transmission (force of infection scales with the proportion infectious).",
+                "Recovered individuals are fully immune with no waning (no R→S transition).",
+                "The intervention ramps linearly: it climbs from no effect to full effect over ramp_up_days from the start date, holds through the window, then falls back over ramp_down_days after the end date.",
+                "At full effect the reduction matches the framework's built-in intervention (adherence x transmission reduction applied to beta).",
+                "Parameter uncertainty is uniform: fields marked with variance in the config are drawn from their min/max range by Latin Hypercube Sampling.",
+                "No inter-zone mobility — the travel matrix is the identity, so zones evolve independently.",
+            ],
+            applicability=(
+                "A teaching example for writing equation() and intervention "
+                "behaviour by hand. Copy it as the starting point when the "
+                "built-in on/off intervention is too abrupt for your question."
+            ),
+            not_for=(
+                "Real-world forecasting or policy advice — the compartments and "
+                "parameter ranges are illustrative, not fitted to any disease."
+            ),
+        )
 
         # --- Compartments ---
         # Mark infective=True on compartments that contribute to force of infection.

@@ -417,6 +417,7 @@ def create_jax_intervention_results(
     start_date: datetime,
     disease_type: str,
     n_timesteps: int,
+    model_class=None,
 ):
     """
     Generate a list of {{id, trigger_date, trigger_type, active}} events
@@ -463,8 +464,12 @@ def create_jax_intervention_results(
 
         # Use schema-declared infective compartments when available;
         # fall back to "I" for legacy models.
-        from compartment.registry import resolve
-        model_class = resolve(disease_type)
+        if model_class is None:
+            # Backward compatibility for direct callers. The normal formatter
+            # passes the exact model class so shared disease types stay valid.
+            from compartment.registry import resolve
+
+            model_class = resolve(disease_type)
         if model_class and hasattr(model_class, "COMPARTMENTS") and hasattr(model_class.COMPARTMENTS, "infective_ids"):
             infective_comps = list(model_class.COMPARTMENTS.infective_ids)
             infective_idx = [
@@ -650,6 +655,7 @@ def format_jax_output(
         start_date,
         disease_type,
         n_timesteps,
+        model_class=model_class,
     )
     intervention_dict = transform_interventions(intervention_dict)
 

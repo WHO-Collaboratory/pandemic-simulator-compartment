@@ -68,6 +68,45 @@ def test_deterministic_intervention_can_end_on_simulation_end_date():
     ]
 
 
+def test_intervention_threshold_uses_exact_model_class():
+    class Compartments:
+        infective_ids = ("X",)
+
+    class SharedDiseaseModel:
+        COMPARTMENTS = Compartments()
+
+    events = create_jax_intervention_results(
+        population_matrix=np.array(
+            [
+                [[90.0], [10.0]],
+                [[90.0], [10.0]],
+            ]
+        ),
+        intervention_dict={
+            "threshold_intervention": {
+                "start_threshold": 0.05,
+                "end_threshold": None,
+                "start_date_ordinal": None,
+                "end_date_ordinal": None,
+            }
+        },
+        compartment_list=["S", "X"],
+        start_date=date(2026, 1, 1),
+        disease_type="SHARED_DISEASE",
+        n_timesteps=1,
+        model_class=SharedDiseaseModel,
+    )
+
+    assert events == [
+        {
+            "id": "threshold_intervention",
+            "trigger_date": "2026-01-01",
+            "trigger_type": "THRESHOLD",
+            "active": True,
+        }
+    ]
+
+
 def test_parent_admin_total_reuses_child_zone_dates():
     """The parent series must not re-derive dates from a fixed step.
 

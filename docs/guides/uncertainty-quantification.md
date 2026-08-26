@@ -287,7 +287,7 @@ Both parameter uncertainty and stochastic run modes default to **30** runs. You 
 - **Stochastic models:** change the default baked into the model by adjusting the `num_runs` parameter's `default` in `define_parameters()` — the same `add_parameter()` call shown in [Enabling a Stochastic Model](#enabling-a-stochastic-model) above (e.g. set `default=50`).
 - **Any run (local only):** set `n_simulations` in your local config file to explore how the model behaves with a different number of runs. This override only applies when running locally — in the hosted Pandemic Simulator you **cannot** change the number of runs for parameter uncertainty; it is fixed at 30.
 
-For example, [`example_parameter_uncertainty_declarative_model/example-config.json`](../../compartment/models/example_parameter_uncertainty_declarative_model/example-config.json) already sets `n_simulations` at the top level, so it runs 20 simulations instead of the default 30:
+For example, [`example_parameter_uncertainty_declarative_model/example-config.json`](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/models/example_parameter_uncertainty_declarative_model/example-config.json) already sets `n_simulations` at the top level, so it runs 20 simulations instead of the default 30:
 
 ```json
 {
@@ -376,9 +376,12 @@ The framework uses a **95% simulation-based interval** by default: the `lower` a
 ## Related Documentation
 
 - **[interventions.md](./interventions.md)** — Varying intervention effectiveness
+- **[model-integration-documentation.md](./model-integration-documentation.md)** — Model development guide
+- **[contact-matrices.md](./contact-matrices.md)** — Age-structured mixing, which multi-run output reports per age group
 - **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; shades the median/lower/upper uncertainty bands from multi-run output
 - **[compartment/run_simulation.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/run_simulation.py)** — UQ orchestration code
 - **[compartment/helpers.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/helpers.py)** — LHS implementation (`generate_LHS_samples`) and run-mode resolution (`resolve_run_mode`)
+- **[compartment/batch_simulation_manager.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/batch_simulation_manager.py)** — Parallel simulation runner
 
 
 
@@ -397,12 +400,7 @@ The framework uses a **95% simulation-based interval** by default: the `lower` a
 
 
 
-- **[INTERVENTIONS.md](./interventions.md)** — Varying intervention effectiveness
-- **[DEVELOPING_MODELS.md](./developing-models.md)** — Model development guide
-- **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; shades the median/lower/upper parameter uncertainty bands from UNCERTAINTY output
-- **[compartment/run_simulation.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/run_simulation.py)** — UQ orchestration code
-- **[compartment/helpers.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/helpers.py)** — LHS implementation (`generate_LHS_samples`)
-- **[compartment/batch_simulation_manager.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/batch_simulation_manager.py)** — Parallel simulation runner
+### Stochastic Epidemic Models
 
 - **Allen (2017).** ["A primer on stochastic epidemic models: Formulation, numerical simulation, and analysis."](https://doi.org/10.1016/j.idm.2017.03.001) *Infectious Disease Modelling* 2(2): 128-142.
   - Introduction to formulating and simulating stochastic epidemic models
@@ -422,5 +420,4 @@ The framework uses a **95% simulation-based interval** by default: the `lower` a
 
 ---
 
-**Last Updated:** August 16, 2026  
-**Version:** 0.2.1
+**Last Updated:** August 24, 2026

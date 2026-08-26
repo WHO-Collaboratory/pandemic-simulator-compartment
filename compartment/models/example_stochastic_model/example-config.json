@@ -13,7 +13,7 @@
                     "target": "infected",
                     "value_type": "RATE"
                 },
-                "value": 0.3,
+                "value": 0.12,
                 "FieldConfigs": {
                     "items": [
                         {
@@ -21,6 +21,26 @@
                             "has_variance": false,
                             "distribution_type": "UNIFORM",
                             "disease_param": "BETA",
+                            "min": 0,
+                            "max": 0
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "susceptible",
+                    "target": "symptomatic",
+                    "value_type": "RATE"
+                },
+                "value": 0.18,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "BETA_SYM",
                             "min": 0,
                             "max": 0
                         }
@@ -41,6 +61,26 @@
                             "has_variance": false,
                             "distribution_type": "UNIFORM",
                             "disease_param": "GAMMA",
+                            "min": 0,
+                            "max": 0
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "symptomatic",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 10.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA_SYM",
                             "min": 0,
                             "max": 0
                         }

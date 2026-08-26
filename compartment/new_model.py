@@ -11,7 +11,8 @@ Creates compartment/models/my_disease_model/ with:
 
 The generated model is a minimal SIR with frequency-dependent transmission.
 Edit model.py to add compartments, parameters, and ODE logic specific to
-your disease; see docs/DEVELOPING_MODELS.md for the full authoring guide.
+your disease; see docs/guides/model-integration-documentation.md for the full
+authoring guide.
 """
 
 from __future__ import annotations
@@ -205,7 +206,7 @@ class CLASS_NAME(Model):
         prop_infective = I.sum() / (N_total.sum() + 1e-10)
 
         # _apply_interventions scales target_rates and returns the updated travel
-        # matrix. It is a no-op when no interventions are configured.
+        # matrix. With no interventions configured it returns both unchanged.
         rates, self.travel_matrix = self._apply_interventions(
             t, {"beta": params["beta"]}, prop_infective
         )
@@ -523,7 +524,7 @@ def main() -> None:
     print(f"  5. Replace the suggested sections in {dest}/model.md with your")
     print(f"     own write-up — it is emitted in the artifact and shown to users")
     print()
-    print("See docs/DEVELOPING_MODELS.md for the full authoring guide.")
+    print("See docs/guides/model-integration-documentation.md for the full authoring guide.")
 
 
 if __name__ == "__main__":

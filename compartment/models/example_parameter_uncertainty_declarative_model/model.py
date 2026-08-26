@@ -2,6 +2,7 @@ import jax.numpy as jnp
 import numpy as np
 import logging
 from compartment.model import Model, ValueType
+# from compartment.helpers import get_gravity_model_travel_matrix
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +19,46 @@ class ExampleParameterUncertaintyDeclarativeModel(Model):
 
         Args:
             schema (ParameterSchemaBuilder): Schema builder to populate with
-                model info, compartments, transmission edges, interventions,
-                and demographic groups.
+                model info, metadata, compartments, transmission edges,
+                interventions, and demographic groups.
         """
         schema.set_model_info(
             disease_type="example_parameter_uncertainty_declarative",
             label="Example Disease with Declarative Parameter Uncertainty",
             description="A SIR model for an example disease with declarative parameter uncertainty",
+        )
+        schema.set_model_metadata(
+            authors=[
+                {
+                    "name": "Example Author",
+                    "email": "example@example.com",
+                    "affiliation": "Example LLC",
+                }
+            ],
+            license="MIT",
+            model_type="Compartmental",
+            diseases=["Example disease"],
+            transmission_routes=["Airborne"],
+            questions_answered=[
+                "How wide are the outcome intervals when transmission and recovery are only known within a range?",
+                "How much does a transmission-reducing intervention shift the median trajectory?",
+                "How does age structure and contact mixing affect outbreak dynamics across age groups?",
+            ],
+            key_assumptions=[
+                "Closed population — no births or deaths.",
+                "Frequency-dependent transmission (force of infection scales with the proportion infectious).",
+                "Recovered individuals are fully immune with no waning (no R→S transition).",
+                "Parameter uncertainty is uniform: fields marked with variance in the config are drawn from their min/max range by Latin Hypercube Sampling.",
+                "No inter-zone mobility — the travel matrix is the identity, so zones evolve independently.",
+            ],
+            applicability=(
+                "A teaching example for the declarative authoring workflow and "
+                "parameter uncertainty. Copy it as the starting point for a new model."
+            ),
+            not_for=(
+                "Real-world forecasting or policy advice — the compartments and "
+                "parameter ranges are illustrative, not fitted to any disease."
+            ),
         )
 
         # --- Compartments ---
@@ -149,7 +183,7 @@ class ExampleParameterUncertaintyDeclarativeModel(Model):
         prop_infective = I.sum() / (N_total.sum() + 1e-10)
 
         # _apply_interventions scales target_rates and returns the updated travel
-        # matrix. It is a no-op when no interventions are configured.
+        # matrix. With no interventions configured it returns both unchanged.
         rates, self.travel_matrix = self._apply_interventions(
             t, {"beta": params["beta"]}, prop_infective
         )
