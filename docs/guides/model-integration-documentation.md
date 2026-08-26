@@ -1358,26 +1358,26 @@ Approve, or request changes with specifics. Then merge to `main`.
 
 ### 2. Tag a release
 
-Merging builds nothing. The `disease-pipeline` workflow fires on a semver tag, which you create from GitHub — no terminal needed.
+Merging to `main` does not deploy anything. To start the build, publish a release with a version tag on GitHub. The `disease-pipeline` workflow runs when the tag matches `v1.4.0` format: a `v` followed by three numbers separated by dots.
 
-1. **Open Releases.** From the repository's **Code** tab, click **Releases** in the right-hand sidebar (or add `/releases` to the repository URL).
+1. **Open Releases.** From the repository **Code** tab, click **Releases** in the right sidebar.
 
 2. **Click "Draft a new release."**
 
-3. **Create the tag.** Click the **Choose a tag** dropdown, type the new version — `v1.4.0` — and click **"+ Create new tag: v1.4.0 on publish."** The tag must start with `v` and be three numbers separated by dots, or the pipeline will not fire.
+3. **Create the tag.** Open the tag dropdown, type a new version (for example `v1.4.0`) in **Search or create a new tag**, click **Create new tag**, and confirm. Other formats are ignored by the pipeline.
 
-4. **Confirm the target is `main`.** The **Target** dropdown sits next to the tag dropdown and defaults to `main`. The tag is cut from whatever is selected there, so set it back if it shows anything else.
+4. **Set the target to `main`.** The **Target** dropdown next to the tag should point at `main` — the tag is cut from whatever branch is selected.
 
-5. **Add a title and notes.** Use the version as the title. Click **Generate release notes** to pull in the merged pull requests since the last release, then add a line naming the model that changed and what changed about it.
+5. **Add a title and notes.** Use the version as the title. Click **Generate release notes** for a summary of merged pull requests, then add a line naming the model that changed and what changed.
 
-6. **Click "Publish release."** This creates and pushes the tag, which starts the build. **Saving a draft does nothing** — a draft holds no tag, so the pipeline never runs. Ticking **Set as a pre-release** still creates the tag and still runs the pipeline; the label is cosmetic.
+6. **Click "Publish release."** This creates the tag and starts the build. A **draft** release does not create a tag and will not trigger the pipeline. **Set as a pre-release** still creates the tag and still runs the pipeline.
 
-The tag covers **every** model in `compartment/models/` that contains an `example-config.json`, not just the one that changed — the pipeline finds them all and fans out. Re-publishing unchanged models is harmless, but the version number applies repo-wide, so pick it accordingly.
+One tag rebuilds **every** model in `compartment/models/` that has an `example-config.json`, not just the one that changed. Rebuilding unchanged models is harmless, but the version number applies repository-wide — choose it accordingly.
 
 **Troubleshooting**
 
-- **Nothing happens after publishing** — check the tag's spelling on the **Releases** page. `1.4.0`, `v1.4`, and `release-1.4.0` do not match the workflow's tag pattern and are ignored without warning.
-- **The tag already exists** — GitHub will not create a second `v1.4.0`. Cut the next patch version rather than deleting the old tag and reusing the number. That number is the only label on what was built: it names the model's container image and the record of which artifact that image goes with. Reusing it for different code overwrites both, so users still see `v1.4.0` while the code behind it has changed, and there is no way to tell which build an earlier simulation ran on.
+- **Nothing happens after publishing** — check the tag on the **Releases** page. Formats like `1.4.0`, `v1.4`, or `release-1.4.0` do not match the workflow and are skipped without warning.
+- **The tag already exists** — use the next patch version (for example `v1.4.1`) instead of reusing a number. The tag names each model's container image and ties it to a specific artifact. Reusing it for different code overwrites that record, so there is no way to tell which build an earlier simulation ran on.
 
 ### 3. Watch the pipeline
 
@@ -1398,7 +1398,7 @@ That event sets up the model's Lambda and registers the artifact with the API. F
 
 ### 4. Review the model in Model Approvals
 
-Go to **Model Approvals** (<https://uat.pandemic-simulator.com/model-approvals>). Admins, super admins, and disease modelers can see the dashboard; **only a super admin can change a model's status.**
+Go to **Model Approvals** (<https://uat.pandemicsimulator.com/model-approvals>). Admins, super admins, and disease modelers can see the dashboard; **only admins and super admins can change a model's status.**
 
 The new version arrives with status **NEW** and is invisible to ordinary users. Find it by name, disease type, or version, and select it to open the preview panel on the right. The preview is what users will see: compartments, transmission edges, interventions, custom fields, demographic groups, contact-matrix overrides, and the model's authorship and assumptions. Anything that reads wrong here reads wrong to the user.
 
