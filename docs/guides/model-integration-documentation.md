@@ -1381,47 +1381,49 @@ One tag rebuilds **every** model in `compartment/models/` that has an `example-c
 
 ### 3. Watch the pipeline
 
-Open the **Actions** tab and follow the `disease-pipeline` run for your tag. In order, it:
+Open the **Actions** tab and follow the `disease-pipeline` run for your tag. It:
 
 1. Runs the smoke tests.
-2. Builds and pushes a container image per model to ECR, tagged `{model_directory}-{tag}`.
-3. Generates each model's artifact JSON, uploads it to S3 under its SHA-256, and records the image-to-artifact mapping.
-4. Emits a `ModelVersionPublished` event per artifact.
+2. Builds and stores a container image for each model, named `{model_directory}-{tag}`.
+3. Generates each model's artifact file — the JSON the web app reads — and uploads it to cloud storage.
+4. Notifies the platform that a new version is ready.
 
-That event sets up the model's Lambda and registers the artifact with the API. From there, the model's transmission edges, interventions, custom fields, and demographic groups are loaded so the UI has something to render.
+That notification registers the model with the web app: transmission edges, interventions, custom fields, and demographic groups. Once that finishes, the model can appear in Model Approvals.
 
 **Troubleshooting**
 
-- **Job fails at "Stage datasets"** — a file declared in the model's `datasets.yaml` is missing from the bucket. Fix the dataset, then tag again. The pipeline fails here on purpose rather than letting the simulation run later with no data.
-- **Pipeline is green but nothing appears in Model Approvals** — setup runs in the background and takes a few minutes. If the artifact still hasn't landed, check the provisioner's dead-letter queue.
-- **Never move or delete a tag to "redo" a release.** Cut the next patch version instead.
+- **Job fails at "Stage datasets"** — a file listed in the model's `datasets.yaml` is missing. Add the dataset or remove the entry from `datasets.yaml`, then tag again. The pipeline stops here on purpose so the model never runs without its data.
+- **Pipeline succeeds but nothing appears in Model Approvals** — registration runs in the background and can take a few minutes.
+- **Never move or delete a tag to redo a release.** Create the next patch version instead.
 
 ### 4. Review the model in Model Approvals
 
-Go to **Model Approvals** (<https://uat.pandemicsimulator.com/model-approvals>). Admins, super admins, and disease modelers can see the dashboard; **only admins and super admins can change a model's status.**
+Open **[Model Approvals](https://uat.pandemicsimulator.com/model-approvals)**. Admins, super admins, and disease modelers can view the dashboard; **only admins and super admins can change a model's status.**
 
-The new version arrives with status **NEW** and is invisible to ordinary users. Find it by name, disease type, or version, and select it to open the preview panel on the right. The preview is what users will see: compartments, transmission edges, interventions, custom fields, demographic groups, contact-matrix overrides, and the model's authorship and assumptions. Anything that reads wrong here reads wrong to the user.
+The new version arrives as **NEW** — invisible to ordinary users until published. Find it by name, disease type, or version and select it to open the preview on the right. That preview matches what users will see: compartments, parameters, interventions, age groups, and the model's authorship and assumptions.
 
-Statuses run **NEW → PREPUBLISH → PUBLISHED → ARCHIVED**. Only `PUBLISHED` models reach the disease-model dropdown on the simulation page.
+Statuses move **NEW → PREPUBLISH → PUBLISHED → ARCHIVED**. Only **PUBLISHED** models appear in the disease-model dropdown on the simulation page.
 
 ### 5. Simulate before publishing
 
-Click **Simulate**. This opens the simulation form preloaded with the model even though it isn't published yet, which is the point: a real run against the deployed Lambda, in UAT, before any user can reach it.
+Click **Simulate** to open the simulation form with this model preloaded — a real run in UAT before any user can reach it.
 
-Confirm that:
+Confirm:
 
-- The form shows every parameter with the labels, units, and bounds you reviewed in the pull request.
-- The run finishes instead of erroring or timing out.
-- Results are plausible, and the intervention and control curves differ in the direction the intervention claims.
+- Every parameter shows with the labels, units, and bounds from the pull request.
+- The run completes without errors or timeouts.
+- Results look plausible; intervention and control curves differ in the expected direction.
 - Interventions and admin-zone selection behave as documented.
 
-If anything is wrong, leave the model unpublished and go back to the modeler. An unpublished model costs nothing; a published broken one is in front of every user.
+If anything is wrong, leave the model unpublished and notify the modeler to fix it.
+
+**If the modeler needs code changes after merge:** this version cannot be edited in place. They should [copy the existing model](#copy-an-existing-model-instead) under a new name, fix it on a new branch ([Git workflow](#git-workflow)), and open a [pull request](#submit-a-pull-request). The new model goes through review, merge, and publishing again.
 
 ### 6. Publish
 
-With the model selected in the preview panel, click **Publish** (super admin only). The status flips to `PUBLISHED` and the model appears in the disease-model dropdown for all UAT users.
+With the model selected in the preview panel, click **Publish** (admins and super admins only). The status changes to **PUBLISHED** and the model appears in the disease-model dropdown for all UAT users.
 
-Then check it as a user would: open the simulation page, confirm the model is listed under the right name and version, and run it once from a clean form.
+Verify as a user would: open the simulation page, confirm the correct name and version appear, and run once from a fresh form.
 
 ### Unpublishing and archiving
 
