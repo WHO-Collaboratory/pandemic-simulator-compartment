@@ -1314,27 +1314,30 @@ Once your model runs and passes tests, open a pull request so WHO Collaboratory 
 
 5. **Write a clear description** covering what changed, why, how it was tested, and any known limitations or follow-up work.
 
-6. **Request review** from the appropriate reviewer or team. Respond to comments and push additional commits if changes are requested.
+6. **Request review** from the appropriate reviewer or team. 
 
-7. **Merge after approval**, once checks pass, following the project's standard process.
+7. **Address review comments.** If the approver requests changes, fix them on the same branch, rerun the relevant tests, push, and reply to or resolve each comment. Re-request review when ready.
+
+8. **Merge after approval**, once checks pass, following the project's standard process.
 
 ---
 
-## Approve a model
+## Approve and publish a model
 
-Everything above is written for the modeler. This section is for the **approver** — the reviewer who takes a submitted model from an open pull request to one users can run.
+This section is written for the **approver** — the reviewer who takes a submitted model from an open pull request to one users can run.
 
-Models are published to UAT, at <https://uat.pandemic-simulator.com/>. Every step below happens there.
+Approval is done via [Github](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment) and then models are published to (UAT)[https://uat.pandemic-simulator.com/]. 
 
-### 1. Review the pull request
+### 1. Review the pull request in Github
 
-Read the diff the way a user will meet the model: **everything the schema declares turns into something the user sees.**
+On the pull request **Files changed** tab, review the diff with these in mind:
 
-- **Every parameter becomes a control.** Each `add_parameter()`, `add_transmission_parameter()`, and `add_intervention()` turns into a control on the Simulation Configuration page. Check that labels read plainly, descriptions say what the number does, units are right, and `min_value` / `max_value` keep the parameter in a physically sensible range. A slider is only as safe as its limits, and widening one later widens it for every existing user.
-- **The defaults have to run.** `example-config.json` is what the smoke test executes and what seeds a user's first simulation. Confirm the defaults give a plausible epidemic curve, not a flat line or a blow-up.
-- **The model documents itself.** `model.md` and the `schema.set_model_metadata()` block — authors, license, citations, key assumptions, applicability, `not_for`, known biases, validation — appear word for word in the approvals preview and on the model's page. Missing provenance is a fair reason to request changes.
+- **Schema parameters become user controls.** Every `add_parameter()`, `add_transmission_parameter()`, and `add_intervention()` becomes a field on the Simulation Configuration page. Check that labels, descriptions, and units are clear, and that `min_value` / `max_value` keep inputs in a sensible range.
+- **The defaults have to run.** `example-config.json` drives the smoke test, confirm it completes and produces plausible output.
+- **The model documents itself.** `schema.set_model_metadata()` and `model.md` appear in the approvals preview and on the results page. Check that all relevant fields are complete.
+- **The name follows the convention.** The directory should match `[disease]_[structure]_[feature]_[author]` — see [Choose a unique name](#choose-a-unique-name).
 - **CI is green.** `smoke-tests` runs each model's integration smoke test plus `tests/test_<model>.py` where one exists. Don't approve a red or skipped leg.
-- **Run it yourself** when the diff touches `equation()`, mobility, or interventions:
+- **Run it yourself (optional).** To verify output, check out the pull request branch locally (`git fetch origin && git checkout <branch-name>`), then run:
 
   ```shell
   python -m compartment.models.<their_model>.main \
@@ -1349,7 +1352,9 @@ Approve, or request changes with specifics. Then merge to `main`.
 
 #### If changes are required
 
-The approver should put comments on the **pull request**, using line comments where possible, and submit the review as **Request changes**. The modeler should make the fixes on the same branch, rerun the relevant tests, commit and push the changes, respond to or resolve each comment, and re-request review. The approver then reviews the updated pull request before approving it.
+1. On the **Files changed** tab, hover over a line number and click the blue **+** to leave a comment on that line. When you are done, click **Review changes** → **Request changes** and submit.
+2. Request that the modeler fix the issues on the same branch, rerun the relevant tests, push, and reply to or resolve each comment. They should re-request review when the code is ready.
+3. Review the updated pull request and approve once the comments are addressed.
 
 ### 2. Tag a release
 
@@ -1427,4 +1432,4 @@ Neither action deletes anything, and neither touches simulations users have alre
 
 ---
 
-**Last Updated:** August 24, 2026
+**Last Updated:** August 26, 2026
