@@ -1,0 +1,131 @@
+{
+    "n_simulations": 20,
+    "Disease": {
+        "disease_type": "AGE_STRATIFIED_SIR",
+        "compartment_list": [
+            "S",
+            "I",
+            "R"
+        ],
+        "beta_age_0_17": 0.05,
+        "beta_age_18_49": 0.1,
+        "beta_age_50_64": 0.08,
+        "beta_age_65_plus": 0.05,
+        "travel_sigma": 20.0,
+        "variance_params": [
+            {
+                "param": "beta_age_0_17",
+                "dist": "UNIFORM",
+                "min": 0.01,
+                "max": 0.10
+            },
+            {
+                "param": "beta_age_18_49",
+                "dist": "UNIFORM",
+                "min": 0.05,
+                "max": 0.20
+            },
+            {
+                "param": "beta_age_50_64",
+                "dist": "UNIFORM",
+                "min": 0.03,
+                "max": 0.18
+            },
+            {
+                "param": "beta_age_65_plus",
+                "dist": "UNIFORM",
+                "min": 0.01,
+                "max": 0.10
+            }
+        ]
+    },
+    "start_date": "2026-01-01",
+    "end_date": "2026-06-30",
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": {
+                    "source": "infected",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 10.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": {
+                    "name": "SOCIAL_ISOLATION",
+                    "display_name": "Social Isolation"
+                },
+                "adherence_min": 90.0,
+                "transmission_percentage": 90.0,
+                "start_date": "2026-01-05",
+                "end_date": "2026-04-15"
+            }
+        ]
+    },
+    "admin_unit_id": "MDG",
+    "admin_zones": [
+        {
+            "name": "Antananarivo",
+            "center_lat": -18.93585290187204,
+            "center_lon": 46.80467692606311,
+            "population": 7982937,
+            "infected_population": 0.05
+        },
+        {
+            "name": "Antsiranana",
+            "center_lat": -13.869271297424163,
+            "center_lon": 49.413514128028105,
+            "population": 2127141,
+            "infected_population": 0.02
+        },
+        {
+            "name": "Fianarantsoa",
+            "center_lat": -21.856236442723883,
+            "center_lon": 46.86230787719887,
+            "population": 5785134,
+            "infected_population": 0.03
+        },
+        {
+            "name": "Mahajanga",
+            "center_lat": -16.536991119784563,
+            "center_lon": 46.68467040064395,
+            "population": 3783162,
+            "infected_population": 0.04
+        },
+        {
+            "name": "Toamasina",
+            "center_lat": -17.82287275056714,
+            "center_lon": 48.7510838190036,
+            "population": 3693480,
+            "infected_population": 0.03
+        },
+        {
+            "name": "Toliary",
+            "center_lat": -22.60126035484297,
+            "center_lon": 45.01750093141163,
+            "population": 4621930,
+            "infected_population": 0.01
+        }
+    ],
+    "demographics": {
+        "age_0_17": 22.0,
+        "age_18_49": 42.0,
+        "age_50_64": 19.0,
+        "age_65_plus": 17.0
+    }
+}
