@@ -1427,11 +1427,14 @@ Verify as a user would: open the simulation page, confirm the correct name and v
 
 ### Unpublishing and archiving
 
-- **Unpublish** returns a published model to `PREPUBLISH`. It leaves the dropdown immediately but stays available in Model Approvals — the fast lever if a problem surfaces after release.
-- **Archive** retires a model version for good. Use it for superseded versions, not for a model you intend to fix and re-publish.
+To remove a published model from the dropdown, open it in **Model Approvals** and change its status from **PUBLISHED**:
 
-Neither action deletes anything, and neither touches simulations users have already run.
+- **PREPUBLISH** — hides it from users but keeps it in Model Approvals. Use when a problem surfaces after release.
+- **ARCHIVED** — retires the version. Use for superseded versions, not for a model you plan to fix and re-publish.
+- **NEW** — returns it to the initial review state.
+
+None of these actions delete the model or affect simulations users have already run.
 
 ---
 
-**Last Updated:** August 26, 2026
+**Last Updated:** August 27, 2026
