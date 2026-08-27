@@ -31,8 +31,8 @@ This guide follows three models that ship with the repository.
 
 | Directory | `disease_type` | What it demonstrates |
 | :---- | :---- | :---- |
-| `compartment/models/example_parameter_uncertainty_declarative_model` | `example_parameter_uncertainty_declarative` | The **default path**. A SIR model where the framework generates the equations from declared transmission edges. Includes age demographics, an intervention, and parameter uncertainty. |
-| `compartment/models/example_parameter_uncertainty_custom_model` | `example_parameter_uncertainty_custom` | The same SIR model with the equations **written by hand**, plus a custom intervention that ramps up and down instead of switching on and off. |
+| `compartment/models/example_parameter_uncertainty_declarative_model` | `example_parameter_uncertainty_declarative` | The **default path**. An unstructured SIR model where the framework generates the equations from declared transmission edges. Includes an intervention and parameter uncertainty (no age stratification). |
+| `compartment/models/example_parameter_uncertainty_custom_model` | `example_parameter_uncertainty_custom` | The same SIR structure with equations **written by hand**, five age demographic groups and contact-matrix mixing, plus a custom intervention that ramps up and down instead of switching on and off. |
 | `compartment/models/example_stochastic_model` | `example_stochastic` | A **stochastic** SIR model (tau-leaping, Euler integration, multiple trajectories) with split asymptomatic / symptomatic infectious compartments. |
 
 ### What a local run represents
@@ -648,7 +648,13 @@ schema.add_intervention(
     adherence=50.0,
     transmission_reduction=50.0,
 )
+```
 
+The declarative example does **not** declare age groups — it is an unstructured *(compartments × zones)* model. [interventions.md](./interventions.md) covers what `add_intervention()` can change and how a user configures it.
+
+To add age stratification, declare groups in `define_parameters()` and wire contact mixing in `equation()`. `example_parameter_uncertainty_custom_model/model.py` does both:
+
+```python
 schema.add_demographic_group("age_0_4",     "Young children", default_weight=6.0,  age_range=(0, 4))
 schema.add_demographic_group("age_5_17",    "School-age",     default_weight=16.0, age_range=(5, 17))
 schema.add_demographic_group("age_18_49",   "Young adults",   default_weight=42.0, age_range=(18, 49))
@@ -656,7 +662,7 @@ schema.add_demographic_group("age_50_64",   "Older adults",   default_weight=19.
 schema.add_demographic_group("age_65_plus", "Seniors",        default_weight=17.0, age_range=(65, 120))
 ```
 
-Two of those calls have guides of their own: [interventions.md](./interventions.md) covers what `add_intervention()` can change and how a user configures it, and [contact-matrices.md](./contact-matrices.md) covers the age mixing that `add_demographic_group()` brings with it.
+When every group declares an `age_range`, the framework auto-loads a contact matrix. See [contact-matrices.md](./contact-matrices.md) for how mixing works and how users can override weights or matrix entries in the config.
 
 > `value_type=ValueType.DAYS` means `default=10.0` is a 10-day mean, converted to a `0.1/day` rate at load. Do not pre-divide.
 
@@ -713,19 +719,23 @@ infection = rates["beta"] * S * I / N
 self._apply_flow(derivs, "S", "I", infection)   # subtracts from S, adds to I, updates totals
 ```
 
-**Manual.** Write every transition yourself. `example_parameter_uncertainty_custom_model/model.py` does this, and also replaces `_apply_interventions` with its own `custom_intervention()` that ramps adherence up and down instead of switching instantly:
+**Manual.** Write every transition yourself. `example_parameter_uncertainty_custom_model/model.py` does this with **age-stratified contact mixing** (`self.contact_matrix`), and also replaces `_apply_interventions` with its own `custom_intervention()` that ramps adherence up and down instead of switching instantly:
 
 ```python
 def equation(self, y, t, p):
     C = self.COMPARTMENTS
     params = self._unpack_params(p)
     states = {c: y[i] for i, c in enumerate(self.compartment_list)}
+    S, I = states[C.S], states[C.I]
     ...
+    I_frac = I / (N_total[None, :] + 1e-10)
     beta = self.custom_intervention(t, params["beta"])
     gamma = params["gamma"]
 
-    new_infections = beta * states[C.S] * prop_infective   # S -> I
-    new_recoveries = gamma * states[C.I]                   # I -> R
+    beta_scaled = ((beta * self.travel_matrix) @ I_frac.T).T
+    omega = self.contact_matrix @ beta_scaled
+    new_infections = S * omega                          # S -> I (age-mixed FOI)
+    new_recoveries = gamma * I                          # I -> R
 
     # Start every compartment at zero so the auto-generated _total
     # compartments are present before stacking.
@@ -776,7 +786,7 @@ A few models (such as dengue) initialize manually instead of calling `super().__
 
 Builds the starting population matrix from each administrative region's population (WorldPop) and the initial infected percentage from the config or UI. **Do not rename it.** Override it if your model needs a different starting state — for a custom mobility matrix, override `build_travel_matrix()` instead (see below).
 
-The population matrix is **(K, R)**: K compartments × R regions. With demographic groups declared via `schema.add_demographic_group()`, it should end up as **(K, A, R)** — call `_prepare_demographic_state()` rather than building it by hand. That method expands the default (K, R) matrix, appends zero-valued rows for `_total` compartments, updates `self.population_matrix` and `self.compartment_list` in place, and returns `None`. Models without demographic groups can ignore it.
+The population matrix is **(K, R)**: K compartments × R regions. With demographic groups declared via `schema.add_demographic_group()`, it should end up as **(K, A, R)** — call `_prepare_demographic_state()` rather than building it by hand. That method expands the default (K, R) matrix, appends zero-valued rows for `_total` compartments, updates `self.population_matrix` and `self.compartment_list` in place, and returns `None`. `example_parameter_uncertainty_custom_model` calls it from `prepare_initial_state()`; the declarative example has no age groups and returns `self.population_matrix` unchanged.
 
 **`get_initial_population(cls, admin_zones, compartment_list, **kwargs)`**
 
@@ -1206,7 +1216,7 @@ The other two examples follow the same pattern:
 
 **macOS / Linux**
 ```shell
-# Custom equation + ramped intervention
+# Custom equation + age demographics + ramped intervention
 python -m compartment.models.example_parameter_uncertainty_custom_model.main \
     --mode local \
     --config_file compartment/models/example_parameter_uncertainty_custom_model/example-config.json \
