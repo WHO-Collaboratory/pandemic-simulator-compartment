@@ -47,6 +47,7 @@ class ExampleParameterUncertaintyCustomModel(Model):
             key_assumptions=[
                 "Closed population — no births or deaths.",
                 "Frequency-dependent transmission (force of infection scales with the proportion infectious).",
+                "Five age bands with contact mixing from a synthetic Prem 2021 matrix loaded by the framework.",
                 "Recovered individuals are fully immune with no waning (no R→S transition).",
                 "The intervention ramps linearly: it climbs from no effect to full effect over ramp_up_days from the start date, holds through the window, then falls back over ramp_down_days after the end date.",
                 "At full effect the reduction matches the framework's built-in intervention (adherence x transmission reduction applied to beta).",
@@ -155,11 +156,16 @@ class ExampleParameterUncertaintyCustomModel(Model):
             transmission_reduction=50.0,
         )
 
-        # --- Optional: age-stratified demographics + contact matrix ---
-        # schema.add_demographic_group("age_0_17",  "Children", default_weight=33.3, age_range=(0, 17))
-        # schema.add_demographic_group("age_18_55", "Adults",   default_weight=44.4, age_range=(18, 55))
-        # schema.add_demographic_group("age_56_plus","Elderly", default_weight=22.3, age_range=(56, 120))
-
+        # --- Age-stratified demographics + contact matrix ---
+        # age_range on every group auto-loads a synthetic Prem 2021 contact
+        # matrix. equation() applies it to the hand-written S→I force of infection.
+        schema.add_demographic_group("age_0_4",    "Young children", default_weight=6.0,  age_range=(0, 4))
+        schema.add_demographic_group("age_5_17",   "School-age",     default_weight=16.0, age_range=(5, 17))
+        schema.add_demographic_group("age_18_49",  "Young adults",   default_weight=42.0, age_range=(18, 49))
+        schema.add_demographic_group("age_50_64",  "Older adults",   default_weight=19.0, age_range=(50, 64))
+        schema.add_demographic_group("age_65_plus","Seniors",        default_weight=17.0, age_range=(65, 120))
+        
+        
     def __init__(self, config):
         """Initialize the model from a validated simulation config.
 
@@ -183,10 +189,15 @@ class ExampleParameterUncertaintyCustomModel(Model):
     def prepare_initial_state(self):
         """Return the initial compartment populations for the solver.
 
+        Expands the population matrix from *(compartments × zones)* to
+        *(compartments × age groups × zones)* using the declared demographic
+        weights.
+
         Returns:
-            jnp.ndarray: Population matrix (compartments x admin zones) used as
-                the solver's initial state.
+            jnp.ndarray: Population matrix (compartments x age groups x admin
+                zones) used as the solver's initial state.
         """
+        self._prepare_demographic_state()
         return self.population_matrix
 
 
@@ -261,8 +272,9 @@ class ExampleParameterUncertaintyCustomModel(Model):
     def equation(self, y, t, p):
         """Compute the compartment derivatives for a single integration step.
 
-        Builds the SIR derivatives by hand and applies ``custom_intervention``
-        to the transmission rate instead of the built-in intervention helper.
+        Builds the SIR derivatives by hand. Applies ``custom_intervention`` to
+        beta and mixes age groups through ``self.contact_matrix`` (zones through
+        ``self.travel_matrix``, which is the identity when mobility is off).
 
         Args:
             y (jnp.ndarray): Current compartment values, ordered by
@@ -277,28 +289,29 @@ class ExampleParameterUncertaintyCustomModel(Model):
         params = self._unpack_params(p)
 
         states = {c: y[i] for i, c in enumerate(self.compartment_list)}
+        S = states[C.S]
+        I = states[C.I]
 
-        I = states[C.I]  
-        non_total = [c for c in C if not c.endswith("_total")]
-        N_total = sum(states[c] for c in non_total)
-        prop_infective = I.sum() / (N_total.sum() + 1e-10)
+        non_total = [c for c in self.compartment_list if not c.endswith("_total")]
+        pop_terms = [states[c] for c in non_total]
+        N_total = sum(pop_terms).sum(axis=0)
+        I_frac = I / (N_total[None, :] + 1e-10)
 
-        # Apply our custom intervention to beta instead of _apply_interventions.
         beta = self.custom_intervention(t, params["beta"])
         gamma = params["gamma"]
-        S = states[C.S]
+        travel_matrix = self.travel_matrix
 
-        new_infections = beta * S * prop_infective  # S -> I (frequency-dependent)
-        new_recoveries = gamma * I                   # I -> R
+        # S→I: frequency-dependent FOI with age contact mixing (and zone travel).
+        beta_scaled = ((beta * travel_matrix) @ I_frac.T).T
+        omega = self.contact_matrix @ beta_scaled
+        new_infections = S * omega
+        new_recoveries = gamma * I
 
-        # Start every compartment at zero so the auto-generated _total
-        # cumulative compartments are always present before stacking.
         derivs = {c: jnp.zeros_like(I) for c in self.compartment_list}
         derivs[C.S] = -new_infections
         derivs[C.I] = new_infections - new_recoveries
         derivs[C.R] = new_recoveries
 
-        # _total compartments accumulate inflows only.
         if f"{C.I}_total" in derivs:
             derivs[f"{C.I}_total"] = new_infections
         if f"{C.R}_total" in derivs:
