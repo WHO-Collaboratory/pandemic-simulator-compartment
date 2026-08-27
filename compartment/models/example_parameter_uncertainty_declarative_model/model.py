@@ -20,7 +20,7 @@ class ExampleParameterUncertaintyDeclarativeModel(Model):
         Args:
             schema (ParameterSchemaBuilder): Schema builder to populate with
                 model info, metadata, compartments, transmission edges,
-                interventions, and demographic groups.
+                and interventions.
         """
         schema.set_model_info(
             disease_type="example_parameter_uncertainty_declarative",
@@ -42,7 +42,7 @@ class ExampleParameterUncertaintyDeclarativeModel(Model):
             questions_answered=[
                 "How wide are the outcome intervals when transmission and recovery are only known within a range?",
                 "How much does a transmission-reducing intervention shift the median trajectory?",
-                "How does age structure and contact mixing affect outbreak dynamics across age groups?",
+                "How do uncertainty ranges on intervention adherence and transmission reduction affect the outcome band?",
             ],
             key_assumptions=[
                 "Closed population — no births or deaths.",
@@ -123,13 +123,6 @@ class ExampleParameterUncertaintyDeclarativeModel(Model):
             adherence=50.0,
             transmission_reduction=50.0,
         )
-
-        # --- Optional: age-stratified demographics + contact matrix ---
-        schema.add_demographic_group("age_0_4",    "Young children", default_weight=6.0,  age_range=(0, 4))
-        schema.add_demographic_group("age_5_17",   "School-age",     default_weight=16.0, age_range=(5, 17))
-        schema.add_demographic_group("age_18_49",  "Young adults",   default_weight=42.0, age_range=(18, 49))
-        schema.add_demographic_group("age_50_64",  "Older adults",   default_weight=19.0, age_range=(50, 64))
-        schema.add_demographic_group("age_65_plus","Seniors",        default_weight=17.0, age_range=(65, 120))
 
     def __init__(self, config):
         """Initialize the model from a validated simulation config.
