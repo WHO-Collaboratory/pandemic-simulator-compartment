@@ -1,0 +1,138 @@
+{
+    "n_simulations": 20,
+    "Disease": {
+        "disease_type": "example_spatial_mobility",
+        "travel_model": 1,
+        "travel_sigma": 20.0,
+        "travel_scale_km": 150.0,
+        "travel_alpha": 2.0
+    },
+    "start_date": "2026-01-01",
+    "end_date": "2026-12-31",
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": {
+                    "source": "susceptible",
+                    "target": "infected",
+                    "value_type": "RATE"
+                },
+                "value": 0.3,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": true,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "BETA",
+                            "default": 0.3,
+                            "min": 0.2,
+                            "max": 0.4
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "infected",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 10.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": true,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA",
+                            "default": 10.0,
+                            "min": 7.0,
+                            "max": 14.0
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": {
+                    "name": "my_intervention",
+                    "display_name": "My Intervention"
+                },
+                "adherence_min": 50.0,
+                "transmission_percentage": 50.0,
+                "start_date": "2026-02-01",
+                "end_date": "2026-12-31",
+                "start_threshold": null,
+                "end_threshold": null,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "adherence_min",
+                            "has_variance": true,
+                            "distribution_type": "UNIFORM",
+                            "default": 50.0,
+                            "min": 40.0,
+                            "max": 60.0
+                        },
+                        {
+                            "field_key": "transmission_percentage",
+                            "has_variance": true,
+                            "distribution_type": "UNIFORM",
+                            "default": 50.0,
+                            "min": 45.0,
+                            "max": 55.0
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "admin_unit_id": "MDG",
+    "demographics": {
+        "age_0_17": 30.0,
+        "age_18_49": 40.0,
+        "age_50_64": 18.0,
+        "age_65_plus": 12.0
+    },
+    "admin_zones": [
+        {
+            "name": "Antananarivo",
+            "center_lat": -18.93585290187204,
+            "center_lon": 46.80467692606311,
+            "population": 1275000,
+            "infected_population": 0.05
+        },
+        {
+            "name": "Toamasina",
+            "center_lat": -17.82287275056714,
+            "center_lon": 48.7510838190036,
+            "population": 274000,
+            "infected_population": 0.0
+        },
+        {
+            "name": "Antsirabe",
+            "center_lat": -19.86585,
+            "center_lon": 47.03333,
+            "population": 245000,
+            "infected_population": 0.0
+        },
+        {
+            "name": "Mahajanga",
+            "center_lat": -15.71667,
+            "center_lon": 46.31667,
+            "population": 220000,
+            "infected_population": 0.0
+        },
+        {
+            "name": "Fianarantsoa",
+            "center_lat": -21.45362,
+            "center_lon": 47.08577,
+            "population": 190000,
+            "infected_population": 0.0
+        }
+    ]
+}
