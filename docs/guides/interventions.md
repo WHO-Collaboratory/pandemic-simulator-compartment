@@ -189,7 +189,7 @@ social isolation  0.2325 × (1 - 0.40 × 0.50) = 0.2325 × 0.80 = 0.186
 
 ### Restricting travel
 
-For a measure that confines people to their own zone, add `modifies_travel=True` to the `schema.add_intervention()` call in your model's `model.py` — the same declaration shown in [Declaring interventions](#declaring-interventions), which `example_parameter_uncertainty_declarative_model/model.py` demonstrates. This is a modeling decision rather than a config field, so it cannot be switched on for a model that does not declare it.
+For a measure that confines people to their own zone, add `modifies_travel=True` to the `schema.add_intervention()` call in your model's `model.py` — the same declaration shown in [Declaring interventions](#declaring-interventions), which [`example_parameter_uncertainty_declarative_model/model.py`](../../compartment/models/example_parameter_uncertainty_declarative_model/model.py) demonstrates. This is a modeling decision rather than a config field, so it cannot be switched on for a model that does not declare it.
 
 While the intervention is active the travel matrix becomes the identity matrix, so people stop traveling outside of their zone and each one runs its own local epidemic. `covid_jax_model` uses both levers in one intervention, cutting `beta` through `target_rates` and halting travel through `modifies_travel`:
 
@@ -253,7 +253,7 @@ Write one when the built-in behaviour cannot express what you need — for examp
 
 Still declare the intervention with `schema.add_intervention()`, since that is what creates the user-facing controls and lets the config validate. Then skip `_apply_interventions()` and apply your own logic in `equation()`.
 
-`example_parameter_uncertainty_custom_model` is the reference example. Its `custom_intervention()` ramps the effect up over `ramp_up_days`, holds it through the window, then releases it over `ramp_down_days`:
+[`example_parameter_uncertainty_custom_model`](../../compartment/models/example_parameter_uncertainty_custom_model/model.py) is the reference example. It pairs a custom ramp with **five age demographic groups and contact-matrix mixing** — see [contact-matrices.md](./contact-matrices.md). `custom_intervention()` scales `beta` first; the contact matrix then turns infectious prevalence into an age-specific force of infection. Its `custom_intervention()` ramps the effect up over `ramp_up_days`, holds it through the window, then releases it over `ramp_down_days`:
 
 ```python
 def custom_intervention(self, t, beta):
@@ -278,10 +278,13 @@ def custom_intervention(self, t, beta):
     return beta * (1.0 - ramp * full_reduction)
 ```
 
-and calls it in place of the helper:
+and calls it before contact mixing in `equation()`:
 
 ```python
 beta = self.custom_intervention(t, params["beta"])
+beta_scaled = ((beta * self.travel_matrix) @ I_frac.T).T
+omega = self.contact_matrix @ beta_scaled
+new_infections = S * omega
 ```
 
 Three rules to follow:
@@ -305,4 +308,4 @@ If the two runs look identical, check in this order: the config `name` matches t
 
 ---
 
-**Last Updated:** August 24, 2026
+**Last Updated:** August 27, 2026

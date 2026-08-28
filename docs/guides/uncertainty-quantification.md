@@ -321,7 +321,7 @@ Each run also carries `start_date`, `end_date`, `time_steps`, `interventions`, `
 
 ### Deterministic Output
 
-Each compartment holds an object of demographic keys. `age_all` carries the population-wide value; a model with declared age groups also lists one key per group:
+Each compartment holds an object of demographic keys. `age_all` carries the population-wide value; a model with declared age groups also lists one key per group. For example, [`example_parameter_uncertainty_custom_model`](../../compartment/models/example_parameter_uncertainty_custom_model/model.py) declares five bands, so a **deterministic** run of that model produces keys like this:
 
 ```json
 "time_series": [
@@ -334,7 +334,7 @@ Each compartment holds an object of demographic keys. `age_all` carries the popu
 ]
 ```
 
-A model with no age stratification produces `age_all` alone:
+A model with no age stratification produces `age_all` alone — for example, a deterministic run of [`example_parameter_uncertainty_declarative_model`](../../compartment/models/example_parameter_uncertainty_declarative_model/model.py):
 
 ```json
 { "date": "2026-01-01", "S": { "age_all": 999900.0 }, "I": { "age_all": 100.0 } }
@@ -344,7 +344,7 @@ One value per compartment per timestep, always nested under a demographic key.
 
 ### Multi-Run Output (Parameter Uncertainty or Stochastic)
 
-Each compartment holds a summary across runs instead. Note that the demographic nesting is **replaced** — multi-run output reports population-wide values only, even for age-stratified models:
+Each compartment holds a summary across runs instead. Note that the demographic nesting is **replaced** — multi-run output reports population-wide values only, even for age-stratified models such as `example_parameter_uncertainty_custom_model`. Both uncertainty examples ship with `has_variance` flags, so their local runs use this shape rather than the per-age keys shown above:
 
 ```json
 "time_series": [
@@ -377,7 +377,7 @@ The framework uses a **95% simulation-based interval** by default: the `lower` a
 
 - **[interventions.md](./interventions.md)** — Varying intervention effectiveness
 - **[model-integration-documentation.md](./model-integration-documentation.md)** — Model development guide
-- **[contact-matrices.md](./contact-matrices.md)** — Age-structured mixing, which multi-run output reports per age group
+- **[contact-matrices.md](./contact-matrices.md)** — Age-structured mixing; per-age-group series appear in **deterministic** output only (multi-run output collapses to population-wide summaries)
 - **[tools/view_results.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tools/view_results.py)** — Local results viewer; shades the median/lower/upper uncertainty bands from multi-run output
 - **[compartment/run_simulation.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/run_simulation.py)** — UQ orchestration code
 - **[compartment/helpers.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/helpers.py)** — LHS implementation (`generate_LHS_samples`) and run-mode resolution (`resolve_run_mode`)
@@ -420,4 +420,4 @@ The framework uses a **95% simulation-based interval** by default: the `lower` a
 
 ---
 
-**Last Updated:** August 24, 2026
+**Last Updated:** August 27, 2026
