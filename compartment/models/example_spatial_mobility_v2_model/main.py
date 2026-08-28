@@ -1,7 +1,7 @@
 import logging
 import argparse
 from compartment.driver import drive_simulation
-from compartment.models.example_spatial_mobility_model.model import ExampleSpatialMobilityModel
+from compartment.models.example_spatial_mobility_v2_model.model import ExampleSpatialMobilityModel
 
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)
