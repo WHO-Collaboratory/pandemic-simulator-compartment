@@ -7,15 +7,37 @@ logger = logging.getLogger(__name__)
 
 
 class ExampleSpatialMobilityModel(Model):
-    """SIR model with a *selectable* mechanistic inter-zone mobility matrix.
+    """SIR model with selectable inter-zone mobility AND age-structured mixing.
 
-    The user picks the mobility mechanism with the numeric ``travel_model``
-    parameter — **1 = gravity, 2 = exponential, 3 = radiation, 4 = uniform** —
-    and ``build_travel_matrix`` synthesises the matrix from each admin zone's
-    population and coordinates (no movement data needed). Every mechanism returns
-    a row-stochastic *presence* matrix (``T[i,j]`` = fraction of zone i present in
-    zone j; rows sum to 1; diagonal = stay-home), and ``equation()`` applies it so
-    zones are genuinely coupled.
+    This extends the spatial-mobility SIR so the population is **age-stratified**
+    and age groups mix through a **contact matrix**, while transmission is still
+    governed by a **single scalar ``beta``** (no per-age transmission rate).
+
+    Two couplings act together on the force of infection:
+
+    * **Space** — a selectable, row-stochastic *presence* travel matrix ``T``
+      (``T[i,j]`` = fraction of zone *i* present in zone *j*; rows sum to 1),
+      built by ``build_travel_matrix`` from each admin zone's population and
+      coordinates (1 = gravity, 2 = exponential, 3 = radiation, 4 = uniform).
+    * **Age** — a contact matrix ``M`` (``M[a,b]`` = relative contact intensity
+      between age groups *a* and *b*), auto-loaded by the framework from each
+      demographic group's ``age_range``. ``M`` is normalised by its spectral
+      radius so it only *redistributes* risk across ages; the overall
+      transmission scale stays set by the single ``beta`` (i.e. ``beta`` keeps
+      its usual R0-equivalent meaning, as in the non-age model).
+
+    Force of infection for susceptibles of age *a* in zone *r* (state axes are
+    ``(age, zone)``; the zone axis is last)::
+
+        N_present[b,j] = sum_i N[b,i] T[i,j]      (age-b people present in j)
+        I_present[b,j] = sum_i I[b,i] T[i,j]      (age-b infectious present in j)
+        phi[b,j]       = I_present[b,j] / N_present[b,j]   (age-b prevalence in j)
+        exposure[a,j]  = sum_b M[a,b] phi[b,j]    (age mixing within each zone)
+        lambda[a,r]    = beta * sum_j T[r,j] exposure[a,j]
+
+    With ``M = I`` (identity) and one age group this reduces exactly to the
+    original zone-only spatial SIR; with ``travel_sigma = 0`` (``T = I``) it
+    reduces to independent, age-mixed SIRs per zone.
     """
 
     # Numeric choice -> mechanism name. The config sets an integer 1-4.
@@ -28,11 +50,11 @@ class ExampleSpatialMobilityModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
-        """Declare compartments, transmission edges, mobility, and parameters."""
+        """Declare compartments, transmission edges, mobility, and demographics."""
         schema.set_model_info(
             disease_type="example_spatial_mobility",
             label="Example Disease with Spatial Mobility",
-            description="A spatial SIR model for an example disease with selectable inter-zone mobility and parameter uncertainty",
+            description="A spatial, age-structured SIR model with selectable inter-zone mobility, contact-matrix age mixing, and a single transmission rate",
         )
 
         # --- Compartments ---
@@ -40,14 +62,14 @@ class ExampleSpatialMobilityModel(Model):
         schema.add_compartment("I", "Infected", "Currently infectious population", infective=True)
         schema.add_compartment("R", "Recovered", "Recovered and immune")
 
-        # --- Transmission edges ---
+        # --- Transmission edges (single scalar beta for everyone) ---
         schema.add_transmission_parameter(
             source="susceptible",
             target="infected",
             variable_name="beta",
             frequency_dependent=True,
             label="Transmission Rate (S->I)",
-            description="Rate at which susceptibles become infected through contact",
+            description="Single transmission rate applied to all age groups; the contact matrix redistributes contact intensity across ages.",
             default=0.3,
             default_min=0.1,
             default_max=0.5,
@@ -71,22 +93,6 @@ class ExampleSpatialMobilityModel(Model):
         )
 
         # --- Spatial mobility: choose a mechanism by NUMBER (1-4) -----------
-        # No movement data required — every mechanism is built from the admin
-        # zones' population + coordinates (great-circle distances).
-        #
-        #   1 = gravity     flow i->j proportional to  pop_j / distance^alpha.
-        #                   Classic "big, nearby places pull hardest"; the
-        #                   distance exponent `travel_alpha` controls how fast
-        #                   pull falls with distance (2.0 = inverse-square).
-        #   2 = exponential flow i->j proportional to  pop_j * exp(-distance/L),
-        #                   with L = `travel_scale_km`. Pull decays smoothly with
-        #                   a characteristic range L (few trips beyond ~2-3 L).
-        #   3 = radiation   Simini et al. 2012, PARAMETER-FREE. Flow depends on
-        #                   populations and the "intervening opportunities" (the
-        #                   population living closer than the destination). No
-        #                   decay knob to tune.
-        #   4 = uniform     each zone spreads its travel equally to every other
-        #                   zone, ignoring distance entirely. Simplest baseline.
         schema.add_parameter(
             name="travel_model",
             label="Mobility Mechanism (1=gravity, 2=exponential, 3=radiation, 4=uniform)",
@@ -152,11 +158,13 @@ class ExampleSpatialMobilityModel(Model):
             transmission_reduction=50.0,
         )
 
-        # --- Optional: age-stratified demographics + contact matrix ---
-        schema.add_demographic_group("age_0_17",    "children", default_weight=22.0,  age_range=(0, 17))
-        schema.add_demographic_group("age_18_49",  "Young adults",   default_weight=42.0, age_range=(18, 49))
-        schema.add_demographic_group("age_50_64",  "Older adults",   default_weight=19.0, age_range=(50, 64))
-        schema.add_demographic_group("age_65_plus","Seniors",        default_weight=17.0, age_range=(65, 120))
+        # --- Age-stratified demographics + contact matrix ---
+        # Declaring age_range on each group lets the framework auto-load the
+        # country's Prem 2021 synthetic contact matrix, aggregated to these bands.
+        schema.add_demographic_group("age_0_17",    "Children",     default_weight=22.0, age_range=(0, 17))
+        schema.add_demographic_group("age_18_49",   "Young adults", default_weight=42.0, age_range=(18, 49))
+        schema.add_demographic_group("age_50_64",   "Older adults", default_weight=19.0, age_range=(50, 64))
+        schema.add_demographic_group("age_65_plus", "Seniors",      default_weight=17.0, age_range=(65, 120))
 
     def __init__(self, config):
         """Initialize the model from a validated simulation config."""
@@ -167,12 +175,7 @@ class ExampleSpatialMobilityModel(Model):
     # ------------------------------------------------------------------
 
     def build_travel_matrix(self, admin_zones):
-        """Return the (R, R) row-stochastic presence matrix for the chosen model.
-
-        Reads the numeric ``travel_model`` (1-4) and the relevant knobs
-        (``travel_sigma``, ``travel_scale_km``, ``travel_alpha``) and synthesises
-        the matrix from the admin zones' populations and coordinates.
-        """
+        """Return the (R, R) row-stochastic presence matrix for the chosen model."""
         n = len(admin_zones)
         choice = int(getattr(self, "travel_model", 1) or 1)
         model = self.TRAVEL_MODEL_CHOICES.get(choice)
@@ -223,9 +226,7 @@ class ExampleSpatialMobilityModel(Model):
     # ---- kernels: off-diagonal attraction weights (diagonal zero) ----
     @staticmethod
     def _w_gravity(pops, dist, alpha=2.0):
-        """1 = GRAVITY. Pull of destination j on origin i is pop_j / d_ij^alpha:
-        larger and nearer zones attract more trips. ``alpha`` controls how
-        sharply attraction falls with distance (2.0 = inverse-square)."""
+        """1 = GRAVITY. Pull of destination j on origin i is pop_j / d_ij^alpha."""
         with np.errstate(divide="ignore"):
             w = pops[None, :] / np.power(dist, alpha)
         w[~np.isfinite(w)] = 0.0
@@ -234,17 +235,14 @@ class ExampleSpatialMobilityModel(Model):
 
     @staticmethod
     def _w_exp(pops, dist, scale_km=150.0):
-        """2 = EXPONENTIAL. Pull is pop_j * exp(-d_ij / scale_km): attraction
-        decays smoothly over a characteristic range ``scale_km`` (very few trips
-        beyond ~2-3 x scale_km). Lighter long-range tail than gravity."""
+        """2 = EXPONENTIAL. Pull is pop_j * exp(-d_ij / scale_km)."""
         w = pops[None, :] * np.exp(-dist / scale_km)
         np.fill_diagonal(w, 0.0)
         return w
 
     @staticmethod
     def _w_uniform(pops):
-        """4 = UNIFORM. Distance-agnostic: each origin spreads its travel equally
-        across all other zones. A simple, assumption-light baseline."""
+        """4 = UNIFORM. Distance-agnostic equal spread across all other zones."""
         n = len(pops)
         w = np.ones((n, n))
         np.fill_diagonal(w, 0.0)
@@ -252,13 +250,7 @@ class ExampleSpatialMobilityModel(Model):
 
     @staticmethod
     def _w_radiation(pops, dist):
-        """3 = RADIATION (Simini et al. 2012), parameter-free.
-
-        flux_ij ~ m_i n_j / [(m_i + s_ij)(m_i + n_j + s_ij)], where s_ij is the
-        population living closer to i than j is (the "intervening opportunities",
-        excluding i and j). Flows emerge from the population landscape with no
-        distance-decay knob to tune.
-        """
+        """3 = RADIATION (Simini et al. 2012), parameter-free."""
         n = len(pops)
         m = pops
         w = np.zeros((n, n))
@@ -287,51 +279,69 @@ class ExampleSpatialMobilityModel(Model):
         np.fill_diagonal(T, 1.0 - T.sum(axis=1))                     # rows sum to 1
         return T
 
+    # ------------------------------------------------------------------
+    # Age-stratified state + normalised contact matrix
+    # ------------------------------------------------------------------
     def prepare_initial_state(self):
-        """Return the initial compartment populations for the solver."""
+        """Expand the state across age bands and precompute the age-mixing matrix.
+
+        ``_prepare_demographic_state`` reshapes the compartments to
+        ``(compartments, age groups, zones)`` using the declared demographic
+        weights, so results are tracked per age group. The framework-loaded
+        contact matrix is normalised by its spectral radius once here (it is
+        constant over the run) so the single ``beta`` keeps its overall
+        transmission scale while ``M`` only sets the *relative* age mixing.
+        """
+        self._prepare_demographic_state()
+
+        # Precompute a spectral-radius-normalised contact matrix (constant),
+        # so equation() stays cheap and jit-friendly (no eig inside the solver).
+        M = getattr(self, "contact_matrix", None)
+        if M is None:
+            n_age = self.population_matrix.shape[1]
+            self._contact_norm = jnp.eye(n_age)
+        else:
+            M = np.asarray(M, dtype=float)
+            rho = float(np.max(np.abs(np.linalg.eigvals(M))))
+            if not np.isfinite(rho) or rho <= 0:
+                rho = 1.0
+            self._contact_norm = jnp.asarray(M / rho)
         return self.population_matrix
 
     # ------------------------------------------------------------------
-    # Dynamics — metapopulation presence force of infection
+    # Dynamics — spatial presence FOI with contact-matrix age mixing
     # ------------------------------------------------------------------
-
     def equation(self, y, t, p):
-        """SIR derivatives with a mobility-coupled force of infection.
+        """SIR derivatives with spatial (travel) and age (contact) mixing.
 
-        The travel matrix ``T`` couples zones: residents of zone i are exposed
-        to the infection prevalence of every zone j they spend time in.
-
-            N_present_j = sum_i N_i T[i,j]           (people present in j)
-            I_present_j = sum_i I_i T[i,j]           (infectious present in j)
-            phi_j       = I_present_j / N_present_j  (prevalence experienced in j)
-            new_inf_i   = S_i * beta * sum_j T[i,j] phi_j
-
-        With ``T = I`` (travel_sigma = 0) this reduces to standard per-zone SIR.
-        Zone is the last axis of the state arrays, so this works for plain (R,)
-        and age-stratified (A, R) states alike.
+        State rows are shaped ``(age groups, zones)``. Space is coupled by the
+        presence travel matrix ``T`` and age by the normalised contact matrix
+        ``M``; a single scalar ``beta`` sets the transmission scale.
         """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)
         states = {c: y[i] for i, c in enumerate(self.compartment_list)}
 
-        S = states[C.S]
-        I = states[C.I]
-        non_total = [c for c in C if not c.endswith("_total")]
-        N_total = sum(states[c] for c in non_total)
+        S = states[C.S]                                   # (A, R)
+        I = states[C.I]                                   # (A, R)
+        non_total = [c for c in self.compartment_list if not c.endswith("_total")]
+        N = sum(states[c] for c in non_total)             # (A, R)
 
-        prop_infective = I.sum() / (N_total.sum() + 1e-10)
+        prop_infective = I.sum() / (N.sum() + 1e-10)
         rates, travel_matrix = self._apply_interventions(
             t, {"beta": params["beta"]}, prop_infective
         )
         beta = rates["beta"]
         gamma = params["gamma"]
-        T = jnp.asarray(travel_matrix)
+        T = jnp.asarray(travel_matrix)                    # (R, R)
+        M = self._contact_norm                            # (A, A)
 
-        # spatial presence FOI (zone = last axis): X_present = X @ T
-        N_present = N_total @ T
-        I_present = I @ T
-        phi = I_present / (N_present + 1e-10)     # prevalence in each destination zone
-        force = beta * (phi @ T.T)                # exposure of each origin zone's residents
+        # Spatial presence, per age band (zone = last axis): X_present = X @ T
+        N_present = N @ T                                 # (A, R)
+        I_present = I @ T                                 # (A, R)
+        phi = I_present / (N_present + 1e-10)             # (A, R) age-b prevalence in zone j
+        exposure = M @ phi                                # (A, R) age mixing within each zone
+        force = beta * (exposure @ T.T)                   # (A, R) exposure of residents by origin zone
         new_inf = S * force
         new_rec = gamma * I
 
