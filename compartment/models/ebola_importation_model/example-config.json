@@ -1,0 +1,80 @@
+{
+    "start_date": "2026-08-27",
+    "end_date": "2026-11-25",
+    "run_mode": "DETERMINISTIC",
+    "simulation_type": "COMPARTMENTAL",
+    "Disease": {
+        "disease_type": "EBOLA_SEI1I2RD",
+        "incubation_period": 10.0,
+        "p_death": 0.43
+    },
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": {
+                    "source": "susceptible",
+                    "target": "exposed",
+                    "value_type": "RATE"
+                },
+                "value": 0.124,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "BETA"
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "infectious (recovering)",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 10.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA"
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "infectious (dying)",
+                    "target": "dead",
+                    "value_type": "DAYS"
+                },
+                "value": 10.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "MU"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "case_file": {
+        "admin_zones": [
+            {
+                "center_lat": 40.7128,
+                "center_lon": -74.006,
+                "name": "Example Zone",
+                "population": 1000000,
+                "infected_population": 1
+            }
+        ]
+    }
+}

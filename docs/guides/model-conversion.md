@@ -96,7 +96,9 @@ early. Produce:
 - Structure: age/demographic groups, spatial or travel coupling, stochasticity
   (STOCHASTIC / SOLVER), and any custom _total accumulation.
 - Interventions, mapped to schema.add_intervention(target_rates=[...]).
-- Initial conditions, and how they map to prepare_initial_state and the config.
+- Initial conditions, and how they map to prepare_initial_state(),
+  get_initial_population() (required when there is no compartment literally
+  named `I`), and the config.
 
 List every place my source was ambiguous or where you had to assume something,
 under a heading "Assumptions / open questions". Do not stop for trivial
@@ -110,7 +112,10 @@ is documented in docs/guides/model-integration-documentation.md.
 Then fill in:
 - compartment/models/[MODEL_NAME]_model/model.py — define_parameters(),
   __init__() (usually just super().__init__(config) plus model-specific
-  fields), prepare_initial_state(), and derivative().
+  fields), prepare_initial_state(), equation(), and get_initial_population()
+  when the model has no compartment literally named `I` (otherwise config
+  validation raises KeyError: 'I' — see model-integration-documentation.md and
+  example_stochastic_model).
 - main.py — a thin drive_simulation() wrapper (copy the standard one).
 - __init__.py — empty package marker.
 - example-config.json — generate it from the schema, then fill in realistic
@@ -119,7 +124,7 @@ Then fill in:
         --config-output compartment/models/[MODEL_NAME]_model/example-config.json
 
 Follow the authoring recipe order in .claude/MODEL_AUTHORING_REFERENCE.md for
-define_parameters(). Use schema edges and _compute_derivatives() for standard
+define_parameters(). Use schema edges and _compute_equations() for standard
 flows; only drop to a manual _apply_flow() for spatial or age-stratified force
 of infection, births and deaths, or multi-rate force of infection (see that
 file's Pitfalls section).
