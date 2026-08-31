@@ -2,7 +2,7 @@
     "n_simulations": 20,
     "Disease": {
         "disease_type": "example_spatial_mobility",
-        "travel_model": 4,
+        "travel_model": 1,
         "travel_sigma": 20.0,
         "travel_scale_km": 150.0,
         "travel_alpha": 2.0
