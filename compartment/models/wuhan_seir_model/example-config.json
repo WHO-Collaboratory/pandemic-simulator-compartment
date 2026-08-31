@@ -1,0 +1,145 @@
+{
+    "start_date": "2026-08-27",
+    "end_date": "2026-11-25",
+    "run_mode": "DETERMINISTIC",
+    "simulation_type": "COMPARTMENTAL",
+    "Disease": {
+        "disease_type": "SEICISCR_WUHAN",
+        "subclinical_infectiousness": 0.25,
+        "clinical_fraction_child": 0.4,
+        "clinical_fraction_adult": 0.8
+    },
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": {
+                    "source": "susceptible",
+                    "target": "exposed",
+                    "value_type": "RATE"
+                },
+                "value": 0.025,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "BETA"
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "exposed",
+                    "target": "infectious (clinical)",
+                    "value_type": "DAYS"
+                },
+                "value": 6.4,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "ALPHA_C"
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "exposed",
+                    "target": "infectious (subclinical)",
+                    "value_type": "DAYS"
+                },
+                "value": 6.4,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "ALPHA_SC"
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "infectious (clinical)",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 7.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA_C"
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "infectious (subclinical)",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 7.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA_SC"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": {
+                    "name": "school_closure",
+                    "display_name": "School closure"
+                },
+                "adherence_min": 100.0,
+                "transmission_percentage": 20.0,
+                "start_date": "2026-09-05",
+                "end_date": "2026-10-25",
+                "start_threshold": null,
+                "end_threshold": null
+            },
+            {
+                "Intervention": {
+                    "name": "lockdown",
+                    "display_name": "Intense intervention (lockdown)"
+                },
+                "adherence_min": 100.0,
+                "transmission_percentage": 60.0,
+                "start_date": "2026-09-20",
+                "end_date": "2026-11-10",
+                "start_threshold": null,
+                "end_threshold": null
+            }
+        ]
+    },
+    "case_file": {
+        "admin_zones": [
+            {
+                "center_lat": 40.7128,
+                "center_lon": -74.006,
+                "name": "Example Zone",
+                "population": 1000000,
+                "infected_population": 1
+            }
+        ]
+    }
+}

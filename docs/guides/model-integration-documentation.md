@@ -31,8 +31,8 @@ This guide follows three models that ship with the repository.
 
 | Directory | `disease_type` | What it demonstrates |
 | :---- | :---- | :---- |
-| `compartment/models/example_parameter_uncertainty_declarative_model` | `example_parameter_uncertainty_declarative` | The **default path**. A SIR model where the framework generates the equations from declared transmission edges. Includes age demographics, an intervention, and parameter uncertainty. |
-| `compartment/models/example_parameter_uncertainty_custom_model` | `example_parameter_uncertainty_custom` | The same SIR model with the equations **written by hand**, plus a custom intervention that ramps up and down instead of switching on and off. |
+| `compartment/models/example_parameter_uncertainty_declarative_model` | `example_parameter_uncertainty_declarative` | The **default path**. An unstructured SIR model where the framework generates the equations from declared transmission edges. Includes an intervention and parameter uncertainty (no age stratification). |
+| `compartment/models/example_parameter_uncertainty_custom_model` | `example_parameter_uncertainty_custom` | The same SIR structure with equations **written by hand**, five age demographic groups and contact-matrix mixing, plus a custom intervention that ramps up and down instead of switching on and off. |
 | `compartment/models/example_stochastic_model` | `example_stochastic` | A **stochastic** SIR model (tau-leaping, Euler integration, multiple trajectories) with split asymptomatic / symptomatic infectious compartments. |
 
 ### What a local run represents
@@ -648,7 +648,13 @@ schema.add_intervention(
     adherence=50.0,
     transmission_reduction=50.0,
 )
+```
 
+The declarative example does **not** declare age groups — it is an unstructured *(compartments × zones)* model. [interventions.md](./interventions.md) covers what `add_intervention()` can change and how a user configures it.
+
+To add age stratification, declare groups in `define_parameters()` and wire contact mixing in `equation()`. `example_parameter_uncertainty_custom_model/model.py` does both:
+
+```python
 schema.add_demographic_group("age_0_4",     "Young children", default_weight=6.0,  age_range=(0, 4))
 schema.add_demographic_group("age_5_17",    "School-age",     default_weight=16.0, age_range=(5, 17))
 schema.add_demographic_group("age_18_49",   "Young adults",   default_weight=42.0, age_range=(18, 49))
@@ -656,7 +662,7 @@ schema.add_demographic_group("age_50_64",   "Older adults",   default_weight=19.
 schema.add_demographic_group("age_65_plus", "Seniors",        default_weight=17.0, age_range=(65, 120))
 ```
 
-Two of those calls have guides of their own: [interventions.md](./interventions.md) covers what `add_intervention()` can change and how a user configures it, and [contact-matrices.md](./contact-matrices.md) covers the age mixing that `add_demographic_group()` brings with it.
+When every group declares an `age_range`, the framework auto-loads a contact matrix. See [contact-matrices.md](./contact-matrices.md) for how mixing works and how users can override weights or matrix entries in the config.
 
 > `value_type=ValueType.DAYS` means `default=10.0` is a 10-day mean, converted to a `0.1/day` rate at load. Do not pre-divide.
 
@@ -713,19 +719,23 @@ infection = rates["beta"] * S * I / N
 self._apply_flow(derivs, "S", "I", infection)   # subtracts from S, adds to I, updates totals
 ```
 
-**Manual.** Write every transition yourself. `example_parameter_uncertainty_custom_model/model.py` does this, and also replaces `_apply_interventions` with its own `custom_intervention()` that ramps adherence up and down instead of switching instantly:
+**Manual.** Write every transition yourself. `example_parameter_uncertainty_custom_model/model.py` does this with **age-stratified contact mixing** (`self.contact_matrix`), and also replaces `_apply_interventions` with its own `custom_intervention()` that ramps adherence up and down instead of switching instantly:
 
 ```python
 def equation(self, y, t, p):
     C = self.COMPARTMENTS
     params = self._unpack_params(p)
     states = {c: y[i] for i, c in enumerate(self.compartment_list)}
+    S, I = states[C.S], states[C.I]
     ...
+    I_frac = I / (N_total[None, :] + 1e-10)
     beta = self.custom_intervention(t, params["beta"])
     gamma = params["gamma"]
 
-    new_infections = beta * states[C.S] * prop_infective   # S -> I
-    new_recoveries = gamma * states[C.I]                   # I -> R
+    beta_scaled = ((beta * self.travel_matrix) @ I_frac.T).T
+    omega = self.contact_matrix @ beta_scaled
+    new_infections = S * omega                          # S -> I (age-mixed FOI)
+    new_recoveries = gamma * I                          # I -> R
 
     # Start every compartment at zero so the auto-generated _total
     # compartments are present before stacking.
@@ -776,7 +786,7 @@ A few models (such as dengue) initialize manually instead of calling `super().__
 
 Builds the starting population matrix from each administrative region's population (WorldPop) and the initial infected percentage from the config or UI. **Do not rename it.** Override it if your model needs a different starting state — for a custom mobility matrix, override `build_travel_matrix()` instead (see below).
 
-The population matrix is **(K, R)**: K compartments × R regions. With demographic groups declared via `schema.add_demographic_group()`, it should end up as **(K, A, R)** — call `_prepare_demographic_state()` rather than building it by hand. That method expands the default (K, R) matrix, appends zero-valued rows for `_total` compartments, updates `self.population_matrix` and `self.compartment_list` in place, and returns `None`. Models without demographic groups can ignore it.
+The population matrix is **(K, R)**: K compartments × R regions. With demographic groups declared via `schema.add_demographic_group()`, it should end up as **(K, A, R)** — call `_prepare_demographic_state()` rather than building it by hand. That method expands the default (K, R) matrix, appends zero-valued rows for `_total` compartments, updates `self.population_matrix` and `self.compartment_list` in place, and returns `None`. `example_parameter_uncertainty_custom_model` calls it from `prepare_initial_state()`; the declarative example has no age groups and returns `self.population_matrix` unchanged.
 
 **`get_initial_population(cls, admin_zones, compartment_list, **kwargs)`**
 
@@ -1206,7 +1216,7 @@ The other two examples follow the same pattern:
 
 **macOS / Linux**
 ```shell
-# Custom equation + ramped intervention
+# Custom equation + age demographics + ramped intervention
 python -m compartment.models.example_parameter_uncertainty_custom_model.main \
     --mode local \
     --config_file compartment/models/example_parameter_uncertainty_custom_model/example-config.json \
@@ -1314,27 +1324,30 @@ Once your model runs and passes tests, open a pull request so WHO Collaboratory 
 
 5. **Write a clear description** covering what changed, why, how it was tested, and any known limitations or follow-up work.
 
-6. **Request review** from the appropriate reviewer or team. Respond to comments and push additional commits if changes are requested.
+6. **Request review** from the appropriate reviewer or team. 
 
-7. **Merge after approval**, once checks pass, following the project's standard process.
+7. **Address review comments.** If the approver requests changes, fix them on the same branch, rerun the relevant tests, push, and reply to or resolve each comment. Re-request review when ready.
+
+8. **Merge after approval**, once checks pass, following the project's standard process.
 
 ---
 
-## Approve a model
+## Approve and publish a model
 
-Everything above is written for the modeler. This section is for the **approver** — the reviewer who takes a submitted model from an open pull request to one users can run.
+This section is written for the **approver** — the reviewer who takes a submitted model from an open pull request to one users can run.
 
-Models are published to UAT, at <https://uat.pandemic-simulator.com/>. Every step below happens there.
+Approval is done via [Github](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment) and then models are published to (UAT)[https://uat.pandemic-simulator.com/]. 
 
-### 1. Review the pull request
+### 1. Review the pull request in Github
 
-Read the diff the way a user will meet the model: **everything the schema declares turns into something the user sees.**
+On the pull request **Files changed** tab, review the diff with these in mind:
 
-- **Every parameter becomes a control.** Each `add_parameter()`, `add_transmission_parameter()`, and `add_intervention()` turns into a control on the Simulation Configuration page. Check that labels read plainly, descriptions say what the number does, units are right, and `min_value` / `max_value` keep the parameter in a physically sensible range. A slider is only as safe as its limits, and widening one later widens it for every existing user.
-- **The defaults have to run.** `example-config.json` is what the smoke test executes and what seeds a user's first simulation. Confirm the defaults give a plausible epidemic curve, not a flat line or a blow-up.
-- **The model documents itself.** `model.md` and the `schema.set_model_metadata()` block — authors, license, citations, key assumptions, applicability, `not_for`, known biases, validation — appear word for word in the approvals preview and on the model's page. Missing provenance is a fair reason to request changes.
+- **Schema parameters become user controls.** Every `add_parameter()`, `add_transmission_parameter()`, and `add_intervention()` becomes a field on the Simulation Configuration page. Check that labels, descriptions, and units are clear, and that `min_value` / `max_value` keep inputs in a sensible range.
+- **The defaults have to run.** `example-config.json` drives the smoke test, confirm it completes and produces plausible output.
+- **The model documents itself.** `schema.set_model_metadata()` and `model.md` appear in the approvals preview and on the results page. Check that all relevant fields are complete.
+- **The name follows the convention.** The directory should match `[disease]_[structure]_[feature]_[author]` — see [Choose a unique name](#choose-a-unique-name).
 - **CI is green.** `smoke-tests` runs each model's integration smoke test plus `tests/test_<model>.py` where one exists. Don't approve a red or skipped leg.
-- **Run it yourself** when the diff touches `equation()`, mobility, or interventions:
+- **Run it yourself (optional).** To verify output, check out the pull request branch locally (`git fetch origin && git checkout <branch-name>`), then run:
 
   ```shell
   python -m compartment.models.<their_model>.main \
@@ -1349,82 +1362,89 @@ Approve, or request changes with specifics. Then merge to `main`.
 
 #### If changes are required
 
-The approver should put comments on the **pull request**, using line comments where possible, and submit the review as **Request changes**. The modeler should make the fixes on the same branch, rerun the relevant tests, commit and push the changes, respond to or resolve each comment, and re-request review. The approver then reviews the updated pull request before approving it.
+1. On the **Files changed** tab, hover over a line number and click the blue **+** to leave a comment on that line. When you are done, click **Review changes** → **Request changes** and submit.
+2. Request that the modeler fix the issues on the same branch, rerun the relevant tests, push, and reply to or resolve each comment. They should re-request review when the code is ready.
+3. Review the updated pull request and approve once the comments are addressed.
 
 ### 2. Tag a release
 
-Merging builds nothing. The `disease-pipeline` workflow fires on a semver tag, which you create from GitHub — no terminal needed.
+Merging to `main` does not deploy anything. To start the build, publish a release with a version tag on GitHub. The `disease-pipeline` workflow runs when the tag matches `v1.4.0` format: a `v` followed by three numbers separated by dots.
 
-1. **Open Releases.** From the repository's **Code** tab, click **Releases** in the right-hand sidebar (or add `/releases` to the repository URL).
+1. **Open Releases.** From the repository **Code** tab, click **Releases** in the right sidebar.
 
 2. **Click "Draft a new release."**
 
-3. **Create the tag.** Click the **Choose a tag** dropdown, type the new version — `v1.4.0` — and click **"+ Create new tag: v1.4.0 on publish."** The tag must start with `v` and be three numbers separated by dots, or the pipeline will not fire.
+3. **Create the tag.** Open the tag dropdown, type a new version (for example `v1.4.0`) in **Search or create a new tag**, click **Create new tag**, and confirm. Other formats are ignored by the pipeline.
 
-4. **Confirm the target is `main`.** The **Target** dropdown sits next to the tag dropdown and defaults to `main`. The tag is cut from whatever is selected there, so set it back if it shows anything else.
+4. **Set the target to `main`.** The **Target** dropdown next to the tag should point at `main` — the tag is cut from whatever branch is selected.
 
-5. **Add a title and notes.** Use the version as the title. Click **Generate release notes** to pull in the merged pull requests since the last release, then add a line naming the model that changed and what changed about it.
+5. **Add a title and notes.** Use the version as the title. Click **Generate release notes** for a summary of merged pull requests, then add a line naming the model that changed and what changed.
 
-6. **Click "Publish release."** This creates and pushes the tag, which starts the build. **Saving a draft does nothing** — a draft holds no tag, so the pipeline never runs. Ticking **Set as a pre-release** still creates the tag and still runs the pipeline; the label is cosmetic.
+6. **Click "Publish release."** This creates the tag and starts the build. A **draft** release does not create a tag and will not trigger the pipeline. **Set as a pre-release** still creates the tag and still runs the pipeline.
 
-The tag covers **every** model in `compartment/models/` that contains an `example-config.json`, not just the one that changed — the pipeline finds them all and fans out. Re-publishing unchanged models is harmless, but the version number applies repo-wide, so pick it accordingly.
+One tag rebuilds **every** model in `compartment/models/` that has an `example-config.json`, not just the one that changed. Rebuilding unchanged models is harmless, but the version number applies repository-wide — choose it accordingly.
 
 **Troubleshooting**
 
-- **Nothing happens after publishing** — check the tag's spelling on the **Releases** page. `1.4.0`, `v1.4`, and `release-1.4.0` do not match the workflow's tag pattern and are ignored without warning.
-- **The tag already exists** — GitHub will not create a second `v1.4.0`. Cut the next patch version rather than deleting the old tag and reusing the number. That number is the only label on what was built: it names the model's container image and the record of which artifact that image goes with. Reusing it for different code overwrites both, so users still see `v1.4.0` while the code behind it has changed, and there is no way to tell which build an earlier simulation ran on.
+- **Nothing happens after publishing** — check the tag on the **Releases** page. Formats like `1.4.0`, `v1.4`, or `release-1.4.0` do not match the workflow and are skipped without warning.
+- **The tag already exists** — use the next patch version (for example `v1.4.1`) instead of reusing a number. The tag names each model's container image and ties it to a specific artifact. Reusing it for different code overwrites that record, so there is no way to tell which build an earlier simulation ran on.
 
 ### 3. Watch the pipeline
 
-Open the **Actions** tab and follow the `disease-pipeline` run for your tag. In order, it:
+Open the **Actions** tab and follow the `disease-pipeline` run for your tag. It:
 
 1. Runs the smoke tests.
-2. Builds and pushes a container image per model to ECR, tagged `{model_directory}-{tag}`.
-3. Generates each model's artifact JSON, uploads it to S3 under its SHA-256, and records the image-to-artifact mapping.
-4. Emits a `ModelVersionPublished` event per artifact.
+2. Builds and stores a container image for each model, named `{model_directory}-{tag}`.
+3. Generates each model's artifact file — the JSON the web app reads — and uploads it to cloud storage.
+4. Notifies the platform that a new version is ready.
 
-That event sets up the model's Lambda and registers the artifact with the API. From there, the model's transmission edges, interventions, custom fields, and demographic groups are loaded so the UI has something to render.
+That notification registers the model with the web app: transmission edges, interventions, custom fields, and demographic groups. Once that finishes, the model can appear in Model Approvals.
 
 **Troubleshooting**
 
-- **Job fails at "Stage datasets"** — a file declared in the model's `datasets.yaml` is missing from the bucket. Fix the dataset, then tag again. The pipeline fails here on purpose rather than letting the simulation run later with no data.
-- **Pipeline is green but nothing appears in Model Approvals** — setup runs in the background and takes a few minutes. If the artifact still hasn't landed, check the provisioner's dead-letter queue.
-- **Never move or delete a tag to "redo" a release.** Cut the next patch version instead.
+- **Job fails at "Stage datasets"** — a file listed in the model's `datasets.yaml` is missing. Add the dataset or remove the entry from `datasets.yaml`, then tag again. The pipeline stops here on purpose so the model never runs without its data.
+- **Pipeline succeeds but nothing appears in Model Approvals** — registration runs in the background and can take a few minutes.
+- **Never move or delete a tag to redo a release.** Create the next patch version instead.
 
 ### 4. Review the model in Model Approvals
 
-Go to **Model Approvals** (<https://uat.pandemic-simulator.com/model-approvals>). Admins, super admins, and disease modelers can see the dashboard; **only a super admin can change a model's status.**
+Open **[Model Approvals](https://uat.pandemicsimulator.com/model-approvals)**. Admins, super admins, and disease modelers can view the dashboard; **only admins and super admins can change a model's status.**
 
-The new version arrives with status **NEW** and is invisible to ordinary users. Find it by name, disease type, or version, and select it to open the preview panel on the right. The preview is what users will see: compartments, transmission edges, interventions, custom fields, demographic groups, contact-matrix overrides, and the model's authorship and assumptions. Anything that reads wrong here reads wrong to the user.
+The new version arrives as **NEW** — invisible to ordinary users until published. Find it by name, disease type, or version and select it to open the preview on the right. That preview matches what users will see: compartments, parameters, interventions, age groups, and the model's authorship and assumptions.
 
-Statuses run **NEW → PREPUBLISH → PUBLISHED → ARCHIVED**. Only `PUBLISHED` models reach the disease-model dropdown on the simulation page.
+Statuses move **NEW → PREPUBLISH → PUBLISHED → ARCHIVED**. Only **PUBLISHED** models appear in the disease-model dropdown on the simulation page.
 
 ### 5. Simulate before publishing
 
-Click **Simulate**. This opens the simulation form preloaded with the model even though it isn't published yet, which is the point: a real run against the deployed Lambda, in UAT, before any user can reach it.
+Click **Simulate** to open the simulation form with this model preloaded — a real run in UAT before any user can reach it.
 
-Confirm that:
+Confirm:
 
-- The form shows every parameter with the labels, units, and bounds you reviewed in the pull request.
-- The run finishes instead of erroring or timing out.
-- Results are plausible, and the intervention and control curves differ in the direction the intervention claims.
+- Every parameter shows with the labels, units, and bounds from the pull request.
+- The run completes without errors or timeouts.
+- Results look plausible; intervention and control curves differ in the expected direction.
 - Interventions and admin-zone selection behave as documented.
 
-If anything is wrong, leave the model unpublished and go back to the modeler. An unpublished model costs nothing; a published broken one is in front of every user.
+If anything is wrong, leave the model unpublished and notify the modeler to fix it.
+
+**If the modeler needs code changes after merge:** this version cannot be edited in place. They should [copy the existing model](#copy-an-existing-model-instead) under a new name, fix it on a new branch ([Git workflow](#git-workflow)), and open a [pull request](#submit-a-pull-request). The new model goes through review, merge, and publishing again.
 
 ### 6. Publish
 
-With the model selected in the preview panel, click **Publish** (super admin only). The status flips to `PUBLISHED` and the model appears in the disease-model dropdown for all UAT users.
+With the model selected in the preview panel, click **Publish** (admins and super admins only). The status changes to **PUBLISHED** and the model appears in the disease-model dropdown for all UAT users.
 
-Then check it as a user would: open the simulation page, confirm the model is listed under the right name and version, and run it once from a clean form.
+Verify as a user would: open the simulation page, confirm the correct name and version appear, and run once from a fresh form.
 
 ### Unpublishing and archiving
 
-- **Unpublish** returns a published model to `PREPUBLISH`. It leaves the dropdown immediately but stays available in Model Approvals — the fast lever if a problem surfaces after release.
-- **Archive** retires a model version for good. Use it for superseded versions, not for a model you intend to fix and re-publish.
+To remove a published model from the dropdown, open it in **Model Approvals** and change its status from **PUBLISHED**:
 
-Neither action deletes anything, and neither touches simulations users have already run.
+- **PREPUBLISH** — hides it from users but keeps it in Model Approvals. Use when a problem surfaces after release.
+- **ARCHIVED** — retires the version. Use for superseded versions, not for a model you plan to fix and re-publish.
+- **NEW** — returns it to the initial review state.
+
+None of these actions delete the model or affect simulations users have already run.
 
 ---
 
-**Last Updated:** August 24, 2026
+**Last Updated:** August 27, 2026

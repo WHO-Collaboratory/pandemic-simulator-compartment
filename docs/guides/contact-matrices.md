@@ -30,6 +30,8 @@ This document explains how contact matrices are created, loaded, aggregated, and
 
 Contact matrices quantify **age-specific social mixing patterns** — how frequently people in different age groups come into contact with each other. These mixing patterns are critical for modeling respiratory and other contact-transmitted diseases, as they determine the force of infection across demographic groups.
 
+The in-repo teaching example for wiring contact mixing into a hand-written `equation()` is [`example_parameter_uncertainty_custom_model`](../../compartment/models/example_parameter_uncertainty_custom_model/model.py) — five age bands, Prem auto-loading, and a custom ramped intervention on `beta`.
+
 The Pandemic Simulator uses **country-specific synthetic contact matrices** from [Prem et al. 2021](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009098), covering 177 countries with 16 five-year age bands (0-4, 5-9, ..., 75+). When a country's ISO code is not in the Prem dataset, the framework uses a **precomputed income-level average** grouped by [World Bank income classification](https://blogs.worldbank.org/en/opendata/understanding-country-income--world-bank-group-income-classifica), and if no income group is available, a **global average** across all 177 countries is used.
 
 ## Contact Matrix Methods
@@ -257,6 +259,7 @@ def define_parameters(cls, schema):
 
 ## Using Contact Matrices in Your Model
 
+[`example_parameter_uncertainty_custom_model/model.py`](../../compartment/models/example_parameter_uncertainty_custom_model/model.py) is the reference implementation in this repository: it declares five age groups, calls `_prepare_demographic_state()` in `prepare_initial_state()`, and applies `self.contact_matrix` in a hand-written SIR `equation()`. For a larger production pattern, see [`covid_jax_model`](../../compartment/models/covid_jax_model/model.py), which uses `_compute_equations` instead of manual flows.
 
 ### In `define_parameters()`
 
@@ -284,9 +287,37 @@ def define_parameters(cls, schema):
     # schema.set_contact_override("age_0_17", "age_0_17", 10.0)
 ```
 
+The custom example uses five Prem-aligned bands instead of three:
+
+```python
+schema.add_demographic_group("age_0_4",     "Young children", default_weight=6.0,  age_range=(0, 4))
+schema.add_demographic_group("age_5_17",    "School-age",     default_weight=16.0, age_range=(5, 17))
+schema.add_demographic_group("age_18_49",   "Young adults",   default_weight=42.0, age_range=(18, 49))
+schema.add_demographic_group("age_50_64",   "Older adults",   default_weight=19.0, age_range=(50, 64))
+schema.add_demographic_group("age_65_plus", "Seniors",        default_weight=17.0, age_range=(65, 120))
+```
+
 
 
 ### In `equation()`
+
+Hand-written models index state as *(compartments × age groups × zones)* — the same layout `_prepare_demographic_state()` produces. From `example_parameter_uncertainty_custom_model/model.py`:
+
+```python
+def equation(self, y, t, p):
+    ...
+    S, I = states[C.S], states[C.I]
+    N_total = sum(states[c] for c in non_total).sum(axis=0)
+    I_frac = I / (N_total[None, :] + 1e-10)
+
+    beta = self.custom_intervention(t, params["beta"])  # or _apply_interventions for built-in
+    beta_scaled = ((beta * self.travel_matrix) @ I_frac.T).T
+    omega = self.contact_matrix @ beta_scaled
+    new_infections = S * omega
+    ...
+```
+
+A generic pattern when state is already reshaped to *(regions × age groups)* per compartment:
 
 ```python
 def equation(self, y, t, p):
@@ -340,7 +371,7 @@ If a target age range has **no overlap** with the Prem source bands (0-120), the
 
 - **[model-integration-documentation.md](./model-integration-documentation.md)** — Writing the model that declares these demographic groups
 - **[adding-datasets.md](./adding-datasets.md)** — Supplying your own matrix as a data file instead of using the bundled ones
-- **[uncertainty-quantification.md](./uncertainty-quantification.md)** — How multi-run output reports results per age group
+- **[uncertainty-quantification.md](./uncertainty-quantification.md)** — Parameter uncertainty runs; deterministic output can include per-age-group series, but multi-run output collapses to population-wide summaries
 - **[compartment/contact_matrices/](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/compartment/contact_matrices/)** — Source code for loader, aggregator, and bundled data
 - **[tests/test_contact_matrices.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_contact_matrices.py)** — Unit tests demonstrating aggregation behavior
 - **[tests/test_demographics.py](https://github.com/WHO-Collaboratory/pandemic-simulator-compartment/blob/main/tests/test_demographics.py)** — Integration tests for `_build_contact_matrix()`
@@ -360,4 +391,4 @@ If a target age range has **no overlap** with the Prem source bands (0-120), the
 
 ---
 
-**Last Updated:** August 24, 2026
+**Last Updated:** August 27, 2026
