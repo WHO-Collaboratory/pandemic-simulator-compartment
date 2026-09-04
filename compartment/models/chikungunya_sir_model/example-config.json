@@ -1,0 +1,90 @@
+{
+  "Disease": {
+    "disease_type": "chikungunya_sir",
+
+    "npi_start_day": 17,
+    "npi_end_day": 28,
+    "npi_max_reduction": 0.80,
+
+    "prop_under12": 0.13,
+    "vaccine_coverage": 0.40,
+    "vaccine_efficacy": 0.40,
+    "vacc_delay": 14,
+    "vacc_start_day": 0,
+    "n_days": 57
+  },
+
+  "start_date": "2025-07-02",
+  "end_date": "2025-08-27",
+
+  "TransmissionEdges": {
+    "items": [
+      {
+        "transmission_edge": {
+          "source": "susceptible",
+          "target": "infected",
+          "value_type": "RATE"
+        },
+        "value": 0.323,
+        "FieldConfigs": {
+          "items": [
+            {
+              "field_key": "value",
+              "has_variance": false,
+              "distribution_type": "UNIFORM",
+              "disease_param": "BETA",
+              "min": 0,
+              "max": 0
+            }
+          ]
+        }
+      },
+
+      {
+        "transmission_edge": {
+          "source": "infected",
+          "target": "recovered",
+          "value_type": "DAYS"
+        },
+        "value": 11.0,
+        "FieldConfigs": {
+          "items": [
+            {
+              "field_key": "value",
+              "has_variance": false,
+              "distribution_type": "UNIFORM",
+              "disease_param": "GAMMA",
+              "min": 0,
+              "max": 0
+            }
+          ]
+        }
+      }
+    ]
+  },
+
+  "Interventions": {
+    "items": [
+      {
+        "Intervention": {
+          "name": "VACCINATION",
+          "display_name": "Vaccination"
+        },
+        "adherence_min": 100.0,
+        "transmission_percentage": 0.0,
+        "start_date": "2025-07-02",
+        "end_date": "2025-08-27"
+      }
+    ]
+  },
+
+  "admin_zones": [
+    {
+      "name": "Foshan",
+      "center_lat": 23.02,
+      "center_lon": 113.12,
+      "population": 9500000,
+      "infected_population": 0.0010526
+    }
+  ]
+}
