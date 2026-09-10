@@ -1,0 +1,77 @@
+{
+    "start_date": "2025-01-29",
+    "end_date": "2025-07-06",
+    "run_mode": "DETERMINISTIC",
+    "simulation_type": "COMPARTMENTAL",
+    "Disease": {
+        "disease_type": "measles_seir_calibrated_gonzalezparra",
+        "initial_immune_fraction": 0
+    },
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": {
+                    "source": "exposed",
+                    "target": "infectious",
+                    "value_type": "DAYS"
+                },
+                "value": 11.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "SIGMA"
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "infectious",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 7.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": {
+                    "name": "mmr_vaccination",
+                    "display_name": "MMR Vaccination Campaign"
+                },
+                "adherence_min": 80.0,
+                "transmission_percentage": 90.0,
+                "start_date": null,
+                "end_date": null,
+                "start_threshold": null,
+                "end_threshold": null
+            }
+        ]
+    },
+    "case_file": {
+        "admin_zones": [
+            {
+                "center_lat": 32.7,
+                "center_lon": -103.2,
+                "name": "5-county affected region (Lea NM; Dawson, Gaines, Terry, Yoakum TX)",
+                "population": 128924,
+                "infected_population": 0.0000155
+            }
+        ]
+    }
+}

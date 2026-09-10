@@ -1,0 +1,4 @@
+datasets:
+  - name: measles-tx-2025-weekly
+    version: "1"
+    file: data/measles_tx_2025_weekly.csv
