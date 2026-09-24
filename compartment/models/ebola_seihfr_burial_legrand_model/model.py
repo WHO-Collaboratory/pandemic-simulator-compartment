@@ -180,7 +180,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
             label="Incubation Period (E->I)",
             description="Mean duration of the incubation (exposed, non-infectious) period.",
             default=7.0,
-            default_min=4.0, default_max=10.0,
+            default_min=5.0, default_max=9.0,
             min_value=1.0, max_value=30.0,
             unit="days",
             value_type=ValueType.DAYS,
@@ -191,7 +191,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
             label="Death-to-Burial Period (F->R)",
             description="Mean duration between death and (safe or traditional) burial.",
             default=2.0,
-            default_min=1.0, default_max=7.0,
+            default_min=1.0, default_max=3.0,
             min_value=1.0, max_value=14.0,
             unit="days",
             value_type=ValueType.DAYS,
@@ -211,7 +211,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
             ),
             value_type=ValueType.RATE,
             default=0.084,
-            default_min=0.060, default_max=0.313,
+            default_min=0.064, default_max=0.104,
             min_value=0.0, max_value=5.0,
             unit="per day",
         )
@@ -224,7 +224,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
             ),
             value_type=ValueType.RATE,
             default=0.113,
-            default_min=0.0001, default_max=0.584,
+            default_min=0.07, default_max=0.15,
             min_value=0.0, max_value=5.0,
             unit="per day",
         )
@@ -237,7 +237,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
             ),
             value_type=ValueType.RATE,
             default=1.093,
-            default_min=0.0001, default_max=1.428,
+            default_min=0.08, default_max=1.4,
             min_value=0.0, max_value=5.0,
             unit="per day",
         )
@@ -261,7 +261,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
             ),
             value_type=ValueType.FLOAT,
             default=5.0,
-            default_min=1.0, default_max=10.0,
+            default_min=1.0, default_max=9.0,
             min_value=0.5, max_value=30.0,
             unit="days",
         )
@@ -315,8 +315,8 @@ class EbolaSeihfrBurialLegrandModel(Model):
                 "(delta1, delta2) are derived from this target."
             ),
             value_type=ValueType.PERCENTAGE,
-            default=81.0,
-            default_min=60.0, default_max=95.0,
+            default=50.0,
+            default_min=10.0, default_max=90.0,
             min_value=0.0, max_value=100.0,
             unit="%",
         )
