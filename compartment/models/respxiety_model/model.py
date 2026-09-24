@@ -34,6 +34,8 @@ class RespxietyModel(Model):
         "E": ["E"],
         "I": ["Iu", "Id"],
         "R": ["R"],
+        "Level": ["Level"],
+        "Slope": ["Slope"],
     }
 
     @classmethod
