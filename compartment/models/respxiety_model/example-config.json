@@ -1,0 +1,127 @@
+{
+    "Disease": {
+        "disease_type": "RESPXIETY",
+        "sens": 500.0,
+        "lrLevel": 0.025,
+        "lrSlope": 0.05,
+        "thInc": 0.02,
+        "thDec": 0.0,
+        "thMax": 0.5,
+        "thLow": 0.1
+    },
+    "start_date": "2026-01-01",
+    "end_date": "2026-12-31",
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": {
+                    "source": "susceptible",
+                    "target": "detected",
+                    "value_type": "RATE"
+                },
+                "value": 0.4,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "BETA",
+                            "min": 0,
+                            "max": 0
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "susceptible",
+                    "target": "undetected",
+                    "value_type": "RATE"
+                },
+                "value": 0.4,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "BETA_U",
+                            "min": 0,
+                            "max": 0
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "exposed",
+                    "target": "detected",
+                    "value_type": "DAYS"
+                },
+                "value": 6.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "MU",
+                            "min": 0,
+                            "max": 0
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "detected",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 5.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA",
+                            "min": 0,
+                            "max": 0
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "undetected",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 5.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA_U",
+                            "min": 0,
+                            "max": 0
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "admin_zones": [
+        {
+            "name": "Example Zone",
+            "center_lat": 40.7128,
+            "center_lon": -74.006,
+            "population": 1000000,
+            "infected_population": 0.01
+        }
+    ]
+}
