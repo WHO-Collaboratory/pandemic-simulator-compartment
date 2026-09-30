@@ -338,8 +338,8 @@ class EbolaSeihfrBurialLegrandModel(Model):
                 "community transmission."
             ),
             target_rates=["betaI"],
-            adherence=100.0,
-            transmission_reduction=12.0,
+            adherence=50.0,
+            transmission_reduction=90.0,
         )
         schema.add_intervention(
             id="hospital_intervention",
@@ -350,8 +350,8 @@ class EbolaSeihfrBurialLegrandModel(Model):
                 "active."
             ),
             target_rates=["betaH"],
-            adherence=100.0,
-            transmission_reduction=100.0,
+            adherence=50.0,
+            transmission_reduction=90.0,
         )
         schema.add_intervention(
             id="funeral_intervention",
@@ -362,7 +362,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
                 "eliminates funeral transmission once active."
             ),
             target_rates=["betaF"],
-            adherence=100.0,
+            adherence=50.0,
             transmission_reduction=100.0,
         )
 
