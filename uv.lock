@@ -978,6 +978,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "boto3" },
+    { name = "certifi" },
     { name = "geopy" },
     { name = "jax" },
     { name = "matplotlib" },
@@ -1004,6 +1005,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = "~=1.39.13" },
+    { name = "certifi", specifier = ">=2026.10.19" },
     { name = "geopy", specifier = "~=2.4.1" },
     { name = "jax", specifier = "~=0.8.1" },
     { name = "matplotlib", specifier = "~=3.10.8" },
