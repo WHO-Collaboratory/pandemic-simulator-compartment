@@ -11,6 +11,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "boto3~=1.39.13",
+    "certifi>=2026.10.19",
     "geopy~=2.4.1",
     "jax~=0.8.1",
     "matplotlib~=3.10.8",
