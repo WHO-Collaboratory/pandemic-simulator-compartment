@@ -49,16 +49,17 @@ AGE_GROUPS = [
 ]
 
 
-class AgeStratifiedSIRModel(Model):
+class GenericSirPerAgeLaiModel(Model):
     """A schema-based SIR model whose transmission rate varies by age group."""
 
     # Class-level identifiers so the framework registry auto-discovers the model.
-    DISEASE_TYPE = "AGE_STRATIFIED_SIR"
-    DISEASE_LABEL = "Age-Stratified SIR (per-age transmission)"
+    DISEASE_TYPE = "generic_sir_per_age_lai"
+    DISEASE_LABEL = "Generic – SIR, per age transmission (Lai et al.)"
     DISEASE_DESCRIPTION = (
         "An SIR model in which each age group has its own transmission rate, "
-        "with age mixing through a contact matrix and spatial mixing through a "
-        "travel matrix."
+        "for exploring how age-specific transmission and interventions shape the "
+        "outbreak in each age band. Age groups mix through a contact matrix and "
+        "regions through a travel matrix."
     )
 
     # ------------------------------------------------------------------
@@ -80,9 +81,44 @@ class AgeStratifiedSIRModel(Model):
             description=cls.DISEASE_DESCRIPTION,
         )
         schema.set_model_metadata(
-            model_type="Compartmental",
-            diseases=["Generic directly-transmitted infection"],
+            model_type="Compartmental – SIR, deterministic",
+            diseases=["Not disease-specific"],
             transmission_routes=["Direct contact / airborne"],
+            authors=[
+                {
+                    "name": "Yingsi Lai",
+                    "affiliation": "WHO Hub for Pandemic and Epidemic Intelligence",
+                }
+            ],
+            license="MIT",
+            citations=[
+                "NA",
+            ],
+            applicability=(
+                "Scenario exploration and teaching for a generic, directly "
+                "transmitted infection whose transmission differs by age, over a "
+                "single wave of weeks to months."
+            ),
+            not_for=(
+                "Reading R0 directly from "
+                "beta_age_*; diseases with a latent period, waning immunity or "
+                "non-contact transmission; multi-year horizons; severity or "
+                "healthcare-demand questions; outbreak fade-out (deterministic)."
+            ),
+            constraints=(
+                "beta_age_* is limited to 0.01-0.9 per day and scales with the "
+                "country's contact matrix, so values are not comparable across "
+                "countries. Countries without a Prem 2021 matrix get no "
+                "between-age mixing. The single intervention reduces all bands "
+                "equally."
+            ),
+            biases=(
+                "Default beta_age_* values are illustrative, not estimated from "
+                "data. Synthetic contact matrices may not reflect local mixing. "
+                "Permanent immunity may overstate herd-immunity effects. "
+                "Uncertainty covers sampled parameters only."
+            ),
+            validation="Not calibrated or validated against outbreak data.",
             questions_answered=[
                 "How does a per-age-group transmission rate shape the outbreak "
                 "in each age band?",
@@ -155,9 +191,9 @@ class AgeStratifiedSIRModel(Model):
                 value_type=ValueType.RATE,
                 default=default_beta,
                 min_value=0.01,
-                max_value=0.9,
-                default_min=0,
-                default_max=1,
+                max_value=0.99,
+                default_min=0.01,
+                default_max=0.99,
                 unit="per day",
             )
 

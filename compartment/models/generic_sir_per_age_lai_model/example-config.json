@@ -1,16 +1,16 @@
 {
     "n_simulations": 20,
     "Disease": {
-        "disease_type": "AGE_STRATIFIED_SIR",
+        "disease_type": "generic_sir_per_age_lai",
         "compartment_list": [
             "S",
             "I",
             "R"
         ],
-        "beta_age_0_17": 0.05,
-        "beta_age_18_49": 0.1,
-        "beta_age_50_64": 0.08,
-        "beta_age_65_plus": 0.05,
+        "beta_age_0_17": 0.45,
+        "beta_age_18_49": 0.35,
+        "beta_age_50_64": 0.3,
+        "beta_age_65_plus": 0.25,
         "travel_sigma": 20.0,
         "variance_params": [
             {

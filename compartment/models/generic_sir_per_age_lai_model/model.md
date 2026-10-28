@@ -1,4 +1,4 @@
-# Age-Stratified SIR (per-age transmission) — Model Notes
+# Generic – SIR, per age transmission (Lai et al.)
 
 A schema-based **SIR** model in which **each age group has its own transmission rate**. It is built the declarative way: compartments, transmission edges, per-age parameters, interventions, and age bands are described in `define_parameters()`, and the framework derives the equations, config validator, and artifact from that schema. It extends the framework's SIR example so that susceptibility/acquisition differs by age band, while age groups still infect one another through a contact matrix.
 
@@ -46,7 +46,7 @@ Per-age transmission rates, set under `Disease` in the config (one editable rate
 
 Each is an absolute per-day rate with its own default, valid range (`0`–`2`), and uncertainty range (±25% by default), and each surfaces as a custom field in the platform UI. Setting a band's rate to `0` makes that band fully protected (it acquires no infection), because the rate gates the *susceptible* band's acquisition.
 
-Other inputs: `travel_sigma` (percentage of each region's population away from home per day, feeds the gravity travel matrix) and the `demographics` block (population share per band; also determines the age axis order).
+Other inputs: `travel_sigma` (default `20` %) (percentage of each region's population away from home per day, feeds the gravity travel matrix) and the `demographics` block (population share per band; also determines the age axis order).
 
 A single intervention (`social_isolation`) targets every per-age rate (`beta_age_0_17` … `beta_age_65_plus`) directly; while it is active each band's transmission rate is reduced by its `adherence × transmission_reduction` factor.
 
@@ -67,3 +67,8 @@ Two runs are returned — an intervention ("business as usual") run and an inter
 ## Assumptions and limitations
 
 Closed population; homogeneous mixing within an (age band, region) cell; full immunity after recovery (no `R → S`). Following the framework's flagship age-stratified (COVID) model, the infectious proportion is normalised by each region's *total* population, with the per-contact scale carried by the contact-matrix magnitudes — so per-age rates should be read relative to that convention rather than as standalone within-band reproduction numbers. Contact patterns come from the Prem 2021 synthetic matrices for the selected country and are static over the run. This is a reference model, not a calibrated model of any specific disease.
+
+## Change history
+
+- Aug 2026 — Created by laiyingsilaiyingsi as `age_stratified_sir_model` (`disease_type` `AGE_STRATIFIED_SIR`, label "Age-Stratified SIR (per-age transmission)"); PR #145, released in v0.2.12.
+- Oct 2026 — Renamed to `generic_sir_per_age_lai_model` (`disease_type` `generic_sir_per_age_lai`, label "Generic – SIR, per age transmission (Lai et al.)"); by laiyingsilaiyingsi.
