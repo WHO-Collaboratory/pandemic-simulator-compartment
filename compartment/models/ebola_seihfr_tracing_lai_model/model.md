@@ -253,10 +253,39 @@ field means what.
 All five interventions are **date-activated only**. Every effect in this model
 is applied by `_ramp()`, which keys off the start date, and all five declare
 `target_rates=[]`, which makes the framework's own threshold branch a no-op — so
-a prevalence trigger could never fire. Rather than leave two fields on the form
-that silently do nothing, the model removes `start_threshold` and `end_threshold`
-from all five, the same way `adherence_min` is removed from the three
-single-effect ones. An intervention with no start date simply never activates.
+a prevalence trigger could never fire. The model therefore does not declare
+`start_threshold` or `end_threshold` on any of them. **An intervention given a
+threshold and no start date never activates, silently**: it behaves exactly as
+if it had been deleted.
+
+Two warnings about what that declaration does and does not buy.
+`add_intervention()` always emits the whole shared field set — the two generic
+fields, the two dates and the two thresholds — and offers no way to declare a
+subset, so the model drops the unwanted entries from the built schema afterwards.
+And the results UI renders a fixed form per intervention rather than reading the
+declared list, so **"By Threshold" still appears there**; undeclaring it states
+what the model supports without hiding the control.
+
+**Both generic fields are used by all five, and relabelled.** The framework
+calls them "Adherence" and "Transmission Reduction", which fits the three
+transmission interventions and not the other two, so the model renames them per
+intervention and each description spells the meaning out:
+
+| Intervention | first field | second field | what the model does with them |
+|---|---|---|---|
+| Community Transmission Control | Coverage | Effectiveness | βI × (1 − coverage × effectiveness) |
+| Isolation-Unit Infection Control | Coverage | Effectiveness | βH × (1 − coverage × effectiveness) |
+| Safe and Dignified Burials | Safe-Burial Completion | Effectiveness | βF × (1 − completion × effectiveness) |
+| Contact Tracing and Follow-up | Contact Follow-up Rate (f) | Contact Listing Completeness (c) | routes new infections into the traced chain |
+| Case Finding and Isolation | Onset-to-Isolation Delay Reduction | Isolated Share After Intervention (θ′) | raises θ and shortens Dh for the untraced chain |
+
+For the three transmission interventions only the **product** matters, so the
+split is a presentational choice except where the evidence supplies both factors
+— safe burial, where 56% is 70% completion × 80% effectiveness. Community
+transmission control is a calibrated residual and isolation IPC has no basis for
+a split, so both carry 100% coverage and put the whole effect in effectiveness.
+An omitted coverage is read as full coverage, not as zero, so a configuration
+that leaves the field out still runs the published effect size.
 
 - **Community Transmission Control** is a *residual* covering community
   engagement, risk communication, household precautions, earlier care-seeking
@@ -328,16 +357,16 @@ intervention and the meaning column says what it carries here.
 | `kappa_t` | 100% | 24–100 | Per-day infectiousness of a traced case before isolation (κ_T) | E | No per-day estimate exists for any filovirus. The 0.24 floor is Uganda 2022's IRR 0.16 with the exposure-time ratio divided out. 100% is deliberately conservative |
 | `listing_delay` | 1 d | 0.5–3 | Detection of a case to listing of its contacts | E | Never reported in 2026. Ituri teams pre-list 14–37 contacts per case before confirmation (INSP sitreps) |
 | `ramp_days` | 7 d | 3–21 | Scale-up period for tracing and case finding | E | Assumption; also numerically necessary, since a hard step stalls the ODE solver at high coverage |
-| `adherence_min` (contact tracing) | 86% | 78–93 | Contact follow-up rate (f) | A | **Ituri's own rate**, averaged over the fitted period: 78.1% of 10,183 contacts on 15 Jul (WHO DON613), 88% in the week to 23 Aug (WHO AFRO weekly sitrep 15), 92.8% (6,382/6,879) on 20–23 Oct (WHO DON622). Ituri runs *above* the national rate (79.7% on the same late-October day), so the former national default of 82% understated it. Never reached the 95% target. Other provinces that day: Nord-Kivu 73.3%, Tshopo 83.7%, Bas-Uélé 98.9% |
-| `transmission_percentage` (contact tracing) | 36.3% | — | Contact listing completeness (c) | B calibrated | Calibrated jointly with the community reduction so that Rc = 0.83 and 15% of new confirmed cases are known contacts (DRC 15–20%, CDC MMWR 75(35)). The indicator has not been published since 12 July 2026, so the target is four months stale. It trades off almost exactly against `f`: at f = 65% it would be 41.0%, at f = 93% 35.0%, with Rc moving 0.834 → 0.830 |
-| `transmission_percentage` (safe burials) | 56% | 40–75 | Efficacy of interventions after death (1 − zF) | B × E | Safe-burial completion × effectiveness ≈ 0.70 × 0.80, from INSP completion ratios; only 49% of health zones have a burial team |
-| `transmission_percentage` (isolation IPC) | 95% | — | Efficacy of isolation infection control (1 − zH) | E | Facility infection-control scorecards averaged 17.6–53.3% of target, Aug–Oct 2026. Small by construction, since isolation carries 1.5% of R0 |
-| `transmission_percentage` (community) | 58.3% | — | Decrease in community transmission (1 − z) | B calibrated | Calibrated so Rc = 0.83, matching Ituri's observed plateau R over 1 Aug – 25 Oct 2026. The residual that absorbs everything not modelled explicitly |
+| Contact tracing: follow-up rate (f) | 86% | 78–93 | Share of listed contacts actually visited until onset | A | **Ituri's own rate**, averaged over the fitted period: 78.1% of 10,183 contacts on 15 Jul (WHO DON613), 88% in the week to 23 Aug (WHO AFRO weekly sitrep 15), 92.8% (6,382/6,879) on 20–23 Oct (WHO DON622). Ituri runs *above* the national rate (79.7% on the same late-October day), so the former national default of 82% understated it. Never reached the 95% target. Other provinces that day: Nord-Kivu 73.3%, Tshopo 83.7%, Bas-Uélé 98.9% |
+| Contact tracing: listing completeness (c) | 36.3% | — | Share of a detected case's contacts who are listed | B calibrated | Calibrated jointly with the community reduction so that Rc = 0.83 and 15% of new confirmed cases are known contacts (DRC 15–20%, CDC MMWR 75(35)). The indicator has not been published since 12 July 2026, so the target is four months stale. It trades off almost exactly against `f`: at f = 65% it would be 41.0%, at f = 93% 35.0%, with Rc moving 0.834 → 0.830 |
+| Safe burials: completion × effectiveness | 70% × 80% = **56%** | 40–75 (product) | Share of burial transmission prevented (1 − zF) | B × E | The two fields now carry the two factors separately. Completion 70% from the INSP alert-completion ratios (66–102% by province and month, falling to about 55% in late October; 21% of Ituri alerts failed, mostly refusal; only 49% of health zones have a burial team). Effectiveness 80% allows for exposure before the team arrives — no 2026 measurement, grade E |
+| Isolation IPC: coverage × effectiveness | 100% × 40% = **40%** | — | Share of in-unit transmission prevented (1 − zH) | E | Facility infection-control scorecards averaged 17.6–53.3% of target, Aug–Oct 2026 (Legrand 2007 assumed 100%, sweeping 50–100%). No basis for splitting coverage from effectiveness, so coverage is left at 100%. Small by construction, since isolation carries 1.5% of R0 |
+| Community: coverage × effectiveness | 100% × 58.3% = **58.3%** | — | Decrease in community transmission (1 − z) | B calibrated | Calibrated so Rc = 0.83, matching Ituri's observed plateau R over 1 Aug – 25 Oct 2026. A residual absorbing everything not modelled explicitly, so there is nothing to split: coverage stays at 100% and the whole effect sits in effectiveness |
 | `community_ramp_days` | 95 d | 70–120 | Days for community transmission control to reach full effect | B fitted | Fitted to the Ituri confirmed-case curve with every intervention starting the day the outbreak was declared; 90–100 days fit about equally well. A response is declared in a day but built over weeks; set to 0 for Legrand's step |
 | `hospital_ramp_days` | 95 d | 70–120 | Same, for isolation infection control | E | Not identified by the Ituri curve, which the community term dominates; defaults to the community value |
 | `funeral_ramp_days` | 95 d | 70–120 | Same, for safe and dignified burial | E | Not identified by the Ituri curve; defaults to the community value |
-| `transmission_percentage` (case finding) | 80% | — | Isolated share after intervention (θ′) | scenario | Legrand et al. 2007 Table 5; Rivers et al. 2014. A target, not a 2026 observation |
-| `adherence_min` (case finding) | 25% | — | Reduction in the onset-to-isolation delay | scenario | Rivers et al. 2014. A target, not a 2026 observation |
+| Case finding: isolated share after (θ′) | 80% | — | Share of all symptomatic cases ever isolated, replacing θ | scenario | Legrand et al. 2007 Table 5; Rivers et al. 2014. A target, not a 2026 observation |
+| Case finding: delay reduction | 25% | — | Proportional cut in the onset-to-isolation route time | scenario | Rivers et al. 2014. A target, not a 2026 observation |
 
 ### What the defaults imply
 
@@ -512,11 +541,16 @@ one. The two-regime growth check above is the load-bearing validation.
   by about 14 days before it lines up with reported incidence, and the shift has
   to be applied by the reader. Dating them at detection would need a distributed
   delay the model does not carry. Cumulative totals are unaffected.
-- **No prevalence-threshold activation.** All five interventions are activated by
-  date. The framework's generic `start_threshold` / `end_threshold` fields are
-  removed from the forms rather than left there to be set in vain, because every
-  effect here routes through the date-activated ramp and `target_rates=[]` makes
-  the framework's own threshold branch a no-op.
+- **No prevalence-threshold activation, and the control is still on the form.**
+  All five interventions are activated by date: every effect routes through the
+  date-activated ramp and `target_rates=[]` makes the framework's own threshold
+  branch a no-op. The model does not declare `start_threshold` / `end_threshold`,
+  but the results UI renders a fixed form and shows "By Threshold" regardless.
+  **Choosing it and leaving the start date empty disables the intervention
+  silently** — in the shipped Ituri scenario that takes cumulative confirmed
+  cases from 9,452 to 1.81 million, exactly as if community transmission control
+  had been deleted. Supporting thresholds properly would need a state variable
+  carrying time since activation, so the ramp has something to key off.
 
 ## Differences from the source model
 

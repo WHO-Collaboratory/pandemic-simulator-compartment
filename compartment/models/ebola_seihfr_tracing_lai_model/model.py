@@ -129,9 +129,32 @@ _SINGLE_EFFECT_INTERVENTIONS = frozenset(
 # Every effect in this model is applied by _ramp(), which activates on a date and
 # nothing else, and all five interventions declare target_rates=[], which makes
 # the framework's own threshold branch a no-op. A prevalence threshold therefore
-# cannot do anything here, so these two generic fields are removed from the forms
-# rather than left on them to be set in vain.
+# cannot do anything here, so the model does not declare these two generic fields.
+# NOTE this is a declaration of intent, not a guarantee about the form: the
+# results UI renders a fixed set of controls per intervention instead of reading
+# the declared parameter list, so "By Threshold" still appears there. An
+# intervention configured that way, with no start date, is inert - see the
+# description of each intervention and the Known edge cases in model.md.
 _UNUSED_INTERVENTION_FIELDS = ("start_threshold", "end_threshold")
+
+# The framework hands every intervention the same two generic fields, labelled
+# "Adherence" and "Transmission Reduction". Those names fit the three
+# transmission interventions but not tracing and case finding, which repurpose
+# the fields entirely. Relabelling them here is the only lever the model has;
+# whether the results UI honours it is for the platform to say, so every
+# description spells the meaning out in words as well.
+_FIELD_LABELS = {
+    "community_intervention": {"adherence_min": "Coverage",
+                               "transmission_percentage": "Effectiveness"},
+    "hospital_intervention": {"adherence_min": "Coverage",
+                              "transmission_percentage": "Effectiveness"},
+    "funeral_intervention": {"adherence_min": "Safe-Burial Completion",
+                             "transmission_percentage": "Effectiveness"},
+    "contact_tracing": {"adherence_min": "Contact Follow-up Rate (f)",
+                        "transmission_percentage": "Contact Listing Completeness (c)"},
+    "case_finding": {"adherence_min": "Onset-to-Isolation Delay Reduction",
+                     "transmission_percentage": "Isolated Share After Intervention"},
+}
 
 
 class EbolaSeihfrTracingLaiModel(Model):
@@ -424,12 +447,9 @@ class EbolaSeihfrTracingLaiModel(Model):
             source="E", target="I", variable_name="alpha",
             label="Incubation Period (E->I)",
             description=(
-                "Mean incubation period (traced and untraced). Default 8.0 d [grade C]. "
-                "Bundibugyo-specific: Uganda 2007 median 7 d, n=116 (Wamala et al. 2010; "
-                "mean 7.68 as re-derived by Quilty et al. 2026); pooled BDBV 7.65 d "
-                "(6.43–8.88) in Oraby et al. 2026; MacNeil et al. 2010 mean 6.3 d, n=24. "
-                "The only 2026 data are the Kenya cluster (n=8, one source), which implies "
-                "9–14 d, hence the upper range of 12 d."
+                "Mean incubation period, shared by the traced and untraced chains. It "
+                "also sets how long a contact stays listable: a contact can only be "
+                "traced if still incubating when the listing happens."
             ),
             default=8.0, default_min=6.3, default_max=12.0,
             min_value=1.0, max_value=30.0, unit="days", value_type=ValueType.DAYS,
@@ -439,10 +459,8 @@ class EbolaSeihfrTracingLaiModel(Model):
             label="Death-to-Burial Period (F->D)",
             description=(
                 "Mean time a body remains infectious and accessible before a traditional "
-                "funeral concludes. Default 2 d [grade D]: Legrand et al. 2007 "
-                "(Kikwit, Gulu); Yambuku 1976 0.99 d (Camacho et al. 2014); funeral "
-                "duration 2.0–4.5 d in West Africa (Rivers et al. 2014). No Bundibugyo or "
-                "2026 estimate; death-to-alert is reported nowhere in 2026."
+                "funeral concludes. It is also the lag between a death and the burial "
+                "that records it, so the D compartment trails the Deaths series by it."
             ),
             default=2.0, default_min=1.0, default_max=4.0,
             min_value=0.5, max_value=14.0, unit="days", value_type=ValueType.DAYS,
@@ -457,18 +475,10 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="betaI", label="Transmission Rate — Community (βI)",
             description=(
-                "Per-day transmission from symptomatic cases not yet isolated — community, "
-                "households, and general health facilities, private clinics and traditional "
-                "healers before diagnosis. Default gives R0 = 2.02 with 85% of R0 from this "
-                "route [grade E, informed by 2026 evidence]. No 2026 study identifies the "
-                "route split: case-investigation forms do not record place of acquisition "
-                "(Verheyden & Mudogo 2026), and the three Legrand coefficients are weakly "
-                "identifiable from aggregate incidence (EID 2015). Every 2026 health-worker "
-                "infection with a recorded location was in a general facility before "
-                "diagnosis; 62% of confirmed deaths occur outside treatment centres; and in "
-                "the only BDBV case-control study, visiting a sick person or a health "
-                "facility carried a HIGHER odds ratio than funeral exposure (8.71 vs 7.37; "
-                "Wamala et al. 2010)."
+                "Per-day transmission from symptomatic cases not yet isolated: community, households, "
+                "and general health facilities, private clinics and traditional healers before "
+                "diagnosis. The three beta values are obtained by splitting R0 across the three "
+                "routes, not fitted; the split and its evidence are in model.md."
             ),
             value_type=ValueType.RATE, default=0.1638, default_min=0.1459, default_max=0.3000,
             min_value=0.0, max_value=5.0, unit="per day",
@@ -476,22 +486,10 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="betaH", label="Transmission Rate — Isolation (βH)",
             description=(
-                "Per-day transmission from patients inside an isolation unit (ETU, transit "
-                "centre), including staff, patient attendants and suspects held awaiting "
-                "results. Default 0.0247 = 0.151 × βI, i.e. a patient-day in isolation "
-                "transmits about 15% as much as a patient-day in the community (isolation "
-                "about 85% effective), giving 1.5% of R0 [grade E, range grade D]. Read it "
-                "as an effectiveness: βH = (1 − ε)·βI with ε = 0.85, the range spanning "
-                "ε = 1.00 (βH = 0) to ε = 0.70 (3% of R0). Why not zero: no 2026 source "
-                "documents an ETU-acquired infection, but place of acquisition is not "
-                "recorded at all, so zero is what that surveillance design yields whatever "
-                "the truth; isolation units ran at up to 152.6% occupancy with suspect "
-                "wards at 93% and 200–400 attendants inside them per province per day; "
-                "Legrand's own BASELINE βH estimates are non-zero (0.794/week at Kikwit, "
-                "15% of R0) and his Table 5 varies isolation efficacy over 50–100%, because "
-                "βH = 0 is his POST-intervention state; and the one 2026 model that sets it "
-                "to zero warns this is probably an underestimate and offsets it with a "
-                "fitted isolation-leakage term this model does not have."
+                "Per-day transmission from patients inside an isolation unit (ETU, transit centre), "
+                "including staff, patient attendants and suspects held awaiting results. Read it as "
+                "an isolation effectiveness: betaH = (1 - eps) x betaI. At betaH = 0 the Isolation- "
+                "Unit Infection Control intervention does nothing, whatever value it is given."
             ),
             value_type=ValueType.RATE, default=0.0247, default_min=0.0, default_max=0.0494,
             min_value=0.0, max_value=5.0, unit="per day",
@@ -499,17 +497,10 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="betaF", label="Transmission Rate — Traditional Burial (βF)",
             description=(
-                "Per-day transmission from the body during a traditional funeral. Default "
-                "gives 13.5% of R0 = 2.02 from burials [grade E, informed by 2026 evidence]. "
-                "This is the BASELINE coefficient, with every body reaching F given a "
-                "traditional funeral; safe burial in the community is applied separately by "
-                "its intervention, and safe burial of deaths in isolation by `s_iso`. No "
-                "2026 funeral cluster is quantified anywhere. Historical anchors bracket it "
-                "very widely: 3.7% of R0 (Gulu 2000) to 66.7% (Kikwit 1995); funeral "
-                "exposure adjusted OR 3.83 in BDBV Uganda 2007; a funeral was the likely "
-                "source in 5 of 11 attributable Isiro 2012 cases; post-death transmission "
-                "10–30% in West Africa (Weitz & Dushoff 2015). Run the burial share at 8% "
-                "and 25% as sensitivity bounds (see model.md)."
+                "Per-day transmission from the body during a traditional funeral. This is the "
+                "BASELINE coefficient, with every body reaching F given a traditional funeral: safe "
+                "burial in the community is applied by its own intervention and safe burial of deaths "
+                "in isolation by s_iso, so do not discount it for current burial coverage."
             ),
             value_type=ValueType.RATE, default=0.6354, default_min=0.5661, default_max=1.1637,
             min_value=0.0, max_value=5.0, unit="per day",
@@ -519,16 +510,10 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="gamma_h", label="Onset to Isolation, untraced (days)",
             description=(
-                "Mean delay from symptom onset to isolation, as Legrand's route rate "
-                "1/γ_h. NOTE this is not the realised wait: under competing exponential "
-                "exits the time a case leaves I is independent of which exit it takes, so "
-                "the realised mean time in I is about 10.5 d at the defaults, pinned by the "
-                "74% of cases who are never isolated. Default 7.0 d [grade B]: DRC 2026 "
-                "onset-to-sampling mean 7.4 d (95% CrI 5.3–13.5), median 4.8, n=129, 3 May–"
-                "8 Jun (Akilimali et al., NEJM 2026) — an upper bound, since post-mortem "
-                "swabs inflate it; onset to appearance in the INSP onset curve has median "
-                "7 d with no shortening from Jul to Sep. Uganda 2026 onset-to-ETU 5.6 d, "
-                "n=18; Isiro 2012 4.0 d. No DRC line list is public."
+                "Mean delay from symptom onset to isolation, as Legrand's route rate 1/gamma_h. NOTE "
+                "this is not the realised wait: under competing exponential exits the time a case "
+                "leaves I is independent of which exit it takes, so the realised mean time in I is "
+                "about 10.5 d at the defaults, pinned by the cases who are never isolated."
             ),
             value_type=ValueType.FLOAT, default=7.0, default_min=5.0, default_max=10.0,
             min_value=0.5, max_value=30.0, unit="days",
@@ -536,14 +521,9 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="gamma_i", label="Onset to End of Infectiousness, Survivors (days)",
             description=(
-                "Mean time from onset to the end of infectiousness in survivors. Default "
-                "12 d [grade C]: Bundibugyo, Uganda 2007, median 10 d (range 2–26), n=116 "
-                "(Wamala et al. 2010); Isiro 2012 onset-to-discharge mean 11.85 d (SD 8.3), "
-                "n=13. This is shorter than a treatment-centre stay, because discharge "
-                "requires two negative PCR tests, so the real stay is longer than the "
-                "γ_i − γ_h ≈ 5 d this implies and isolation-bed demand is understated. "
-                "No 2026 length-of-stay estimate could be sourced for the comparison "
-                "(a withdrawn earlier draft quoted 10.8 d). See the limitations in model.md."
+                "Mean time from onset to the end of infectiousness in survivors. It is shorter than a "
+                "treatment-centre stay, because discharge requires two negative PCR tests, so "
+                "isolation-bed demand is understated."
             ),
             value_type=ValueType.FLOAT, default=12.0, default_min=10.0, default_max=17.0,
             min_value=1.0, max_value=40.0, unit="days",
@@ -551,11 +531,7 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="gamma_d", label="Onset to Death (days)",
             description=(
-                "Mean time from onset to death. Default 11.0 d [grade C]: Bundibugyo, Isiro "
-                "2012, mean 11.37 d (SD 5.41), n=27–28 (Rosello et al. 2015), the "
-                "informative prior used by both Imperial College and epiforecasts in 2026; "
-                "Uganda 2007 median 10 d (range 3–21). The 2026 DRC posterior is only "
-                "weakly identified, at about 13.7 d."
+                "Mean time from onset to death."
             ),
             value_type=ValueType.FLOAT, default=11.0, default_min=8.0, default_max=14.0,
             min_value=1.0, max_value=40.0, unit="days",
@@ -563,17 +539,10 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="theta_target", label="Isolated Share, untraced (θ)",
             description=(
-                "Share of untraced symptomatic cases who are ever isolated. Legrand's θ₁ is "
-                "derived so this share is realised. Denominator is ALL symptomatic cases, "
-                "detected or not, so it is much lower than the share of *confirmed* cases "
-                "who are admitted. Default 26% [grade B, derived]: inverted from the "
-                "cumulative community share of confirmed deaths, 62.1% (blending 59% to "
-                "21 Aug, CDC MMWR 75(35), with 65.4% over 30 Sep–28 Oct counted from the "
-                "INSP sitreps), given the death-notification share. θ and `p_notify` are "
-                "identified only jointly — see model.md. Check NOT used in the fit: this "
-                "gives 64% of confirmed cases ever isolated, inside the 0.556–0.698 bracket "
-                "implied by the 28 Oct outcome decomposition. The community death share has "
-                "risen since August, so θ is falling over time."
+                "Share of untraced symptomatic cases who are ever isolated; Legrand's theta_1 is "
+                "derived so that this share is realised. The denominator is ALL symptomatic cases, "
+                "detected or not, so it is much lower than the share of CONFIRMED cases who are "
+                "admitted. Identified only jointly with p_notify."
             ),
             value_type=ValueType.PERCENTAGE, default=26.0, default_min=22.0, default_max=29.0,
             min_value=0.0, max_value=100.0, unit="%",
@@ -581,18 +550,11 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="delta_target", label="Case-Fatality Ratio, isolated arm (δ)",
             description=(
-                "Case-fatality ratio of cases who reach isolation, among all of them, "
-                "detected or not. With `cfr_ratio_comm` at its default 100% it is also "
-                "the CFR of cases never isolated, and so of the chain as a whole - "
-                "Legrand's single-CFR assumption; delta_1 and delta_2 are derived so each "
-                "arm realises its own ratio.\n\n"
-                "Default 29% [grade B], pinned by the identity delta = (intra-CTE deaths "
-                "/ confirmed) / (share of confirmed ever isolated) = 0.1843 / 0.636, "
-                "which is insensitive to the other parameters. It is NOT the crude "
-                "confirmed CFR of 48.6% (INSP sitrep 167), which the model reproduces as "
-                "an OUTPUT: community deaths are confirmed by post-mortem swab while "
-                "community survivors mostly go undetected. The October treatment-centre "
-                "flow CFR of 32.6% is an upper bound; historical BDBV is 32-54%."
+                "Case-fatality ratio of cases who reach isolation, among all of them, detected or "
+                "not. With cfr_ratio_comm at 100% it is also the ratio for cases never isolated, and "
+                "so for the chain as a whole - Legrand's single-CFR assumption; delta_1 and delta_2 "
+                "are derived so each arm realises its own ratio. It is NOT the crude confirmed-case "
+                "CFR, which the model reproduces as an output."
             ),
             value_type=ValueType.PERCENTAGE, default=29.0, default_min=27.0, default_max=33.0,
             min_value=0.0, max_value=100.0, unit="%",
@@ -601,20 +563,12 @@ class EbolaSeihfrTracingLaiModel(Model):
             name="cfr_ratio_comm",
             label="Community-vs-Isolation CFR Ratio (δ_c/δ_h, %)",
             description=(
-                "Case-fatality ratio of cases who are NEVER isolated, as a percentage of "
-                "the isolated arm's ratio (`delta_target`). 100% reproduces Legrand's "
-                "single CFR and is the shipped default, so the calibration is "
-                "unchanged.\n\n"
-                "[grade E] Values above 100% are the direction the evidence points - ETU "
-                "admission carries a hazard ratio of 0.5 for death (Lindblade 2015) and "
-                "each extra day unhospitalised multiplies the odds by 1.11 (Rosello 2015) "
-                "- but the magnitude cannot be measured here, because community survivors "
-                "are almost never detected so the community CFR has no denominator.\n\n"
-                "NOT a free parameter: theta is inverted from the community share of "
-                "confirmed deaths under delta cancelling, so a ratio above 100% scales "
-                "theta/(1-theta) with it - at 130% theta rises from 25.8% to 31.2% and "
-                "the three betas must be re-inverted. Change it only as a sensitivity "
-                "scenario, with the rest refitted."
+                "Case-fatality ratio of cases who are NEVER isolated, as a percentage of the isolated "
+                "arm's ratio (delta_target). 100% reproduces Legrand's single CFR. NOT a free "
+                "parameter: theta is inverted from the community share of confirmed deaths with delta "
+                "cancelling, so a ratio above 100% scales theta/(1 - theta) with it and the three "
+                "betas have to be re-inverted. Change it only as a sensitivity scenario, with the "
+                "rest refitted."
             ),
             value_type=ValueType.PERCENTAGE, default=100.0, default_min=100.0, default_max=150.0,
             min_value=50.0, max_value=300.0, unit="%",
@@ -622,12 +576,10 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="s_iso", label="Safe Burial of Deaths in Isolation",
             description=(
-                "Share of deaths inside an isolation unit whose body is buried safely, "
-                "contributing no funeral transmission; the rest go to F as in Legrand, who "
-                "sends all of them there. With s_iso = 1 this removes exactly θ of all "
-                "deaths from the burial route. Default 100% [grade E]: standard practice in "
-                "treatment units, also assumed in the CDC 2026 scenarios, but never "
-                "actually reported in the 2026 sitreps. Set to 0 to reproduce Legrand."
+                "Share of deaths inside an isolation unit whose body is buried safely and so "
+                "contributes no funeral transmission; the rest go to F, where Legrand sends all of "
+                "them. At 100% this removes exactly theta of all deaths from the burial route. Set to "
+                "0 to reproduce Legrand."
             ),
             value_type=ValueType.PERCENTAGE, default=100.0, default_min=80.0, default_max=100.0,
             min_value=0.0, max_value=100.0, unit="%",
@@ -637,18 +589,10 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="gamma_h_t", label="Onset to Isolation, traced contacts (days)",
             description=(
-                "Mean onset-to-isolation route rate for followed-up contacts. Default "
-                "4.7 d [grade D]: no 2026 DRC estimate exists and the sitreps carry no "
-                "traced/untraced split, but two independent routes agree - Uganda 2022's "
-                "4 d for known contacts against 6 d for others (Wanyana 2024) scales "
-                "7.0 d to 4.7 d, and the standard-follow-up arm of Keita 2023, the regime "
-                "DRC runs, measured 4.8 d directly.\n\n"
-                "The much shorter figures (Keita's 1.3 d; Kenya 2026) are PRE-SYMPTOMATIC "
-                "contact isolation, which DRC does not do - 3 such transfers in 75 "
-                "sitreps against 36,095 contacts followed - so the sampling range stops "
-                "at 3.0 d. Set 1.3-2.0 explicitly to explore contact isolation. This "
-                "delay bites hard because the traced chain isolates 80% of cases; if case "
-                "finding shortens the untraced delay below it, it follows."
+                "Mean onset-to-isolation route rate for followed-up contacts. Held at or below the "
+                "untraced delay, so if case finding shortens that below this value, this follows it "
+                "down. Values of 1.3-2.0 d describe pre-symptomatic isolation of contacts, which DRC "
+                "does not do - set them explicitly to explore that regime."
             ),
             value_type=ValueType.FLOAT, default=4.7, default_min=3.0, default_max=5.5,
             min_value=0.5, max_value=30.0, unit="days",
@@ -656,19 +600,10 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="theta_t_target", label="Isolated Share, traced contacts",
             description=(
-                "Share of traced cases who are isolated. Default 80% [grade E]: never "
-                "measured in 2026, for traced or untraced cases. The best anchor is the "
-                "share of LIVING validated suspects transferred to a treatment or transit "
-                "centre, 62.6% pooled over 25–28 Oct (1,009/1,613; INSP sitreps 164–167), "
-                "treated as a floor — a monitored contact should reach isolation at least "
-                "as reliably as an average validated suspect. The ceiling stays below 100% "
-                "because transfer refusals recur in the sitreps. Held at or above the "
-                "untraced share. The sampling range runs to 100% so that the "
-                "isolate-every-traced-case scenario can be swept; note that it buys little, "
-                "because only about 7% of infections travel the traced chain, so 80% -> 100% "
-                "moves Rc by roughly 0.008 (0.830 -> 0.822) before re-calibration, and "
-                "nothing at all after it, since the listing completeness c absorbs the "
-                "change while refitting the known-contact share."
+                "Share of traced cases who are isolated. Held at or above the untraced share. Raising "
+                "it buys little, because only about 7% of infections travel the traced chain, and "
+                "nothing at all after recalibration, since the listing completeness absorbs the "
+                "change."
             ),
             value_type=ValueType.PERCENTAGE, default=80.0, default_min=60.0, default_max=100.0,
             min_value=0.0, max_value=100.0, unit="%",
@@ -676,15 +611,11 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="kappa_t", label="Pre-isolation Infectiousness, traced contacts",
             description=(
-                "Community infectiousness of a traced case before isolation, PER DAY, "
-                "relative to an untraced case. Default 100% [grade E, conservative: tracing "
-                "then helps only by speeding isolation]. No per-day estimate exists for any "
-                "filovirus. Uganda 2022 found known contacts transmitted 84% less overall "
-                "(IRR 0.16, 95% CI 0.08–0.32), but that is a TOTAL ratio which already "
-                "contains their shorter community exposure (4 vs 6 d) — using 0.16 here "
-                "would double-count what `gamma_h_t` carries. Dividing out the time ratio "
-                "leaves a residual per-day bound of 0.16/(4/6) = 0.24, the floor of the "
-                "range; treat it as a bound, not an estimate."
+                "Community infectiousness of a traced case before isolation, PER DAY, relative to an "
+                "untraced case. At 100% tracing helps only by speeding isolation. Do not set it from "
+                "a TOTAL transmission ratio such as Uganda 2022's IRR of 0.16: that already contains "
+                "the shorter community exposure which gamma_h_t carries, so using it here double- "
+                "counts."
             ),
             value_type=ValueType.PERCENTAGE, default=100.0, default_min=24.0, default_max=100.0,
             min_value=0.0, max_value=100.0, unit="%",
@@ -692,22 +623,9 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="cfr_or_day", label="Survival Benefit of Earlier Isolation (odds ratio/day)",
             description=(
-                "Odds ratio of death per additional day not hospitalised, used to derive "
-                "the traced-case CFR from its shorter delay: "
-                "odds(δ_T) = odds(δ) × OR^(γ_h_T − γ_h). Default 1.11 (95% CI 1.02–1.21) "
-                "[grade D, partly C]: Rosello et al. 2015, pooling Kikwit 1995, Isiro 2012 "
-                "(Bundibugyo) and Boende 2014. At the default delays this gives δ_T = 24.3% "
-                "against δ = 29%. **Set to 1.0 to disable**, making traced and untraced "
-                "CFRs equal — worth running, because traced cases are enriched for "
-                "high-risk exposure (adjusted HR 2.5 for becoming a case), which may offset "
-                "the survival gain. Two caveats: the odds ratio is conditional on "
-                "eventually being hospitalised, whereas δ here covers the isolated arm (all "
-                "cases at cfr_ratio_comm = 100%); and "
-                "observed CFR gaps by detection route are confounded by survival selection, "
-                "so treat the magnitude as an upper bound. The much larger gap in Keita et "
-                "al. (12.5% vs 48.4%) cannot be transferred, being confounded by Ervebo "
-                "uptake — in 2026 Ervebo reaches frontline workers only, so contacts are "
-                "not ring-vaccinated."
+                "Odds ratio of death per additional day not hospitalised, used to derive the traced- "
+                "case CFR from its shorter delay: odds(delta_T) = odds(delta) x OR^(gamma_h_T - "
+                "gamma_h). Set to 1.0 to disable, making the traced and untraced CFRs equal."
             ),
             value_type=ValueType.FLOAT, default=1.11, default_min=1.0, default_max=1.21,
             min_value=1.0, max_value=2.0, unit="odds ratio per day",
@@ -715,12 +633,8 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="listing_delay", label="Detection to Contact Listing (days)",
             description=(
-                "Delay from detecting a case to listing their contacts (treated as fixed). "
-                "A contact can only be traced if still incubating when listed. Default 1 d "
-                "[grade E]: never reported in 2026. Community engagement teams in Ituri "
-                "pre-list 14–37 contacts per case before confirmation, which supports a "
-                "short delay. It costs little here — exp(−α·L) = 0.88 — next to the wait "
-                "for the source to be detected, which costs about 57%."
+                "Delay from detecting a case to listing its contacts, treated as fixed. A contact can "
+                "only be traced if still incubating when listed."
             ),
             value_type=ValueType.FLOAT, default=1.0, default_min=0.5, default_max=3.0,
             min_value=0.0, max_value=21.0, unit="days",
@@ -728,16 +642,10 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="p_notify", label="Community Deaths Notified, untraced",
             description=(
-                "Share of untraced deaths outside a treatment centre that are alerted AND "
-                "swabbed, so they count as confirmed deaths and their contacts can be "
-                "listed. Default 57% [grade B]. The death-weighted swab coverage of death "
-                "alerts measured from the October sitreps is 66.9% (Ituri 69.2%, Nord-Kivu "
-                "61.6%, Haut-Uele 72.2%, Tshopo 11.5%), corroborated by CDC MMWR 75(35): "
-                "laboratory testing done for 72% of validated alerts. Since this parameter "
-                "is P(alerted) × P(swabbed | alerted), 66.9% is a HARD CEILING and the "
-                "default applies an alerting probability of about 0.85 to it; P(alerted) is "
-                "measured nowhere. NOT identified by the published indicators — it trades "
-                "off against θ along a ridge, so it is set from the swab data and θ is "
+                "Share of untraced deaths outside a treatment centre that are alerted AND swabbed, so "
+                "that they count as confirmed deaths and their contacts can be listed. It is "
+                "P(alerted) x P(swabbed | alerted). Not identified by the published indicators: it "
+                "trades off against theta along a ridge, so it is set from the swab data and theta is "
                 "derived from it."
             ),
             value_type=ValueType.PERCENTAGE, default=57.0, default_min=47.0, default_max=67.0,
@@ -746,14 +654,9 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="p_notify_t", label="Community Deaths Notified, traced contacts",
             description=(
-                "The same share for a traced contact who dies outside a treatment centre. "
-                "Default 67% [grade B]: a contact seen daily is effectively certain to have "
-                "their death alerted, so the parameter collapses onto the measured "
-                "P(swabbed | alerted) = 66.9%, which is also its ceiling. The implied ratio "
-                "to the untraced value, 1.17, is conservative next to North Kivu 2018–19, "
-                "where 91% of confirmed-case deaths received a safe burial against 61% of "
-                "all suspected Ebola deaths. The mechanism is notification, not burial "
-                "practice: `s_iso` is deliberately shared between the chains."
+                "The same share for a traced contact who dies outside a treatment centre. The "
+                "mechanism is notification, not burial practice: s_iso is deliberately shared between "
+                "the two chains."
             ),
             value_type=ValueType.PERCENTAGE, default=67.0, default_min=57.0, default_max=67.0,
             min_value=0.0, max_value=100.0, unit="%",
@@ -761,19 +664,11 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="p_detect_rec", label="Community Survivors Detected",
             description=(
-                "Share of cases who are never isolated and survive who are nevertheless "
-                "tested while ill, so they become confirmed cases and their contacts can be "
-                "listed. Shared by both chains: the evidence does not support traced cases "
-                "being near-certain to be confirmed — the Likati serosurvey found "
-                "symptomatic contacts under follow-up going unconfirmed at scale, and 2026 "
-                "DRC tests only 72% of validated alerts. Default 5% [grade B, derived]: "
-                "inverted from the crude confirmed CFR of 48.6% given δ and θ, and bounded "
-                "directly — such a survivor can never be recorded as discharged, so they "
-                "can only sit in the 14.25% of confirmed cases with no recorded outcome "
-                "(1,464/10,274 at 28 Oct), a bucket they share with absconders and lag, "
-                "which caps this near 0.10–0.12. The sampling range stops at 12% for that "
-                "reason: 12% puts the implied no-outcome share at 0.1416, just inside the "
-                "ceiling, while 13% already breaches it at 0.1516."
+                "Share of cases who are never isolated and survive who are nevertheless tested while "
+                "ill, so that they become confirmed cases and their contacts can be listed. Shared by "
+                "both chains. Such a survivor can never be recorded as discharged, so they can only "
+                "sit among the confirmed cases with no recorded outcome, which is what caps this "
+                "parameter."
             ),
             value_type=ValueType.PERCENTAGE, default=5.0, default_min=3.0, default_max=12.0,
             min_value=0.0, max_value=100.0, unit="%",
@@ -781,9 +676,9 @@ class EbolaSeihfrTracingLaiModel(Model):
         schema.add_parameter(
             name="ramp_days", label="Scale-up Period (days)",
             description=(
-                "Days for contact tracing and case finding to reach full effect after their "
-                "start date (linear). Default 7 d [grade E]. Also numerically necessary: a "
-                "hard step stalls the ODE solver at high tracing coverage."
+                "Days for contact tracing and case finding to reach full effect after their start "
+                "date (linear). Also numerically necessary: a hard step stalls the ODE solver at high "
+                "tracing coverage."
             ),
             value_type=ValueType.FLOAT, default=7.0, default_min=3.0, default_max=21.0,
             min_value=1.0, max_value=60.0, unit="days",
@@ -798,40 +693,31 @@ class EbolaSeihfrTracingLaiModel(Model):
                 label=f"{_label} Scale-up Period (days)",
                 description=(
                     f"Days for {_what} to reach its full effect after its start date "
-                    "(linear). A response is declared in a day but built over weeks - "
-                    "burial teams, treatment centres and community engagement all arrive "
-                    "gradually, and not necessarily at the same speed - so these ramp "
-                    "rather than stepping. Set to 0 for Legrand's step: full effect from "
-                    "the start date.\n\n"
-                    "Default 95 d [grade B], fitted to the Ituri confirmed-case curve "
-                    "with every intervention starting the day the outbreak was declared; "
-                    "90-100 days fit about equally well. Only the community one is "
-                    "identified by that curve, which the community term dominates; the "
-                    "other two default to the same length [grade E]."
+                    "(linear). A response is declared in a day but built over weeks, so "
+                    "these ramp rather than stepping. Set to 0 for Legrand's step: full "
+                    "effect from the start date."
                 ),
                 value_type=ValueType.FLOAT, default=95.0, default_min=70.0,
                 default_max=120.0, min_value=0.0, max_value=180.0, unit="days",
             )
 
         # --- Interventions ---------------------------------------------------
-        # Legrand's three transmission interventions take ONE effect size each:
-        # the decrease of the route's coefficient after T. The framework applies
-        # rate x (1 - adherence x reduction), so adherence defaults to 100% and
-        # the formula collapses to rate x (1 - z), as in the paper. Leave
-        # adherence at 100% unless you mean to scale the published effect size.
+        # All five use the framework's two generic fields. For the three
+        # transmission interventions they keep their generic meaning, coverage x
+        # effectiveness; for tracing and case finding they are repurposed, so
+        # each is relabelled below and its meaning given in the description.
+        # Evidence for every default is in model.md and evidence.md, not here.
         schema.add_intervention(
             id="community_intervention", label="Community Transmission Control",
             description=(
-                "Everything that reduces contact with cases before isolation: community "
-                "engagement, risk communication, household precautions, earlier "
-                "care-seeking, and infection control in general facilities before "
-                "diagnosis. Reduces betaI by the effect size entered, ramped over the "
-                "Community Scale-up Period; adherence is fixed at 100%.\n\n"
-                "Default 58.3% [grade B], calibrated so Rc = 0.83, Ituri's observed "
-                "plateau over 1 Aug - 25 Oct 2026 (Legrand 2007 fitted 12% for Kikwit and "
-                "88% for Gulu). This is a residual that absorbs everything not modelled "
-                "explicitly, which is why it is the right quantity to calibrate - and why "
-                "it should be refitted for any other province or outbreak."
+                "Everything that reduces contact with cases before they are isolated: "
+                "community engagement, risk communication, household precautions, earlier "
+                "care-seeking, and infection control in general health facilities before "
+                "diagnosis.\n\n"
+                "Multiplies betaI by (1 - coverage x effectiveness), ramped in over the "
+                "Community Scale-up Period. COVERAGE is the share of the population the "
+                "measures reach; EFFECTIVENESS is the share of their community "
+                "transmission prevented. Only the product matters."
             ),
             target_rates=[], adherence=100.0, transmission_reduction=58.3,
         )
@@ -839,121 +725,81 @@ class EbolaSeihfrTracingLaiModel(Model):
             id="hospital_intervention", label="Isolation-Unit Infection Control",
             description=(
                 "Barrier nursing, PPE, patient cohorting and waste management inside "
-                "isolation units. Reduces betaH by the effect size entered, ramped over "
-                "the Isolation-Unit Scale-up Period; adherence is fixed at 100%.\n\n"
-                "Default 40% [grade E]: 2026 facility infection-control scorecards "
-                "averaged 17.6-53.3% of target (Legrand 2007 assumed 100%, with 50-100% "
-                "as its sensitivity range). Its effect is proportional to betaH, so it is "
-                "small by construction here - isolation carries 1.5% of R0 - and with "
-                "betaH = 0 it does nothing whatever value is entered."
+                "isolation units.\n\n"
+                "Multiplies betaH by (1 - coverage x effectiveness), ramped in over the "
+                "Isolation-Unit Scale-up Period. COVERAGE is the share of isolation units "
+                "applying the measures; EFFECTIVENESS is the share of in-unit "
+                "transmission they prevent. Only the product matters. The effect is "
+                "proportional to betaH, so at betaH = 0 it does nothing."
             ),
             target_rates=[], adherence=100.0, transmission_reduction=40.0,
         )
         schema.add_intervention(
             id="funeral_intervention", label="Safe and Dignified Burials",
             description=(
-                "Safe and dignified burial of people who died in the community. Reduces "
-                "betaF by the effect size entered, ramped over the Safe-Burial Scale-up "
-                "Period; adherence is fixed at 100%. Deaths inside isolation are handled "
-                "by `s_iso`, not here - do not count them twice.\n\n"
-                "The effect size is the share of burial transmission prevented = safe "
-                "burials completed x effectiveness, not burial coverage. Default 56% = "
-                "0.70 x 0.80 [grade B x E], range 40-75%: 2026 completion ran 66-102% of "
-                "alerts by province and month but fell to about 55% in late October, 21% "
-                "of Ituri alerts failed (mostly refusal) and only 49% of health zones had "
-                "a burial team; effectiveness 0.80 allows for exposure before the team "
-                "arrives."
+                "Safe and dignified burial of people who died in the community. Deaths "
+                "inside isolation are handled by the separate parameter s_iso, not here.\n\n"
+                "Multiplies betaF by (1 - completion x effectiveness), ramped in over the "
+                "Safe-Burial Scale-up Period. COMPLETION is the share of community deaths "
+                "that receive a safe burial; EFFECTIVENESS is the share of that body's "
+                "transmission the safe burial prevents. The product is the share of "
+                "burial transmission prevented, not burial coverage."
             ),
-            target_rates=[], adherence=100.0, transmission_reduction=56.0,
+            target_rates=[], adherence=70.0, transmission_reduction=80.0,
         )
-
-        # Legrand's three interventions carry ONE effect size, so the adherence
-        # field is removed from their forms here and pinned to 100% at runtime in
-        # __init__. Both halves are needed: hiding the field alone would make the
-        # framework read a missing config value as 0 and silently disable them.
-        # The builder exposes no public accessor for what it has collected, so this
-        # reaches for its private list and does nothing if that name ever changes.
-        # Behaviour does not depend on it: __init__ pins adherence either way, and
-        # the only consequence of the fallback is that the field stays on the form.
-        for _intv in getattr(schema, "_interventions", ()):
-            if _intv.id in _SINGLE_EFFECT_INTERVENTIONS:
-                _intv.parameters = [
-                    _p for _p in _intv.parameters if _p.name != "adherence_min"
-                ]
-        # Contact tracing and case finding do NOT scale a transmission coefficient:
-        # target_rates is empty and the model reads the two generic fields by hand in
-        # _tracing_and_case_finding(). The framework's field names therefore carry a
-        # model-specific meaning, spelled out in each description below. Both are
-        # date-activated; the prevalence thresholds are removed from the forms below.
         schema.add_intervention(
             id="contact_tracing", label="Contact Tracing and Follow-up",
             description=(
-                "Listing and daily follow-up of the contacts of detected cases. Only "
-                "infections caused by a detected case can be traced, and only if the "
-                "contact is listed while still incubating, so this intervention is "
-                "bounded by case detection however high its two fields are set. "
-                "Date-activated, scaled up over the Scale-up Period. It does not scale a "
-                "transmission coefficient, so its two generic fields carry "
-                "model-specific meanings:\n\n"
-                "TRANSMISSION REDUCTION = CONTACT LISTING COMPLETENESS - the share of a "
-                "detected case's contacts who are listed. Default 36.3% [grade B], "
-                "calibrated jointly with the community reduction so that Rc = 0.830 "
-                "(Ituri's plateau) and 15% of new confirmed cases are already known "
-                "contacts (DRC reported 15-20%, last on 12 July 2026). That indicator has "
-                "not appeared in any sitrep since, so the target is months stale. It also "
-                "trades off almost exactly against the follow-up rate below: at f = 65% it "
-                "would be 40.9%, at f = 93% 35.0%, with Rc unmoved.\n\n"
-                "ADHERENCE = CONTACT FOLLOW-UP RATE - the share of listed contacts "
-                "actually followed until onset. Default 86% [grade A], Ituri's own measured "
-                "rate averaged over the fitted period: 78.1% of 10,183 contacts on 15 Jul "
-                "2026 (WHO DON613), 88% in the week to 23 Aug (WHO AFRO weekly external "
-                "sitrep 15) and 92.8% (6,382/6,879) on 20-23 Oct (WHO DON622). Ituri runs "
-                "ABOVE the national rate, which was 79.7% on the same late-October day, so "
-                "the earlier national default of 82% understated it. The 95% operational "
-                "target was never reached. Other provinces differ sharply on the same day "
-                "(Nord-Kivu 73.3%, Tshopo 83.7%, Bas-Uelé 98.9%), so a run on another "
-                "province should use that province's figure. Applied once at listing "
-                "rather than as a daily hazard."
+                "Listing the contacts of a case that has already been DETECTED, and "
+                "visiting them daily so that they are isolated quickly once symptoms "
+                "start. It moves a share of new infections into the traced chain; it "
+                "reduces no one's transmission directly.\n\n"
+                "LISTING COMPLETENESS is the share of a detected case's contacts who are "
+                "put on the list. FOLLOW-UP RATE is the share of listed contacts actually "
+                "visited until onset, applied once at listing rather than as a daily "
+                "hazard.\n\n"
+                "Both are bounded by case detection, which this intervention does not "
+                "change: a contact can be listed only if the source was detected and only "
+                "if the contact is still incubating when that happens. Case Finding and "
+                "Isolation is the lever that moves that bound."
             ),
             target_rates=[], adherence=86.0, transmission_reduction=36.3,
         )
         schema.add_intervention(
             id="case_finding", label="Case Finding and Isolation",
             description=(
-                "Active case finding, alert investigation, more beds and transport. This "
-                "is the lever that reaches what tracing cannot, because it does not "
-                "require the source to have been detected (Legrand 2007 Table 5). Both "
-                "changes propagate to the traced chain, which is held to be at least as "
-                "good as the untraced one. Date-activated, scaled up over the Scale-up "
-                "Period. Its two generic fields carry model-specific meanings:\n\n"
-                "TRANSMISSION REDUCTION = ISOLATED SHARE AFTER INTERVENTION (theta') - "
-                "replaces theta once scaled up, so a value below theta models a "
-                "deterioration. This field does nearly all the work: raising theta from "
-                "26% towards 80% is transformative. Scenario default 80% - a target, not "
-                "a 2026 observation, since only about half of validated suspects are "
-                "transferred and 32% of confirmed cases are first confirmed after "
-                "death.\n\n"
-                "ADHERENCE = REDUCTION IN ONSET-TO-ISOLATION DELAY - a percentage cut in "
-                "the untraced route rate 1/gamma_h. Expect a modest effect: only about a "
-                "quarter of untraced cases are ever isolated, so the realised infectious "
-                "period falls roughly 10% across this field's whole range. It bites much "
-                "harder on the traced chain. Scenario default 25%."
+                "Active search for cases that contact tracing cannot reach: alert "
+                "investigation, community screening, more beds and transport. It does not "
+                "require the case's source to have been detected.\n\n"
+                "ISOLATED SHARE AFTER INTERVENTION replaces theta once scaled up - the "
+                "share of all symptomatic cases ever isolated. A value below theta models "
+                "a deterioration. DELAY REDUCTION is the proportional cut in the "
+                "onset-to-isolation route time. Both are ramped in over the Scale-up "
+                "Period and both propagate to the traced chain, which is held to be at "
+                "least as good as the untraced one."
             ),
             target_rates=[], adherence=25.0, transmission_reduction=80.0,
         )
 
-        # All five are date-activated, so the generic prevalence thresholds are
-        # removed from every form here (see _UNUSED_INTERVENTION_FIELDS). Left on,
-        # they look like a second way to switch an intervention on, and a user who
-        # sets one instead of a start date gets an intervention that never fires -
-        # silently, because nothing reads the field. Same private-list caveat as
-        # the adherence strip above: if the builder renames it, the fields simply
-        # stay on the form and behaviour is unchanged either way.
+        # All five are date-activated, so the model does not declare the generic
+        # prevalence thresholds (see _UNUSED_INTERVENTION_FIELDS). They look like a
+        # second way to switch an intervention on, and a user who sets one instead
+        # of a start date gets an intervention that never fires - silently, because
+        # nothing reads the field. Undeclaring them is the correct statement of
+        # what this model supports; it does NOT remove them from the current
+        # results UI, which renders a fixed form. add_intervention() offers no way
+        # to declare a subset, so this reaches for the builder's private list and
+        # is a no-op if that name ever changes.
         for _intv in getattr(schema, "_interventions", ()):
             _intv.parameters = [
                 _p for _p in _intv.parameters
                 if _p.name not in _UNUSED_INTERVENTION_FIELDS
             ]
+            # and give the two generic fields their real names (see _FIELD_LABELS)
+            for _p in _intv.parameters:
+                _label = _FIELD_LABELS.get(_intv.id, {}).get(_p.name)
+                if _label:
+                    _p.label = _label
 
     # ------------------------------------------------------------------
     # Initial state
@@ -994,16 +840,18 @@ class EbolaSeihfrTracingLaiModel(Model):
                 reads the disease parameters, transmission edges, interventions
                 and admin zones from it and sets ``self.compartment_list``.
         """
-        # Pin adherence at 100% for Legrand's single-effect interventions, whatever
-        # the config says or omits, so the framework's
-        # rate x (1 - adherence x reduction) collapses to rate x (1 - z).
-        # This has to happen BEFORE super().__init__(), which builds the runtime
-        # Intervention objects from intervention_dict and copies the value out of
-        # it; changing the dict afterwards would have no effect. The control run
-        # passes an empty intervention_dict, which this leaves alone.
+        # Supply the missing coverage rather than let it read as zero. The three
+        # transmission interventions take coverage x effectiveness, and the
+        # framework turns an absent adherence_min into 0.0, which would silently
+        # disable the intervention instead of leaving it at full coverage. A
+        # value that IS given is honoured. This has to happen BEFORE
+        # super().__init__(), which builds the runtime Intervention objects from
+        # intervention_dict and copies the values out of it; changing the dict
+        # afterwards would have no effect. The control run passes an empty
+        # intervention_dict, which this leaves alone.
         for _iid in _SINGLE_EFFECT_INTERVENTIONS:
             _cfg = (config.get("intervention_dict") or {}).get(_iid)
-            if _cfg is not None:
+            if _cfg is not None and _cfg.get("adherence_min") is None:
                 _cfg["adherence_min"] = 1.0
         super().__init__(config)
 
@@ -1130,7 +978,10 @@ class EbolaSeihfrTracingLaiModel(Model):
         ):
             _r, _iv = self._ramp(_iid, t, _days)
             if _iv is not None:
-                _f = 1.0 - _r * _iv.transmission_reduction
+                # coverage x effectiveness, as in the framework's own
+                # rate x (1 - adherence x reduction). The product is the share
+                # of that route's transmission prevented.
+                _f = 1.0 - _r * _iv.adherence * _iv.transmission_reduction
                 if _key == "betaI":
                     bI = bI * _f
                 elif _key == "betaH":
@@ -1253,12 +1104,12 @@ class EbolaSeihfrTracingLaiModel(Model):
         fields explicitly::
 
             iv = {i.id: i for i in model.interventions}
-            z = lambda k: iv[k].transmission_reduction
+            z = lambda k: iv[k].adherence * iv[k].transmission_reduction
             model.reproduction_numbers(
                 betaI=model.betaI * (1 - z("community_intervention")),
                 betaH=model.betaH * (1 - z("hospital_intervention")),
                 betaF=model.betaF * (1 - z("funeral_intervention")),
-                completeness=z("contact_tracing"),
+                completeness=iv["contact_tracing"].transmission_reduction,
                 follow_up=iv["contact_tracing"].adherence)
 
         Every Rc quoted in model.md is computed that way (see ``_post`` in the
