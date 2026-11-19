@@ -1,0 +1,176 @@
+{
+    "start_date": "2017-10-22",
+    "end_date": "2018-02-04",
+    "run_mode": "DETERMINISTIC",
+    "simulation_type": "COMPARTMENTAL",
+    "Disease": {
+        "disease_type": "cholera_svirb_ocv_maity",
+        "beta_e": 0.0082857,
+        "nu": 0.257143,
+        "treatment_days": 3.0,
+        "xi": 10.0,
+        "bacteria_lifetime": 30.0,
+        "half_saturation": 1000000.0,
+        "life_expectancy": 43.5,
+        "vaccine_efficacy": 67.0,
+        "time_to_protection": 7.0
+    },
+    "TransmissionEdges": {
+        "items": [
+            {
+                "transmission_edge": {
+                    "source": "susceptible",
+                    "target": "infected",
+                    "value_type": "RATE"
+                },
+                "value": 2e-07,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "BETA_H"
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "susceptible",
+                    "target": "vaccinated",
+                    "value_type": "RATE"
+                },
+                "value": 0.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "PHI"
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "vaccinated",
+                    "target": "susceptible",
+                    "value_type": "DAYS"
+                },
+                "value": 912.5,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "ALPHA"
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "infected",
+                    "target": "recovered",
+                    "value_type": "DAYS"
+                },
+                "value": 5.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "GAMMA"
+                        }
+                    ]
+                }
+            },
+            {
+                "transmission_edge": {
+                    "source": "recovered",
+                    "target": "susceptible",
+                    "value_type": "DAYS"
+                },
+                "value": 730.0,
+                "FieldConfigs": {
+                    "items": [
+                        {
+                            "field_key": "value",
+                            "has_variance": false,
+                            "distribution_type": "UNIFORM",
+                            "disease_param": "OMEGA"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "Interventions": {
+        "items": [
+            {
+                "Intervention": {
+                    "name": "treatment",
+                    "display_name": "Treatment (case management)"
+                },
+                "start_date": "2017-10-22",
+                "end_date": "2018-02-04"
+            },
+            {
+                "Intervention": {
+                    "name": "water_measures",
+                    "display_name": "Safe water & sanitation (environment-to-human)"
+                },
+                "adherence_min": 100.0,
+                "transmission_percentage": 16.0,
+                "start_date": "2017-12-28",
+                "end_date": "2018-02-04"
+            },
+            {
+                "Intervention": {
+                    "name": "contact_measures",
+                    "display_name": "Hygiene & contact measures (human-to-human)"
+                },
+                "adherence_min": 100.0,
+                "transmission_percentage": 16.0,
+                "start_date": "2017-12-28",
+                "end_date": "2018-02-04"
+            },
+            {
+                "Intervention": {
+                    "name": "bacteria_removal",
+                    "display_name": "Bacteria removal from water (sanitation, nu)"
+                },
+                "start_date": "2017-10-22",
+                "end_date": "2018-02-04"
+            },
+            {
+                "Intervention": {
+                    "name": "ocv_campaign",
+                    "display_name": "Reactive OCV campaign"
+                },
+                "start_date": "2018-01-10",
+                "end_date": "2018-01-20",
+                "adherence_min": 98.4892,
+                "transmission_percentage": 9.84892
+            }
+        ]
+    },
+    "case_file": {
+        "admin_zones": [
+            {
+                "name": "Lusaka (population at risk)",
+                "center_lat": -15.4167,
+                "center_lon": 28.2833,
+                "population": 1339513,
+                "infected_population": 0.00025535,
+                "vaccinated_population": 0.0,
+                "initial_water_mode": "Balanced with starting cases",
+                "bacteria_concentration": 0.0
+            }
+        ]
+    }
+}
