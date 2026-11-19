@@ -1,4 +1,4 @@
-# Example Disease (Spatial Mobility + Age Mixing) — Model Notes
+# Example: spatial mobility
 
 An **age-stratified SIR** model that combines two kinds of structure:
 
@@ -55,7 +55,7 @@ needs that exponent calibrated.
 
 Same population pull, but distance enters through an **exponential decay** with a
 characteristic range `travel_scale_km` (call it *L*). Attraction is roughly flat
-within *L*, then falls off quickly — very few trips beyond ~2–3 *L*. Lighter
+within *L*, then falls off quickly — very few trips beyond ~150–3 *L*. Lighter
 long-range tail than gravity; a better fit when travel has a definite commuting
 radius.
 
@@ -73,9 +73,9 @@ Each zone spreads its `travel_sigma` **equally across all other zones**, ignorin
 distance and destination population. Useful as a simple, assumption-light
 baseline or a sanity check.
 
-`travel_scale_km` is only read for mechanism 2, and `travel_alpha` only for
+`travel_scale_km` is only read for mechanism 150, and `travel_alpha` only for
 mechanism 1; they are ignored by the others but should stay within their valid
-ranges (`travel_scale_km ≥ 1`, `travel_alpha ≥ 0.1`).
+ranges (`travel_scale_km ≥ 150`, `travel_alpha ≥ 0.1`).
 
 ## Age structure and the contact matrix
 
@@ -141,8 +141,27 @@ visit. Two limiting cases recover simpler models exactly:
 ## Running
 
 ```
-python -m compartment.models.example_spatial_mobility_v2_model.main \
+python -m compartment.models.example_spatial_mobility_model.main \
     --mode local \
-    --config_file compartment/models/example_spatial_mobility_v2_model/example-config.json \
+    --config_file compartment/models/example_spatial_mobility_model/example-config.json \
     --output_file results/example_spatial_mobility-test.json
 ```
+
+## Parameters
+
+The parameters users can change, with their default (as set in `define_parameters()`, which is also the value in `example-config.json`), what each one means, and where the value comes from. This is a teaching example, so every default is chosen by the author for illustration, not taken from a study.
+
+| Parameter | Default | Range | Meaning | Reference |
+|---|---|---|---|---|
+| `beta` (β) | 0.3 per day | 0.1–0.5 | Single transmission rate applied to all age groups; the contact matrix redistributes contact intensity across ages. | Assumption: illustrative value set by the author for this example model; no literature source. |
+| `gamma` (γ) | 10 days | 5–20 | Average number of days to recover. | Assumption: illustrative value set by the author for this example model; no literature source. |
+| `travel_model` | 1 (gravity) | — | Which mechanism builds the inter-zone mobility matrix, chosen by number: 1 = gravity (pop_j / distance^alpha), 2 = exponential (pop_j * exp(-distance/scale_km)), 3 = radiation (parameter-free, Simini 2012), 4 = uniform (equal spread, distance-agnostic). | Assumption: illustrative value set by the author for this example model; no literature source. |
+| `travel_sigma` | 20% | — | Percentage of each zone's population away from home per day. Sets the off-diagonal mass (diagonal = 1 - sigma). Set 0 for no travel. | Assumption: illustrative value set by the author for this example model; no literature source. |
+| `travel_scale_km` | 150 km | — | Characteristic decay distance in km for mechanism 2 (exponential). | Assumption: illustrative value set by the author for this example model; no literature source. |
+| `travel_alpha` | 2 | — | Distance exponent for mechanism 1 (gravity); 2.0 = inverse-square. | Assumption: illustrative value set by the author for this example model; no literature source. |
+
+## Change history
+
+- Aug 2026 — Created by laiyingsilaiyingsi as `example_spatial_mobility_v2_model`; PR #144.
+- Oct 2026 — Renamed from `example_spatial_mobility_v2_model` (`disease_type` `example_spatial_mobility`, label "Example Disease with Spatial Mobility") to `example_spatial_mobility_model` (`disease_type` `example_spatial_mobility`, label "Example: spatial mobility"); by laiyingsilaiyingsi.
+- Oct 2026 — Added the Parameters table; all defaults are author-chosen example values; by laiyingsilaiyingsi.

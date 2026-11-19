@@ -1,13 +1,17 @@
 """Stochastic SEIHFR Ebola model — community / hospital / burial routes.
 
-Stochastic (demographic-noise) counterpart of ``ebola_test_model``, both ported
-from
+Author: Yingsi Lai.
+
+Stochastic (demographic-noise) counterpart of ``ebola_seihfr_burial_legrand_model``, both ported
+from the notebook ``ebola_SEIHFR_model.ipynb``. Model structure and DRC 1995
+parameter values are based on
 
     Legrand J, Grais RF, Boelle PY, Valleron AJ, Flahault A.
     "Understanding the dynamics of Ebola epidemics."
     Epidemiol Infect. 2007;135(4):610-621. doi:10.1017/S0950268806007217
 
-and its source notebook ``ebola_SEIHFR_model.ipynb``. The paper's model is
+The source of each default parameter value is documented in ``model.md``
+("Parameters" table, and "Differences from Legrand 2007"). The paper's model is
 stochastic — *"Simulations of the model were performed using Gillespie's first
 reaction method"* — with the eight transitions of its Table 2.
 
@@ -22,7 +26,7 @@ destinations (I -> H/R/F, H -> R/F) are split multinomially in the ratio of the
 destination hazards. This
 
   * conserves the population exactly (draws are bounded by the source count),
-  * reproduces the observed hospitalisation proportion ``theta`` and
+  * reproduces the target hospitalisation proportion ``theta`` and
     case-fatality ratio ``delta`` on expectation (the routing split preserves
     ``theta1``/``delta1``/``delta2``), and
   * matches the deterministic model's mean trajectory.
@@ -34,11 +38,10 @@ probability), see the standalone ``ebola_seihfr_gillespie.py`` /
 ``model.md``.
 
 Compartments: S, E, I, H, F, R (+ cumulative ``_total`` trackers).
-Defaults are the DRC (Kikwit) 1995 preset (Zaire EBOV), matching ``ebola_test_model``.
+Defaults are the DRC (Kikwit) 1995 preset (Zaire EBOV), matching ``ebola_seihfr_burial_legrand_model``.
 """
 
 import logging
-import time
 
 import numpy as np
 
@@ -48,8 +51,8 @@ from compartment.parameters import CompartmentDef
 logger = logging.getLogger(__name__)
 
 
-class EbolaTestStochasticModel(Model):
-    """Stochastic SEIHFR Ebola model (chain-binomial tau-leap; Legrand et al. 2007)."""
+class EbolaSeihfrStochasticLaiModel(Model):
+    """Stochastic SEIHFR Ebola model by Yingsi Lai (chain-binomial tau-leap; based on Legrand et al. 2007)."""
 
     # Fixed-step Euler + multi-trajectory median/interval output.
     STOCHASTIC = True
@@ -57,14 +60,14 @@ class EbolaTestStochasticModel(Model):
     # Number of stochastic trajectories reported as a median + 95% band. This is
     # the fallback default; Model.__init_subclass__ overwrites it with
     # schema.num_runs, i.e. the default of the ``num_runs`` parameter declared in
-    # define_parameters() (also 100). The framework caps the effective count at
-    # 100. Change the trajectory count via that parameter / the config, not here.
-    NUM_RUNS = 100
+    # define_parameters() (30; allowed range 10-100). Change the trajectory count
+    # via that parameter / the config, not here.
+    NUM_RUNS = 30
 
     # Cumulative inflow trackers. Declared explicitly (rather than relying on the
     # framework's per-edge auto-generation) and assigned in equation(), because
     # most of the inflows they track are manual multi-rate event draws, not
-    # transmission edges. Same pattern as ebola_test_model.
+    # transmission edges. Same pattern as ebola_seihfr_burial_legrand_model.
     _TOTAL_COMPARTMENTS = (
         ("E_total", "Exposed Total",
          "Cumulative number of individuals ever exposed (cumulative infections)."),
@@ -93,34 +96,47 @@ class EbolaTestStochasticModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
-        """Declare compartments, edges, disease parameters, and interventions."""
+        """Declare compartments, edges, disease parameters, and interventions.
+
+        Args:
+            schema (ParameterSchemaBuilder): builder to fill in.
+        """
         schema.set_model_info(
-            disease_type="ebola_seihfr_stochastic_lai_v1",
-            label="ebola_seihfr_stochastic_lai_v1",
+            disease_type="ebola_seihfr_stochastic_lai",
+            label="Ebola – SEIHFR, stochastic (Lai 2026)",
             description=(
                 "Stochastic (chain-binomial tau-leap) SEIHFR model of Ebola virus "
                 "disease with explicit community, hospital, and traditional-burial "
-                "transmission routes, based on Legrand et al. (Epidemiol. Infect. "
+                "transmission routes, built by Yingsi Lai. Model structure and "
+                "parameter values are based on Legrand et al. (Epidemiol. Infect. "
                 "2007). Demographic-noise counterpart of the deterministic "
-                "ebola_test model. Defaults are the DRC (Kikwit) 1995 preset."
+                "ebola_seihfr_burial_legrand_model. Defaults are the DRC (Kikwit) 1995 preset; see "
+                "model.md for the source of each default and where they differ "
+                "from the paper."
             ),
         )
 
         schema.set_model_metadata(
             authors=[
                 {
-                    "name": "Judith Legrand, R F Grais, P Y Boelle, A J Valleron, A Flahault",
-                    "affiliation": "INSERM UMR-S 707 / Universite Pierre et Marie Curie",
+                    "name": "Yingsi Lai",
+                    "affiliation": "NA",
                 }
             ],
-            license="N/A (public research model; see paper for terms)",
+            license="Apache-2.0",
             citations=[
                 "Legrand J, Grais RF, Boelle PY, Valleron AJ, Flahault A. "
                 "Understanding the dynamics of Ebola epidemics. "
                 "Epidemiol Infect. 2007;135(4):610-621. "
-                "doi:10.1017/S0950268806007217"
+                "https://doi.org/10.1017/S0950268806007217 "
+                "-- model structure and DRC 1995 parameter values (Tables 3-4).",
+                "Khan AS, et al. The reemergence of Ebola hemorrhagic fever, "
+                "Democratic Republic of the Congo, 1995. "
+                "J Infect Dis. 1999;179(Suppl 1):S76-S86. "
+                "https://doi.org/10.1086/514306 "
+                "-- primary data source for the DRC 1995 defaults, via Legrand et al.",
             ],
-            model_type="Compartmental",
+            model_type="Compartmental (SEIHFR, stochastic chain-binomial tau-leap)",
             diseases=["Ebola virus disease"],
             transmission_routes=[
                 "Direct contact (community)",
@@ -128,22 +144,89 @@ class EbolaTestStochasticModel(Model):
                 "Traditional burial",
             ],
             questions_answered=[
-                "How much do community, hospital, and burial transmission each contribute to R0?",
-                "How does the timing and strength of control interventions change epidemic size?",
-                "How likely is a small introduction to fade out, and how variable is outbreak size?",
+                "How much do community, hospital, and burial transmission each "
+                "contribute to R0?",
+                "How do the timing and strength of hospital isolation, safe burial, "
+                "and community measures change outbreak size and deaths?",
             ],
             key_assumptions=[
-                "Homogeneous mixing within a closed population (no age/spatial structure).",
+                "Homogeneous mixing within a single closed population (no age or "
+                "spatial structure, no importations after the seed cases).",
                 "No background births or deaths; the population is conserved (Ebola "
                 "deaths pass through F to the removed class R).",
                 "Entire population initially susceptible apart from the seed cases.",
-                "Interventions activate as a step function on their start date and, "
-                "with a null end date, remain active thereafter.",
-                "Frequency-dependent force of infection.",
+                "Frequency-dependent force of infection with three routes: "
+                "community (I), hospital (H), and traditional burial (F).",
+                "Hospitalised proportion (theta) and case-fatality ratio (delta) are "
+                "fixed for the whole simulation; interventions change only the "
+                "transmission coefficients.",
+                "Interventions activate as a step function on their start date (fully "
+                "effective immediately) and, with a null end date, remain active "
+                "thereafter.",
                 "Demographic stochasticity via a chain-binomial tau-leap on a daily "
                 "step; per-transition counts are binomial with probability "
                 "1 - exp(-hazard), multinomially split across competing destinations.",
+                "Default parameters are the Kikwit, DRC 1995 values from Legrand et al. "
+                "2007, except the case-fatality ratio (default 50%; the paper reports "
+                "81%). See model.md.",
             ],
+            applicability=(
+                "Scenario exploration for Ebola outbreaks in a single, well-mixed "
+                "population (e.g. a town or health zone) where community, nosocomial, "
+                "and traditional-burial transmission all matter. Suited to comparing "
+                "the timing and strength of hospital isolation, safe burial, and "
+                "community measures, and to showing the spread of outbreak sizes that "
+                "demographic noise produces. Defaults reproduce the Kikwit, DRC 1995 "
+                "(Zaire ebolavirus) setting of Legrand et al. 2007; other outbreaks "
+                "need their own parameter values."
+            ),
+            not_for=(
+                "Real-time forecasting or operational case projections. Precise "
+                "early-extinction (fade-out) probabilities of small introductions -- "
+                "the daily tau-leap understates them; use the exact Gillespie "
+                "implementation instead. Multi-district, cross-border, or "
+                "mobility-driven spread; age-specific questions; vaccination, "
+                "therapeutics, or contact-tracing capacity, none of which are "
+                "modelled. The no-intervention control run is a relative baseline, "
+                "not a forecast."
+            ),
+            constraints=(
+                "Fixed one-day step (chain-binomial tau-leap), not continuous-time "
+                "Gillespie. Interventions are step changes on the three transmission "
+                "coefficients only. The derived split rates require the survivor "
+                "infectious period (1/gamma_i) and onset-to-death period (1/gamma_d) "
+                "to exceed onset-to-hospitalisation (1/gamma_h). Number of "
+                "trajectories (num_runs) is 10-100, default 30 (about 1 s per "
+                "trajectory per scenario locally). Each trajectory is seeded from "
+                "operating-system entropy, so runs are not reproducible. "
+                "Cumulative _total series are stripped from the per-timestep output "
+                "and appear only as final values in compartment_deltas."
+            ),
+            biases=(
+                "The default case-fatality ratio (50%) is lower than the 81% observed "
+                "in Kikwit 1995, so with defaults deaths and the burial contribution "
+                "to R0 are lower than in the paper's DRC setting. Transmission "
+                "coefficients come from one outbreak and have wide confidence "
+                "intervals (Legrand et al. 2007, Table 4). Step-function "
+                "interventions that act at full strength from day one overstate how "
+                "quickly control takes hold. The daily tau-leap understates fade-out "
+                "of small introductions, so results lean towards outbreaks that take "
+                "off. Homogeneous mixing ignores household and healthcare-worker "
+                "clustering. The unbounded control run gives a much larger attack "
+                "rate than any observed Ebola outbreak."
+            ),
+            validation=(
+                "Internal consistency checks: population is conserved exactly and no "
+                "compartment goes negative on any trajectory; the realised "
+                "case-fatality ratio and hospitalised fraction converge to delta and "
+                "theta; the ensemble mean matches the deterministic ebola_seihfr_burial_legrand_model; "
+                "the mean size of outbreaks that take off agrees with a standalone "
+                "exact-Gillespie implementation. NumPy binomial draws are used because "
+                "jax.random.binomial was found to inflate outbreak size by about 20%. "
+                "The model is not re-fitted: transmission parameters are taken from "
+                "Legrand et al. 2007, who fitted them to the 1995 DRC data, and no "
+                "comparison with the observed Kikwit incidence is part of this model."
+            ),
         )
 
         # --- Compartments --------------------------------------------------
@@ -181,6 +264,8 @@ class EbolaTestStochasticModel(Model):
         # Declared as DAYS so the framework converts the mean duration to a
         # per-day rate at load. The flows themselves are drawn manually in
         # equation(); these edges exist so the rate parameters are defined.
+        # Defaults: Legrand et al. 2007, Table 3 (DRC 1995) — incubation 7 d,
+        # death-to-burial 2 d. Slider ranges are assumptions.
         schema.add_transmission_parameter(
             source="E", target="I",
             variable_name="alpha",
@@ -205,7 +290,8 @@ class EbolaTestStochasticModel(Model):
         )
 
         # --- Disease parameters (multi-rate flows computed manually) -------
-        # Transmission coefficients (per day) = weekly Table 4 value / 7, at full
+        # Transmission coefficients (per day) = weekly Legrand et al. 2007
+        # Table 4 value (DRC 1995, maximum-likelihood estimates) / 7, at full
         # precision: 0.588/7=0.084, 0.794/7=0.1134286, 7.653/7=1.0932857. Do not
         # round to 3 dp (that shifts pre-intervention R0 from 2.694 to 2.692).
         schema.add_parameter(
@@ -252,6 +338,11 @@ class EbolaTestStochasticModel(Model):
         # gamma_ih/gamma_dh split rates. FLOAT (not DAYS) so the fractional
         # gamma_d=9.6 is accepted; days -> per-day-rate conversion is done via
         # self._to_rate(value, ValueType.DAYS) in equation().
+        # Defaults: Legrand et al. 2007, Table 3 (DRC 1995) — onset to
+        # hospitalisation 5 d, onset to end of infectiousness (survivors) 10 d,
+        # onset to death 9.6 d, hospitalised proportion 80%. The case-fatality
+        # default (50%) is NOT the paper's DRC value (81%); see model.md,
+        # "Differences from Legrand 2007". Slider ranges are assumptions.
         schema.add_parameter(
             name="gamma_h",
             label="Onset to Hospitalisation (1/gamma_h, days)",
@@ -323,9 +414,9 @@ class EbolaTestStochasticModel(Model):
         # Number of stochastic trajectories. run_simulation reads this to decide
         # how many runs to average for the median + 95% interval band. The
         # framework derives the class attribute NUM_RUNS from this parameter's
-        # default (Model.__init_subclass__ sets cls.NUM_RUNS = schema.num_runs),
-        # and the framework caps the effective count at 100. Declared exactly as
-        # in example_stochastic_model.
+        # default (Model.__init_subclass__ sets cls.NUM_RUNS = schema.num_runs);
+        # min_value/max_value limit a configured value to 10-100. Declared
+        # exactly as in example_stochastic_model.
         schema.add_parameter(
             name="num_runs",
             label="Number of Stochastic Trajectories",
@@ -342,11 +433,14 @@ class EbolaTestStochasticModel(Model):
         )
 
         # --- Interventions -------------------------------------------------
-        # Each route is scaled independently by z in [0, 1] from its start date.
-        # The framework step intervention applies rate * (1 - adherence *
-        # transmission_reduction); with adherence 100% this is rate * (1 - z),
-        # so transmission_reduction = 1 - z. DRC preset: z_community = 0.50,
-        # z_hospital = 0.0, z_funeral = 0.0.
+        # Each route is scaled independently from its start date. The framework
+        # step intervention applies rate * (1 - adherence * transmission_reduction).
+        # In Legrand et al.'s notation the remaining fraction is z, so
+        # adherence * transmission_reduction = 1 - z. Defaults for all three:
+        # adherence 50%, transmission_reduction 100% -> each targeted beta is
+        # halved once active (z = 0.5). Legrand et al. instead set hospital and
+        # burial transmission to 0 (z = 0) and estimated a 12% community
+        # reduction for DRC 1995; see model.md, "Differences from Legrand 2007".
         schema.add_intervention(
             id="community_intervention",
             label="Community Transmission Control",
@@ -357,27 +451,28 @@ class EbolaTestStochasticModel(Model):
             ),
             target_rates=["betaI"],
             adherence=50.0,
-            transmission_reduction=90.0,
+            transmission_reduction=100.0,
         )
         schema.add_intervention(
             id="hospital_intervention",
             label="Hospital Isolation / Barrier Nursing",
             description=(
                 "Isolation ward and barrier-nursing procedures at the hospital. "
-                "The DRC preset assumes these eliminate hospital transmission once "
-                "active."
+                "With the defaults (50% adherence, 100% reduction) they halve "
+                "hospital transmission once active."
             ),
             target_rates=["betaH"],
             adherence=50.0,
-            transmission_reduction=90.0,
+            transmission_reduction=100.0,
         )
         schema.add_intervention(
             id="funeral_intervention",
             label="Safe Burial Practices",
             description=(
                 "Replacement of traditional burial with safe burial practices "
-                "(e.g. by trained response teams). The DRC preset assumes this "
-                "eliminates funeral transmission once active."
+                "(e.g. by trained response teams). With the defaults (50% "
+                "adherence, 100% reduction) this halves funeral transmission "
+                "once active."
             ),
             target_rates=["betaF"],
             adherence=50.0,
@@ -392,25 +487,19 @@ class EbolaTestStochasticModel(Model):
         """Initialize the model and seed its PRNG for the stochastic draws.
 
         Each trajectory in a stochastic batch is built by re-running ``__init__``
-        (see ``BatchSimulationManager._single_run``), so seeding from system
-        entropy here gives every trajectory an independent random stream. Pass a
-        ``seed`` in the config only for a single reproducible trajectory — a
-        fixed seed makes every trajectory in a batch identical and collapses the
-        interval band.
+        (see ``BatchSimulationManager._single_run``), so seeding from operating-
+        system entropy here gives every trajectory an independent random stream.
 
         Args:
             config: The validated simulation configuration.
         """
         super().__init__(config)
-        seed = config.get("seed") if isinstance(config, dict) else None
-        if seed is None:
-            seed = int(time.time() * 1e6) % (2**31)
         # NumPy Generator gives exact binomial draws. (jax.random.binomial
         # carries a ~1% per-draw bias that compounds over the ~10^3 draws in a
         # run and inflates outbreak size by ~20%; numpy matches the deterministic
         # ODE and the exact-Gillespie reference. The framework's Euler path runs
         # this model in numpy end-to-end, so no JAX is needed here.)
-        self._rng = np.random.default_rng(int(seed))
+        self._rng = np.random.default_rng()
 
     # ------------------------------------------------------------------
     # Simulation setup

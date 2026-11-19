@@ -1,8 +1,7 @@
 import logging
 import argparse
-
 from compartment.driver import drive_simulation
-from compartment.models.age_stratified_sir_model.model import AgeStratifiedSIRModel
+from compartment.models.cholera_svirb_ocv_maity_model.model import CholeraSvirbOcvMaityModel
 
 logging.getLogger("jax").setLevel(logging.WARNING)
 logging.getLogger("jax._src").setLevel(logging.WARNING)
@@ -11,8 +10,17 @@ logger = logging.getLogger(__name__)
 
 
 def lambda_handler(event, context):
+    """Run a simulation job on the platform (AWS Lambda entry point).
+
+    Args:
+        event (dict): Lambda event; must contain ``simulation_job_id``.
+        context (object): Lambda context (unused).
+
+    Returns:
+        None: Results are written by the driver.
+    """
     drive_simulation(
-        model_class=AgeStratifiedSIRModel,
+        model_class=CholeraSvirbOcvMaityModel,
         args={"mode": "cloud", "simulation_job_id": event["simulation_job_id"]},
     )
     return None
@@ -20,7 +28,7 @@ def lambda_handler(event, context):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Run the Age-Stratified SIR simulation with a specified config file"
+        description="Run Cholera – SVIRB, reactive OCV (extends Maity et al. 2023) simulation with specified config file"
     )
     parser.add_argument("--mode", choices=["local", "cloud"], default="local")
     parser.add_argument("--config_file", help="Path to the JSON config file for the simulation")
@@ -37,4 +45,4 @@ if __name__ == "__main__":
         help="Existing simulation job id in a graphql backend.",
     )
     args = parser.parse_args()
-    drive_simulation(model_class=AgeStratifiedSIRModel, args=vars(args))
+    drive_simulation(model_class=CholeraSvirbOcvMaityModel, args=vars(args))

@@ -1,8 +1,7 @@
 """Ebola SEIHFR model with community / hospital / burial transmission routes.
 
-Port of the deterministic mean-field limit of the stochastic compartmental
-model in Legrand J, Grais RF, Boelle PY, Valleron AJ, Flahault A.
-"Understanding the dynamics of Ebola epidemics." Epidemiol Infect.
+Deterministic model based on Legrand J, Grais RF, Boelle PY, Valleron AJ,
+Flahault A. "Understanding the dynamics of Ebola epidemics." Epidemiol Infect.
 2007;135(4):610-621. doi:10.1017/S0950268806007217 (PMC2870608).
 
 The paper splits the infectious period into three phases with distinct
@@ -15,8 +14,7 @@ Compartments: S, E, I, H, F, R.
 Two structural features of the source model don't fit the framework's
 standard "declarative transmission edge" pattern and are therefore
 computed manually in ``equation()`` (see the Pitfalls section of
-``.claude/MODEL_AUTHORING_REFERENCE.md`` for the general pattern, and
-``hantavirus_jax_model`` for a precedent):
+``.claude/MODEL_AUTHORING_REFERENCE.md`` for the general pattern):
 
 1. The force of infection mixes three distinct betas across three
    distinct infectious compartments (community/hospital/funeral) into a
@@ -104,8 +102,8 @@ class EbolaSeihfrBurialLegrandModel(Model):
             schema (ParameterSchemaBuilder): Schema builder to populate.
         """
         schema.set_model_info(
-            disease_type="ebola-seihfr-burial-legrand",
-            label="Ebola (SEIHFR, Community/Hospital/Burial) — Legrand et al. 2007",
+            disease_type="ebola_seihfr_burial_legrand",
+            label="Ebola – SEIHFR, burial (Legrand et al. 2007)",
             description=(
                 "SEIHFR compartmental model of Ebola virus disease with explicit "
                 "community, hospital, and traditional-burial transmission routes, "
@@ -121,14 +119,14 @@ class EbolaSeihfrBurialLegrandModel(Model):
                     "affiliation": "INSERM UMR-S 707 / Universite Pierre et Marie Curie",
                 }
             ],
-            license="N/A (public research model; see paper for terms)",
+            license="Apache-2.0",
             citations=[
                 "Legrand J, Grais RF, Boelle PY, Valleron AJ, Flahault A. "
                 "Understanding the dynamics of Ebola epidemics. "
                 "Epidemiol Infect. 2007;135(4):610-621. "
                 "doi:10.1017/S0950268806007217"
             ],
-            model_type="Compartmental",
+            model_type="Compartmental – SEIHFR, deterministic, traditional-burial transmission",
             diseases=["Ebola virus disease"],
             transmission_routes=["Direct contact (community)", "Nosocomial (hospital)", "Traditional burial"],
             questions_answered=[
@@ -138,11 +136,80 @@ class EbolaSeihfrBurialLegrandModel(Model):
             key_assumptions=[
                 "Homogeneous mixing within the population (no age/spatial structure).",
                 "Entire population initially susceptible.",
-                "Interventions are fully efficient from their start date onward "
+                "Interventions act at full strength from their start date onward "
                 "(step-function activation, not gradual).",
-                "After interventions, hospital and burial transmission are eliminated "
-                "and community transmission is reduced by a fixed factor.",
+                "After interventions, each route's transmission coefficient is reduced "
+                "by a fixed factor (adherence x reduction). The paper eliminates "
+                "hospital and burial transmission; the defaults here halve all three "
+                "(50% adherence x 100% reduction).",
+                "Default parameters are the Kikwit, DRC 1995 values from Legrand et al. "
+                "2007, except the case-fatality ratio (default 50%; the paper reports "
+                "81%) and the intervention strengths. See model.md.",
             ],
+            applicability=(
+                "Scenario exploration for an Ebola outbreak in a single, well-mixed "
+                "population (e.g. a town or health zone) where community, nosocomial, "
+                "and traditional-burial transmission all matter. Suited to "
+                "decomposing R0 into the three routes, comparing the timing and "
+                "strength of hospital isolation, safe burial, and community "
+                "measures, and exploring parameter sensitivity with the framework's "
+                "Latin Hypercube uncertainty mode (close to the paper's own LHS "
+                "method). Defaults are the Kikwit, DRC 1995 setting of Legrand et al. "
+                "2007, apart from the case-fatality ratio and intervention "
+                "strengths; other outbreaks (e.g. Gulu, Uganda 2000) need their own "
+                "values from the paper's Tables 3-4."
+            ),
+            not_for=(
+                "Real-time forecasting or predicting absolute case counts: the "
+                "well-mixed mean-field model predicts a much larger epidemic than the "
+                "~315 cases observed in Kikwit. Outbreak-size variability or the "
+                "chance that a small introduction fades out -- the model is "
+                "deterministic; use ebola_seihfr_stochastic_lai_model instead. "
+                "Spatial, mobility-driven, or age-specific questions; vaccination, "
+                "therapeutics, or contact-tracing capacity, none of which are "
+                "modelled. Faster or more frequent hospitalisation after an "
+                "intervention date, which the framework cannot switch on (see "
+                "model.md). Estimating parameters from data; the model is not fitted."
+            ),
+            constraints=(
+                "Deterministic ODE (mean-field limit of the paper's stochastic "
+                "model), so compartments hold fractional individuals and there is "
+                "no demographic noise. Single population with no travel coupling. "
+                "Interventions can only reduce the three transmission coefficients "
+                "proportionally, as step changes from one start date; they cannot "
+                "change hospitalisation timing or proportion. The derived split "
+                "rates require the survivor infectious period (1/gamma_i) and "
+                "onset-to-death period (1/gamma_d) to exceed onset-to-"
+                "hospitalisation (1/gamma_h). Intended for local experimentation; "
+                "not yet supported by the Pandemic Simulator app."
+            ),
+            biases=(
+                "The default case-fatality ratio (50%) is lower than the 81% observed "
+                "in Kikwit 1995, so deaths and the burial component of R0 are lower "
+                "than in the paper's DRC setting (R0 about 2.0 instead of 2.7). The "
+                "default interventions halve each route, weaker than the paper's "
+                "assumption that hospital and burial transmission are eliminated. "
+                "Homogeneous mixing ignores household and healthcare-worker "
+                "clustering and overstates epidemic size. Transmission coefficients "
+                "come from one outbreak and have wide confidence intervals (Legrand "
+                "et al. 2007, Table 4). Step-function interventions at full strength "
+                "from day one overstate how quickly control takes hold. Being "
+                "deterministic, the model never shows stochastic fade-out, so any "
+                "introduction with R > 1 grows."
+            ),
+            validation=(
+                "Checked against the paper: with the DRC 1995 parameters and "
+                "delta = 81%, the R0 decomposition (community 0.50, hospital 0.42, "
+                "burial 1.77; total 2.69) matches Legrand et al. 2007, Table 4 "
+                "(0.5, 0.4, 1.8; 2.7), and the derived split rates (theta1 = 0.67, "
+                "delta1 = delta2 = 0.80) match Table 3. The over-prediction of "
+                "absolute case counts matches the paper's own Discussion and "
+                "independent teaching material reproducing the same model "
+                "(J. Drake & P. Rohani). The stochastic counterpart "
+                "(ebola_seihfr_stochastic_lai_model) has an ensemble mean that "
+                "matches this model. Not re-fitted and not compared with the "
+                "observed Kikwit incidence."
+            ),
         )
 
         # --- Compartments ---------------------------------------------------
@@ -201,7 +268,9 @@ class EbolaSeihfrBurialLegrandModel(Model):
         # Transmission coefficients. DRC 1995 point estimates from Table 4 of
         # the paper: beta_I=0.588, beta_H=0.794, beta_F=7.653 week^-1,
         # converted here to day^-1 (/7) since the framework's solver runs in
-        # days. 95% CIs (also /7) become default_min/default_max.
+        # days, and rounded to 3 dp. 95% CIs (also /7) become
+        # default_min/default_max: beta_I 0.420-2.191, beta_H 0.001-4.091,
+        # beta_F 0.001-9.997 week^-1.
         schema.add_parameter(
             name="betaI",
             label="Transmission Rate — Community (βI)",
@@ -211,7 +280,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
             ),
             value_type=ValueType.RATE,
             default=0.084,
-            default_min=0.064, default_max=0.104,
+            default_min=0.06, default_max=0.313,
             min_value=0.0, max_value=5.0,
             unit="per day",
         )
@@ -224,7 +293,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
             ),
             value_type=ValueType.RATE,
             default=0.113,
-            default_min=0.07, default_max=0.15,
+            default_min=0.0001, default_max=0.584,
             min_value=0.0, max_value=5.0,
             unit="per day",
         )
@@ -237,13 +306,18 @@ class EbolaSeihfrBurialLegrandModel(Model):
             ),
             value_type=ValueType.RATE,
             default=1.093,
-            default_min=0.08, default_max=1.4,
+            default_min=0.0001, default_max=1.428,
             min_value=0.0, max_value=5.0,
             unit="per day",
         )
 
         # Raw duration/rate parameters that feed the derived theta1/delta1/
         # delta2/gamma_ih/gamma_dh quantities used to split exits from I and H.
+        # Defaults: Legrand et al. 2007, Table 3 (DRC 1995) — onset to
+        # hospitalisation 5 d, onset to end of infectiousness (survivors) 10 d,
+        # onset to death 9.6 d, hospitalised proportion 80%. The case-fatality
+        # default (50%) is NOT the paper's DRC value (81%); see model.md,
+        # "Differences from Legrand 2007". Slider ranges are assumptions.
         # NOTE: these three use ValueType.FLOAT rather than ValueType.DAYS.
         # ValueType.DAYS on add_parameter() (unlike on add_transmission_parameter())
         # maps to a Pydantic *int* field in the auto-generated disease config
@@ -328,7 +402,11 @@ class EbolaSeihfrBurialLegrandModel(Model):
         # fixed factor (assumption d). Three separate interventions are used
         # (rather than one shared one) because the reduction magnitude differs
         # per rate, and add_intervention applies one reduction % to all of its
-        # target_rates.
+        # target_rates. The framework applies rate * (1 - adherence *
+        # transmission_reduction), so the defaults below (50% adherence, 100%
+        # reduction for all three) halve betaI, betaH and betaF once active —
+        # weaker than the paper's DRC scenario (hospital and burial
+        # transmission eliminated, community reduced by 12%); see model.md.
         schema.add_intervention(
             id="community_intervention",
             label="Community Transmission Control",
@@ -339,7 +417,7 @@ class EbolaSeihfrBurialLegrandModel(Model):
             ),
             target_rates=["betaI"],
             adherence=50.0,
-            transmission_reduction=90.0,
+            transmission_reduction=100.0,
         )
         schema.add_intervention(
             id="hospital_intervention",
@@ -347,11 +425,12 @@ class EbolaSeihfrBurialLegrandModel(Model):
             description=(
                 "Isolation ward and barrier-nursing procedures at the hospital. "
                 "The paper assumes these eliminate hospital transmission once "
-                "active."
+                "active; with the defaults (50% adherence, 100% reduction) "
+                "hospital transmission is halved."
             ),
             target_rates=["betaH"],
             adherence=50.0,
-            transmission_reduction=90.0,
+            transmission_reduction=100.0,
         )
         schema.add_intervention(
             id="funeral_intervention",
@@ -359,7 +438,8 @@ class EbolaSeihfrBurialLegrandModel(Model):
             description=(
                 "Replacement of traditional burial with safe burial practices "
                 "(e.g. by trained response teams). The paper assumes this "
-                "eliminates funeral transmission once active."
+                "eliminates funeral transmission once active; with the defaults "
+                "(50% adherence, 100% reduction) funeral transmission is halved."
             ),
             target_rates=["betaF"],
             adherence=50.0,
