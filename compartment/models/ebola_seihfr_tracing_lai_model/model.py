@@ -37,8 +37,6 @@ under follow-up) but wrong for a quarantine-based response such as Kenya's,
 where 92-98.5% of listed contacts were placed in 21-day quarantine. Modelling
 that would need an S_Q compartment; see model.md.
 
-WARNING: intended for local experimentation; not yet supported by the
-Pandemic Simulator app.
 """
 
 import logging
