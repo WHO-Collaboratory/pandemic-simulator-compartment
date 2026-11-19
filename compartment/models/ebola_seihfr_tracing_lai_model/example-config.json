@@ -1,0 +1,119 @@
+{
+  "start_date": "2026-05-14",
+  "end_date": "2027-05-14",
+  "Disease": {
+    "disease_type": "ebola_seihfr_tracing_lai",
+    "betaI": 0.1638,
+    "betaH": 0.0247,
+    "betaF": 0.6354,
+    "gamma_h": 7.0,
+    "gamma_i": 12.0,
+    "gamma_d": 11.0,
+    "theta_target": 26.0,
+    "delta_target": 29.0,
+    "cfr_ratio_comm": 100.0,
+    "s_iso": 100.0,
+    "gamma_h_t": 4.7,
+    "theta_t_target": 80.0,
+    "kappa_t": 100.0,
+    "cfr_or_day": 1.11,
+    "listing_delay": 1.0,
+    "p_notify": 57.0,
+    "p_notify_t": 67.0,
+    "p_detect_rec": 5.0,
+    "ramp_days": 7.0,
+    "community_ramp_days": 95.0,
+    "hospital_ramp_days": 95.0,
+    "funeral_ramp_days": 95.0
+  },
+  "TransmissionEdges": {
+    "items": [
+      {
+        "transmission_edge": {
+          "source": "E",
+          "target": "I",
+          "value_type": "DAYS"
+        },
+        "value": 8.0,
+        "FieldConfigs": {
+          "items": [
+            {
+              "field_key": "value",
+              "has_variance": false,
+              "distribution_type": "UNIFORM",
+              "disease_param": "ALPHA"
+            }
+          ]
+        }
+      },
+      {
+        "transmission_edge": {
+          "source": "F",
+          "target": "D",
+          "value_type": "DAYS"
+        },
+        "value": 2.0,
+        "FieldConfigs": {
+          "items": [
+            {
+              "field_key": "value",
+              "has_variance": false,
+              "distribution_type": "UNIFORM",
+              "disease_param": "GAMMA_F"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "Interventions": {
+    "items": [
+      {
+        "Intervention": {
+          "name": "community_intervention",
+          "display_name": "Community Transmission Control"
+        },
+        "transmission_percentage": 58.3,
+        "start_date": "2026-05-15",
+        "end_date": null
+      },
+      {
+        "Intervention": {
+          "name": "hospital_intervention",
+          "display_name": "Isolation-Unit Infection Control"
+        },
+        "transmission_percentage": 40.0,
+        "start_date": "2026-05-15",
+        "end_date": null
+      },
+      {
+        "Intervention": {
+          "name": "funeral_intervention",
+          "display_name": "Safe and Dignified Burials"
+        },
+        "transmission_percentage": 56.0,
+        "start_date": "2026-05-15",
+        "end_date": null
+      },
+      {
+        "Intervention": {
+          "name": "contact_tracing",
+          "display_name": "Contact Tracing and Follow-up"
+        },
+        "transmission_percentage": 36.3,
+        "start_date": "2026-05-15",
+        "end_date": null,
+        "adherence_min": 86.0
+      }
+    ]
+  },
+  "admin_zones": [
+    {
+      "name": "Ituri, DRC",
+      "center_lat": 1.5597,
+      "center_lon": 30.2458,
+      "population": 5700000,
+      "infected_population": 0.00605263
+    }
+  ]
+}
