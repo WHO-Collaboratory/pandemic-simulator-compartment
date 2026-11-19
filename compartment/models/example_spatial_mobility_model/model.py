@@ -50,11 +50,98 @@ class ExampleSpatialMobilityModel(Model):
 
     @classmethod
     def define_parameters(cls, schema):
-        """Declare compartments, transmission edges, mobility, and demographics."""
+        """Declare compartments, transmission edges, mobility, and demographics.
+
+        Args:
+            schema (ParameterSchemaBuilder): builder to fill in.
+        """
         schema.set_model_info(
             disease_type="example_spatial_mobility",
-            label="Example Disease with Spatial Mobility",
+            label="Example: spatial mobility",
             description="A spatial, age-structured SIR model with selectable inter-zone mobility, contact-matrix age mixing, and a single transmission rate",
+        )
+
+        schema.set_model_metadata(
+            authors=[{"name": "Yingsi Lai", "affiliation": "NA"}],
+            license="Apache-2.0",
+            citations=[
+                "Prem K, Zandvoort KV, Klepac P, Eggo RM, Davies NG, CMMID COVID-19 "
+                "Working Group, Cook AR, Jit M. Projecting contact matrices in 177 "
+                "geographical regions: an update and comparison with empirical data "
+                "for the COVID-19 era. PLoS Comput Biol. 2021;17(7):e1009098. "
+                "doi:10.1371/journal.pcbi.1009098 -- age contact matrices.",
+                "Simini F, Gonzalez MC, Maritan A, Barabasi AL. A universal model for "
+                "mobility and migration patterns. Nature. 2012;484(7392):96-100. "
+                "doi:10.1038/nature10856 -- radiation mobility model (mechanism 3).",
+            ],
+            model_type=(
+                "Compartmental - SIR, deterministic, spatial metapopulation with "
+                "age structure"
+            ),
+            diseases=["Example disease (not disease-specific)"],
+            transmission_routes=[
+                "Direct person-to-person contact (frequency-dependent), within and "
+                "between zones through daily travel",
+            ],
+            questions_answered=[
+                "How does the choice of mobility mechanism (gravity, exponential, "
+                "radiation, uniform) change how an epidemic spreads between zones?",
+                "How does the share of people travelling each day (travel_sigma) "
+                "change the timing and spread of the epidemic across zones?",
+                "How do attack rates differ between age groups when they mix "
+                "through a country contact matrix?",
+                "How does an intervention that reduces transmission change the "
+                "epidemic?",
+            ],
+            key_assumptions=[
+                "SIR structure: no latent period, lifelong immunity after recovery, "
+                "no births or deaths.",
+                "Homogeneous mixing within each zone and age group; a single "
+                "transmission rate (beta) for all ages.",
+                "Inter-zone mobility is synthesised from zone populations and "
+                "great-circle distances (no movement data), is row-stochastic so "
+                "each zone's population is conserved, and is constant over time.",
+                "Age mixing uses the country's Prem 2021 synthetic contact matrix, "
+                "normalised by its spectral radius so it only redistributes risk "
+                "across ages; it is constant over time.",
+                "Interventions reduce beta as a step function between their start "
+                "and end dates.",
+            ],
+            applicability=(
+                "A teaching example and template for building spatial, "
+                "age-structured models in the framework. Suited to exploring, "
+                "qualitatively, how mobility mechanisms, travel volume, age mixing "
+                "and a transmission-reducing intervention shape an epidemic across "
+                "several admin zones. Parameter values are illustrative, chosen by "
+                "the author, and not calibrated to any disease."
+            ),
+            not_for=(
+                "Decisions about any real disease or outbreak, or forecasting; the "
+                "defaults are illustrative and not calibrated. Diseases that need a "
+                "latent period, waning immunity, or vector or environmental "
+                "transmission. Settings where observed mobility data should be used "
+                "instead of a synthetic mobility matrix."
+            ),
+            constraints=(
+                "travel_model must be an integer 1-4. Mobility only has an effect "
+                "with two or more admin zones. travel_scale_km is used only by mechanism 2 and "
+                "travel_alpha only by mechanism 1. If no contact matrix is "
+                "available, age groups mix as an identity matrix (no cross-age "
+                "mixing). Parameter uncertainty uses UNIFORM distributions only. "
+                "The standard results JSON sums over age groups; per-age results "
+                "need the solver's age-resolved array."
+            ),
+            biases=(
+                "Synthetic mobility ignores real transport networks and borders. "
+                "The gravity kernel has a heavy long-distance tail that can "
+                "overstate long-range travel; the radiation model can underestimate "
+                "long, sparse flows. The Prem 2021 contact matrices are synthetic "
+                "projections, not measured contacts. A single beta ignores age "
+                "differences in susceptibility and infectiousness."
+            ),
+            validation=(
+                "Not validated against data: it is an illustrative example."
+            ),
         )
 
         # --- Compartments ---
@@ -108,6 +195,7 @@ class ExampleSpatialMobilityModel(Model):
             max_value=4,
             required=False,
             enable_variance=False,
+            unit="dimensionless",
         )
         schema.add_parameter(
             name="travel_sigma",
@@ -146,6 +234,7 @@ class ExampleSpatialMobilityModel(Model):
             max_value=5.0,
             required=False,
             enable_variance=False,
+            unit="dimensionless",
         )
 
         # --- Optional: interventions ---
@@ -175,7 +264,14 @@ class ExampleSpatialMobilityModel(Model):
     # ------------------------------------------------------------------
 
     def build_travel_matrix(self, admin_zones):
-        """Return the (R, R) row-stochastic presence matrix for the chosen model."""
+        """Return the (R, R) row-stochastic presence matrix for the chosen model.
+
+        Args:
+            admin_zones (list[dict]): admin zones with population and coordinates.
+
+        Returns:
+            np.ndarray: travel matrix.
+        """
         n = len(admin_zones)
         choice = int(getattr(self, "travel_model", 1) or 1)
         model = self.TRAVEL_MODEL_CHOICES.get(choice)
@@ -317,6 +413,11 @@ class ExampleSpatialMobilityModel(Model):
         State rows are shaped ``(age groups, zones)``. Space is coupled by the
         presence travel matrix ``T`` and age by the normalised contact matrix
         ``M``; a single scalar ``beta`` sets the transmission scale.
+
+        Args:
+            y (jnp.ndarray): current compartment values.
+            t (float): time in days since the start date.
+            p (tuple): packed parameters.
         """
         C = self.COMPARTMENTS
         params = self._unpack_params(p)
