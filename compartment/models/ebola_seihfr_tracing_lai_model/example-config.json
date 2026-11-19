@@ -75,7 +75,8 @@
         },
         "transmission_percentage": 58.3,
         "start_date": "2026-05-15",
-        "end_date": null
+        "end_date": null,
+        "adherence_min": 100.0
       },
       {
         "Intervention": {
@@ -84,16 +85,18 @@
         },
         "transmission_percentage": 40.0,
         "start_date": "2026-05-15",
-        "end_date": null
+        "end_date": null,
+        "adherence_min": 100.0
       },
       {
         "Intervention": {
           "name": "funeral_intervention",
           "display_name": "Safe and Dignified Burials"
         },
-        "transmission_percentage": 56.0,
+        "transmission_percentage": 80.0,
         "start_date": "2026-05-15",
-        "end_date": null
+        "end_date": null,
+        "adherence_min": 70.0
       },
       {
         "Intervention": {
